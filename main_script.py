@@ -46,7 +46,7 @@ from veloce_reduction.wavelength_solution import get_wavelength_solution, get_si
 
 
 #haehaehae
-#haehaehae2
+#haehaehae222222
 
 #path = '/Users/christoph/UNSW/veloce_spectra/test1/'
 #path = '/Users/christoph/UNSW/veloce_spectra/test2/'
