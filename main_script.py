@@ -24,7 +24,7 @@ from matplotlib.colors import LogNorm
 from readcol import readcol
 #from mpl_toolkits.mplot3d import Axes3D
 
-#from barycorrpy.barycorrpy.barycorrpy import get_BC_vel
+from barycorrpy import get_BC_vel
 from veloce_reduction.helper_functions import *
 
 from veloce_reduction.get_info_from_headers import identify_obstypes, short_filenames
@@ -51,7 +51,7 @@ from veloce_reduction.wavelength_solution import get_wavelength_solution, get_si
 #path = '/Users/christoph/UNSW/veloce_spectra/test1/'
 #path = '/Users/christoph/UNSW/veloce_spectra/test2/'
 #path = '/Users/christoph/UNSW/veloce_spectra/bias_test/'
-path = '/Users/christoph/UNSW/veloce_spectra/test_20180517/'
+path = '/Users/christoph/UNSW/veloce_spectra/test_20180517/
 
 #####################################################################################################################################################
 # (0) identify bias / darks / whites / thoriums / stellar exposures etc. based on information in header
