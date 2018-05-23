@@ -45,11 +45,11 @@ from veloce_reduction.wavelength_solution import get_wavelength_solution, get_si
 
 
 
-#haehaehae
+#haehaehaexxx
 #haehaehae2222223333333
 
 #path = '/Users/christoph/OneDrive - UNSW/veloce_spectra/test1/'
-#path = '/Users/christoph/OneDreive - UNSW/veloce_spectra/test2/'
+#path = '/Users/christoph/OneDrive - UNSW/veloce_spectra/test2/'
 #path = '/Users/christoph/OneDrive - UNSW/veloce_spectra/bias_test/'
 path = '/Users/christoph/OneDrive - UNSW/veloce_spectra/test_20180517/'
 
