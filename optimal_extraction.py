@@ -10,7 +10,7 @@ from veloce_reduction.order_tracing import *
 from veloce_reduction.spatial_profiles import fit_single_fibre_profile
 
 #read in polynomial coefficients of best-fit individual-fibre-profile parameters
-fibparms = np.load('/Users/christoph/UNSW/fibre_profiles/sim/fibparms_by_ord.npy').item()
+fibparms = np.load('/Users/christoph/OneDrive - UNSW/fibre_profiles/sim/fibparms_by_ord.npy').item()
 
 
 
@@ -110,9 +110,9 @@ def optimal_extraction(img, P_id, stripes, stripe_indices, gain=1., RON=4., slit
         start_time = time.time()
     
     #read in polynomial coefficients of best-fit individual-fibre-profile parameters
-    #fibparms = np.load('/Users/christoph/UNSW/fibre_profiles/sim/fibparms_by_ord.npy').item()
-    #fibparms = np.load('/Users/christoph/UNSW/fibre_profiles/real/first_real_veloce_test_fps.npy').item()
-    fibparms = np.load('/Users/christoph/UNSW/fibre_profiles/real/from_master_white_40orders.npy').item()
+    #fibparms = np.load('/Users/christoph/OneDrive - UNSW/fibre_profiles/sim/fibparms_by_ord.npy').item()
+    #fibparms = np.load('/Users/christoph/OneDrive - UNSW/fibre_profiles/real/first_real_veloce_test_fps.npy').item()
+    fibparms = np.load('/Users/christoph/OneDrive - UNSW/fibre_profiles/real/from_master_white_40orders.npy').item()
     #nfib = len(fibparms['order_01'])
     nfib = 19
     

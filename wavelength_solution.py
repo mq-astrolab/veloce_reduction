@@ -20,11 +20,11 @@ from astropy.modeling import models, fitting
 from mpl_toolkits import mplot3d
 
 from veloce_reduction.helper_functions import *
-from readcol import *
+from readcol import readcol
 
 
-# thardata = np.load('/Users/christoph/UNSW/rvtest/thardata.npy').item()
-# laserdata = np.load('/Users/christoph/UNSW/rvtest/laserdata.npy').item()
+# thardata = np.load('/Users/christoph/OneDrive - UNSW/rvtest/thardata.npy').item()
+# laserdata = np.load('/Users/christoph/OneDrive - UNSW/rvtest/laserdata.npy').item()
 # thdata = thardata['flux']['order_01']
 # ldata = laserdata['flux']['order_01']
 
@@ -267,7 +267,7 @@ def fit_emission_lines(data, fitwidth=4, thresh = 5000., bgthresh = 2000., maxth
 ###########################################
 
 # ###########################################
-# thar_refwlord01, thar_relintord01, flag = readcol('/Users/christoph/UNSW/linelists/test_thar_list_order_01.dat',fsep=';',twod=False)
+# thar_refwlord01, thar_relintord01, flag = readcol('/Users/christoph/OneDrive - UNSW/linelists/test_thar_list_order_01.dat',fsep=';',twod=False)
 # thar_refwlord01 *= 1e3
 # refdata = {}
 # refdata['order_01'] = {}
@@ -318,12 +318,12 @@ def get_dispsol_from_thar(thardata, refdata, deg_polynomial=5, timit=False, verb
 # #################################################################
 # # the following is needed as input for "get_dispsol_from_laser" #
 # #################################################################
-# laser_ref_wl,laser_relint = readcol('/Users/christoph/UNSW/linelists/laser_linelist_25GHz.dat',fsep=';',twod=False)
+# laser_ref_wl,laser_relint = readcol('/Users/christoph/OneDrive - UNSW/linelists/laser_linelist_25GHz.dat',fsep=';',twod=False)
 # laser_ref_wl *= 1e3
 # 
 # #wavelength solution from HDF file
 # #read dispersion solution from file
-# dispsol = np.load('/Users/christoph/UNSW/dispsol/mean_dispsol_by_orders_from_zemax.npy').item()
+# dispsol = np.load('/Users/christoph/OneDrive - UNSW/dispsol/mean_dispsol_by_orders_from_zemax.npy').item()
 # #read extracted spectrum from files (obviously this needs to be improved)
 # xx = np.arange(4096)
 # #this is so as to match the order number with the physical order number (66 <= m <= 108)
@@ -346,7 +346,7 @@ def get_dispsol_from_laser(laserdata, laser_ref_wl, deg_polynomial=5, timit=Fals
         stats = {}
 
     #read in mask for fibre_01 (ie the Laser-comb fibre) from order_tracing as a first step in excluding low-flux regions
-    mask_01 = np.load('/Users/christoph/UNSW/fibre_profiles/masks/mask_01.npy').item()
+    mask_01 = np.load('/Users/christoph/OneDrive - UNSW/fibre_profiles/masks/mask_01.npy').item()
 
     laser_dispsol = {}
     
@@ -560,10 +560,10 @@ def fit_dispsol_2D(x_norm, ord_norm, WL, weights=None, polytype = 'chebyshev', p
 
 
 
-# dispsol = np.load('/Users/christoph/UNSW/dispsol/lab_tests/thar_dispsol.npy').item()
-# fitshapes = np.load('/Users/christoph/UNSW/dispsol/lab_tests/fitshapes.npy').item() 
-# wavelengths = np.load('/Users/christoph/UNSW/dispsol/lab_tests/wavelengths.npy').item()
-# wl_ref = np.load('/Users/christoph/UNSW/linelists/AAT_folder/wl_ref.npy').item()
+# dispsol = np.load('/Users/christoph/OneDrive - UNSW/dispsol/lab_tests/thar_dispsol.npy').item()
+# fitshapes = np.load('/Users/christoph/OneDrive - UNSW/dispsol/lab_tests/fitshapes.npy').item()
+# wavelengths = np.load('/Users/christoph/OneDrive - UNSW/dispsol/lab_tests/wavelengths.npy').item()
+# wl_ref = np.load('/Users/christoph/OneDrive - UNSW/linelists/AAT_folder/wl_ref.npy').item()
 # x = np.array([])
 # m = np.array([])
 # wl = np.array([])
@@ -609,11 +609,11 @@ def get_wavelength_solution(thflux, thflux2, poly_deg=5, laser=False, polytype='
         start_time = time.time()
     
     #read in pre-defined thresholds (needed for line identification)
-    thresholds = np.load('/Users/christoph/UNSW/linelists/AAT_folder/thresholds.npy').item()
+    thresholds = np.load('/Users/christoph/OneDrive - UNSW/linelists/AAT_folder/thresholds.npy').item()
     
     #wavelength solution from Zemax as a reference
     if saveplots:
-        zemax_dispsol = np.load('/Users/christoph/UNSW/dispsol/mean_dispsol_by_orders_from_zemax.npy').item()   
+        zemax_dispsol = np.load('/Users/christoph/OneDrive - UNSW/dispsol/mean_dispsol_by_orders_from_zemax.npy').item()
     
     #prepare arrays for fitting
     x = np.array([])
@@ -640,11 +640,11 @@ def get_wavelength_solution(thflux, thflux2, poly_deg=5, laser=False, polytype='
         fitted_line_pos = fit_emission_lines(data,return_all_pars=return_all_pars,varbeta=False,timit=False,verbose=False,thresh=thresholds['thresh'][ord],bgthresh=thresholds['bgthresh'][ord],maxthresh=thresholds['maxthresh'][ord])
         goodpeaks,mostpeaks,allpeaks = find_suitable_peaks(data,thresh=thresholds['thresh'][ord],bgthresh=thresholds['bgthresh'][ord],maxthresh=thresholds['maxthresh'][ord])    
         
-        line_number, refwlord = readcol('/Users/christoph/UNSW/linelists/AAT_folder/ThAr_linelist_order_'+ordnum+'.dat',fsep=';',twod=False)
+        line_number, refwlord = readcol('/Users/christoph/OneDrive - UNSW/linelists/AAT_folder/ThAr_linelist_order_'+ordnum+'.dat',fsep=';',twod=False)
         #lam = refwlord.copy()  
         #wl_ref[ord] = lam
         
-        mask_order = np.load('/Users/christoph/UNSW/linelists/posmasks/mask_order'+ordnum+'.npy')
+        mask_order = np.load('/Users/christoph/OneDrive - UNSW/linelists/posmasks/mask_order'+ordnum+'.npy')
         xord = fitted_line_pos[mask_order]
         #stupid python!?!?!?
         if ordnum == '30':
@@ -692,7 +692,7 @@ def get_wavelength_solution(thflux, thflux2, poly_deg=5, laser=False, polytype='
 #             plt.text(3000,thar_fit(350),'deg_pol = '+str(fitdegpol))
 #             plt.text(3000,thar_fit(100),'RMS = '+str(round(rms, 1))+' m/s')
 #             plt.legend()
-#             plt.savefig('/Users/christoph/UNSW/dispsol/lab_tests/fit_to_order_'+ordnum+'.pdf')
+#             plt.savefig('/Users/christoph/OneDrive - UNSW/dispsol/lab_tests/fit_to_order_'+ordnum+'.pdf')
 #             plt.close(fig1)
 #             
 #             #second figure: spectrum vs fitted dispsol
@@ -703,7 +703,7 @@ def get_wavelength_solution(thflux, thflux2, poly_deg=5, laser=False, polytype='
 #             plt.title('Order '+str(m))
 #             plt.xlabel(ur'wavelength [\u00c5]')
 #             plt.ylabel('counts')
-#             plt.savefig('/Users/christoph/UNSW/dispsol/lab_tests/ThAr_order_'+ordnum+'.pdf')
+#             plt.savefig('/Users/christoph/OneDrive - UNSW/dispsol/lab_tests/ThAr_order_'+ordnum+'.pdf')
 #             plt.close(fig2)
     
     
@@ -725,7 +725,7 @@ def get_wavelength_solution(thflux, thflux2, poly_deg=5, laser=False, polytype='
         now = datetime.datetime.now()
         model_wl = p(x_norm, order_norm)
         resid = wl - model_wl
-        outfn = '/Users/christoph/UNSW/linelists/AAT_folder/lines_used_in_fit_as_of_'+str(now)[:10]+'.dat'
+        outfn = '/Users/christoph/OneDrive - UNSW/linelists/AAT_folder/lines_used_in_fit_as_of_'+str(now)[:10]+'.dat'
         outfn = open(outfn, 'w')
         outfn.write('line number   order_number   physical_order_number     pixel      reference_wl[A]   model_wl[A]    residuals[A]\n')
         outfn.write('=====================================================================================================================\n')
@@ -759,7 +759,7 @@ def get_wavelength_solution(thflux, thflux2, poly_deg=5, laser=False, polytype='
 
 def get_simu_dispsol():
     #read dispersion solution from file
-    dispsol = np.load('/Users/christoph/UNSW/dispsol/mean_dispsol_by_orders_from_zemax.npy').item()
+    dispsol = np.load('/Users/christoph/OneDrive - UNSW/dispsol/mean_dispsol_by_orders_from_zemax.npy').item()
     
     #read extracted spectrum from files (obviously this needs to be improved)
     xx = np.arange(4096)
@@ -774,6 +774,9 @@ def get_simu_dispsol():
         wl['order_'+ordnum] = dispsol['order'+m]['model'](xx)
 
     return wl
+
+
+
 
 
 

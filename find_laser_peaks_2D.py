@@ -39,7 +39,7 @@ ysigma = 0.7             # sigma of 2D-Gaussian PSF in cross-dispersion directio
 boxwidth = 11            # size of box to use for the 2D Gaussian peak fitting
 
 
-imgname = '/Users/christoph/UNSW/simulated_spectra/ES/veloce_laser_comb.fit'
+imgname = '/Users/christoph/OneDrive - UNSW/simulated_spectra/ES/veloce_laser_comb.fit'
 img = pyfits.getdata(imgname) + 1
 testimg = img[250:450,250:450]
 

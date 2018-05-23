@@ -25,8 +25,8 @@ from readcol import readcol
 #from mpl_toolkits.mplot3d import Axes3D
 
 from barycorrpy import get_BC_vel
-from veloce_reduction.helper_functions import *
 
+from veloce_reduction.helper_functions import *
 from veloce_reduction.get_info_from_headers import identify_obstypes, short_filenames
 from veloce_reduction.bias_and_darks import bias_subtraction, dark_subtraction
 from veloce_reduction.create_master_frames import create_master_img
@@ -46,30 +46,30 @@ from veloce_reduction.wavelength_solution import get_wavelength_solution, get_si
 
 
 #haehaehae
-#haehaehae222222
+#haehaehae2222223333333
 
-#path = '/Users/christoph/UNSW/veloce_spectra/test1/'
-#path = '/Users/christoph/UNSW/veloce_spectra/test2/'
-#path = '/Users/christoph/UNSW/veloce_spectra/bias_test/'
-path = '/Users/christoph/UNSW/veloce_spectra/test_20180517/
+#path = '/Users/christoph/OneDrive - UNSW/veloce_spectra/test1/'
+#path = '/Users/christoph/OneDreive - UNSW/veloce_spectra/test2/'
+#path = '/Users/christoph/OneDrive - UNSW/veloce_spectra/bias_test/'
+path = '/Users/christoph/OneDrive - UNSW/veloce_spectra/test_20180517/'
 
 #####################################################################################################################################################
 # (0) identify bias / darks / whites / thoriums / stellar exposures etc. based on information in header
-#imgname = '/Users/christoph/UNSW/simulated_spectra/blue_ghost_spectrum_20170803.fits'
-#imgname = '/Users/christoph/UNSW/simulated_spectra/blue_ghost_spectrum_nothar_highsnr_20170906.fits'
-#imgname = '/Users/christoph/UNSW/simulated_spectra/ES/veloce_flat_t70000_single_fib01.fit'
-#imgname = '/Users/christoph/UNSW/simulated_spectra/ES/veloce_high_SNR_solar_template.fit'
-imgname = '/Users/christoph/UNSW/simulated_spectra/ES/veloce_full_solar_image_with_2calibs.fit'
-imgname2 = '/Users/christoph/UNSW/simulated_spectra/ES/veloce_solar_red100ms.fit'
-imgname3 = '/Users/christoph/UNSW/simulated_spectra/ES/veloce_full_solar_image_with_2calibs_red1000ms.fit'
-#gflatname = '/Users/christoph/UNSW/simulated_spectra/blue_ghost_flat_20170905.fits'
-#flatname = '/Users/christoph/UNSW/simulated_spectra/veloce_flat_highsn2.fit'
-#flatname = '/Users/christoph/UNSW/simulated_spectra/ES/veloce_flat_t70000_single_fib01.fit'
-flatname = '/Users/christoph/UNSW/simulated_spectra/ES/veloce_flat_t70000_nfib19.fit'
-flat02name = '/Users/christoph/UNSW/simulated_spectra/ES/veloce_flat_t70000_single_fib02.fit'
-flat03name = '/Users/christoph/UNSW/simulated_spectra/ES/veloce_flat_t70000_single_fib03.fit'
-flat21name = '/Users/christoph/UNSW/simulated_spectra/ES/veloce_flat_t70000_single_fib21.fit'
-flat22name = '/Users/christoph/UNSW/simulated_spectra/ES/veloce_flat_t70000_single_fib22.fit'
+#imgname = '/Users/christoph/OneDrive - UNSW/simulated_spectra/blue_ghost_spectrum_20170803.fits'
+#imgname = '/Users/christoph/OneDrive - UNSW/simulated_spectra/blue_ghost_spectrum_nothar_highsnr_20170906.fits'
+#imgname = '/Users/christoph/OneDrive - UNSW/simulated_spectra/ES/veloce_flat_t70000_single_fib01.fit'
+#imgname = '/Users/christoph/OneDrive - UNSW/simulated_spectra/ES/veloce_high_SNR_solar_template.fit'
+imgname = '/Users/christoph/OneDrive - UNSW/simulated_spectra/ES/veloce_full_solar_image_with_2calibs.fit'
+imgname2 = '/Users/christoph/OneDrive - UNSW/simulated_spectra/ES/veloce_solar_red100ms.fit'
+imgname3 = '/Users/christoph/OneDrive - UNSW/simulated_spectra/ES/veloce_full_solar_image_with_2calibs_red1000ms.fit'
+#gflatname = '/Users/christoph/OneDrive - UNSW/simulated_spectra/blue_ghost_flat_20170905.fits'
+#flatname = '/Users/christoph/OneDrive - UNSW/simulated_spectra/veloce_flat_highsn2.fit'
+#flatname = '/Users/christoph/OneDrive - UNSW/simulated_spectra/ES/veloce_flat_t70000_single_fib01.fit'
+flatname = '/Users/christoph/OneDrive - UNSW/simulated_spectra/ES/veloce_flat_t70000_nfib19.fit'
+flat02name = '/Users/christoph/OneDrive - UNSW/simulated_spectra/ES/veloce_flat_t70000_single_fib02.fit'
+flat03name = '/Users/christoph/OneDrive - UNSW/simulated_spectra/ES/veloce_flat_t70000_single_fib03.fit'
+flat21name = '/Users/christoph/OneDrive - UNSW/simulated_spectra/ES/veloce_flat_t70000_single_fib21.fit'
+flat22name = '/Users/christoph/OneDrive - UNSW/simulated_spectra/ES/veloce_flat_t70000_single_fib22.fit'
 img = pyfits.getdata(imgname) + 1.
 img2 = pyfits.getdata(imgname2) + 1.
 img3 = pyfits.getdata(imgname3) + 1.
@@ -87,7 +87,7 @@ flatimg = flat + 1.
 
 
 # #eventually this is going to be:
-# path = '/Users/christoph/UNSW/veloce_spectra/test1/'
+# path = '/Users/christoph/OneDrive - UNSW/veloce_spectra/test1/'
 bias_list,dark_list,white_list,thar_list,thxe_list,laser_list,stellar_list = identify_obstypes(path)
 obsnames = short_filenames(stellar_list)
 #####################################################################################################################################################
@@ -225,7 +225,7 @@ for obsname in obsnames:
 
 # (b) Tramline Extraction
 # # identify tramlines for extraction
-# fibre_profiles_01 = np.load('/Users/christoph/UNSW/fibre_profiles/sim/fibre_profiles_01.npy').item()
+# fibre_profiles_01 = np.load('/Users/christoph/OneDrive - UNSW/fibre_profiles/sim/fibre_profiles_01.npy').item()
 # laser_tramlines = find_laser_tramlines(fibre_profiles_01, mask_01)
 # #-----------------------------------------------------------------------------------------------------
 # ####################################################################################################################################
@@ -238,14 +238,14 @@ for obsname in obsnames:
 # # This is only needed once, ie for fitting the fibre profiles, then written to file as it takes ages...                            #
 # # fibre_profiles_** = fit_profiles(img**, P_id_**, stripes_**)                                                                     #
 # ####################################################################################################################################
-# fibre_profiles_02 = np.load('/Users/christoph/UNSW/fibre_profiles/sim/fibre_profiles_02.npy').item()
-# fibre_profiles_03 = np.load('/Users/christoph/UNSW/fibre_profiles/sim/fibre_profiles_03.npy').item()
-# fibre_profiles_21 = np.load('/Users/christoph/UNSW/fibre_profiles/sim/fibre_profiles_21.npy').item()
-# fibre_profiles_22 = np.load('/Users/christoph/UNSW/fibre_profiles/sim/fibre_profiles_22.npy').item()
-# mask_02 = np.load('/Users/christoph/UNSW/fibre_profiles/masks/mask_02.npy').item()
-# mask_03 = np.load('/Users/christoph/UNSW/fibre_profiles/masks/mask_03.npy').item()
-# mask_21 = np.load('/Users/christoph/UNSW/fibre_profiles/masks/mask_21.npy').item()
-# mask_22 = np.load('/Users/christoph/UNSW/fibre_profiles/masks/mask_22.npy').item()
+# fibre_profiles_02 = np.load('/Users/christoph/OneDrive - UNSW/fibre_profiles/sim/fibre_profiles_02.npy').item()
+# fibre_profiles_03 = np.load('/Users/christoph/OneDrive - UNSW/fibre_profiles/sim/fibre_profiles_03.npy').item()
+# fibre_profiles_21 = np.load('/Users/christoph/OneDrive - UNSW/fibre_profiles/sim/fibre_profiles_21.npy').item()
+# fibre_profiles_22 = np.load('/Users/christoph/OneDrive - UNSW/fibre_profiles/sim/fibre_profiles_22.npy').item()
+# mask_02 = np.load('/Users/christoph/OneDrive - UNSW/fibre_profiles/masks/mask_02.npy').item()
+# mask_03 = np.load('/Users/christoph/OneDrive - UNSW/fibre_profiles/masks/mask_03.npy').item()
+# mask_21 = np.load('/Users/christoph/OneDrive - UNSW/fibre_profiles/masks/mask_21.npy').item()
+# mask_22 = np.load('/Users/christoph/OneDrive - UNSW/fibre_profiles/masks/mask_22.npy').item()
 #-----------------------------------------------------------------------------------------------------
 
 tramlines = find_tramlines(fibre_profiles_02, fibre_profiles_03, fibre_profiles_21, fibre_profiles_22, mask_02, mask_03, mask_21, mask_22)
@@ -262,12 +262,12 @@ pix2,flux2,err2 = optimal_extraction(img, P_id, stripes, stripe_indices, RON=4.,
 
 # (10) wavelength calibration #######################################################################################################################
 #### read dispersion solution from file (obviously this is only a temporary crutch)
-####dispsol = np.load('/Users/christoph/UNSW/dispsol/mean_dispsol_by_orders_from_zemax.npy').item()
+####dispsol = np.load('/Users/christoph/OneDrive - UNSW/dispsol/mean_dispsol_by_orders_from_zemax.npy').item()
 # get dispersion solution from laser frequency comb
 #first read extracted laser comb spectrum
-laserdata = np.load('/Users/christoph/UNSW/rvtest/laserdata.npy').item()
+laserdata = np.load('/Users/christoph/OneDrive - UNSW/rvtest/laserdata.npy').item()
 # now read laser_linelist
-laser_ref_wl,laser_relint = readcol('/Users/christoph/UNSW/linelists/laser_linelist_25GHz.dat',fsep=';',twod=False)
+laser_ref_wl,laser_relint = readcol('/Users/christoph/OneDrive - UNSW/linelists/laser_linelist_25GHz.dat',fsep=';',twod=False)
 laser_ref_wl *= 1e3
 
 
