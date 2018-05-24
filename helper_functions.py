@@ -131,10 +131,10 @@ def norm_fibmodel_with_amp_and_offset(x, mu, sigma, amp, beta, offset):
     return amp * fibmodel(x, mu, sigma, beta=beta, alpha=0, norm=1) + offset
 
 def fibmodel_with_amp_and_offset_and_slope(x, mu, sigma, amp, beta, offset, slope):
-    return amp * fibmodel(x, mu, sigma, beta=beta, alpha=0, norm=0) + offset + slope*xarr
+    return amp * fibmodel(x, mu, sigma, beta=beta, alpha=0, norm=0) + offset + slope*x
 
 def gausslike_with_amp_and_offset_and_slope(x, mu, sigma, amp, beta, offset, slope):
-    return amp * fibmodel(x, mu, sigma, beta=beta, alpha=0, norm=0) + offset + slope*xarr
+    return amp * fibmodel(x, mu, sigma, beta=beta, alpha=0, norm=0) + offset + slope*x
 
 
 def blaze(x, alpha, amp, shift):

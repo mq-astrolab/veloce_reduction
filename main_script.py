@@ -39,6 +39,7 @@ from veloce_reduction.quick_extract import quick_extract, quick_extract_from_ind
 from veloce_reduction.collapse_extract import collapse_extract
 from veloce_reduction.optimal_extraction import optimal_extraction
 from veloce_reduction.wavelength_solution import get_wavelength_solution, get_simu_dispsol
+from get_radial_velocity import get_RV_from_xcorr
 
 
 
@@ -116,7 +117,7 @@ np.save(path+'bad_pixel_mask_'+datestring+'.npy', bad_pixel_mask)
 # (2) subtract bias and/or dark frames ##############################################################################################################
 # (i) BIAS 
 # create master bias frame
-MB = create_master_img(bias_list, clip=5., imgtype='bias', remove_outliers=???, norm=True)
+MB = create_master_img(bias_list, clip=5., imgtype='bias', remove_outliers=True, norm=True)
 #for the Veloce lab frames???
 MB = 0.
 #maybe need to estimate the bias from overscan regions!?!?!?
@@ -153,7 +154,7 @@ P,tempmask = find_stripes(MW, deg_polynomial=2, min_peak=0.05, gauss_filter_sigm
 P_id = make_P_id(P)
 mask = make_mask_dict(tempmask)
 # extract stripes of user-defined width from the science image, centred on the polynomial fits defined in step (1)
-flat_stripes,fs_indices = extract_stripes(img, P_id, return_indices=True, slit_height=10)
+flat_stripes,fs_indices = extract_stripes(MW, P_id, return_indices=True, slit_height=10)
 #####################################################################################################################################################
 
 
@@ -186,6 +187,11 @@ ny,nx = MW.shape
 xx = np.arange(nx)    
 yy = np.arange(ny)
 
+#either 1D:
+
+
+#or 2D:
+
 
 #####################################################################################################################################################
 
@@ -211,10 +217,14 @@ for obsname,imgname in zip(obsnames,stellar_list):
 
 # (a) Quick-and-Dirty Extraction
 #pix_quick, flux_quick, err_quick = quick_extract(stripes, slit_height=25, RON=10., gain=1., verbose=False, timit=False)
-quick_extracted = {}
+quick_extracted_raw = {}
 for obsname in obsnames:
-    quick_extracted[obsname] = {}
-    quick_extracted[obsname]['pix'], quick_extracted[obsname]['flux'], quick_extracted[obsname]['err'] = quick_extract(all_stripes[obsname], slit_height=25, RON=1., gain=1., verbose=False, timit=False)
+    quick_extracted_raw[obsname] = {}
+    quick_extracted_raw[obsname]['pix'], quick_extracted_raw[obsname]['flux'], quick_extracted_raw[obsname]['err'] = quick_extract(all_stripes[obsname], slit_height=25, RON=1., gain=1., verbose=False, timit=False)
+#extract Master White as well
+#flat_pix_quick, flat_flux_quick, flat_err_quick = quick_extract(flat_stripes, slit_height=25, RON=1., gain=1., verbose=False, timit=False)
+quick_extracted_raw['MW'] = {}
+quick_extracted_raw['MW']['pix'], quick_extracted_raw['MW']['flux'], quick_extracted_raw['MW']['err'] = quick_extract(flat_stripes, slit_height=25, RON=1., gain=1., verbose=False, timit=False)
 #this works fine as well, but is a factor of ~2 slower:
 #pix_quick_fi, flux_quick_fi, err_quick_fi = quick_extract_from_indices(img, stripe_indices, slit_height=25, RON=10., gain=1., verbose=False, timit=False)
 #calculate mean SNR of observation
@@ -286,14 +296,31 @@ pwl,wl = get_wavelength_solution(thflux, thflux2, poly_deg=5, laser=False, polyt
 
 #add wavelength solution to extracted spectra dictionaries
 for obsname in obsnames:
-    quick_extracted[obsname]['wl'] = wl
+    quick_extracted_raw[obsname]['wl'] = wl
+quick_extracted_raw['MW']['wl'] = wl
 
+
+#if flat quick-extract or collapse-extract has been performed, do the flat-fielding in 1D now
+filtered_flat, pix_sens = onedim_pixtopix_variations(f_flat, filt='g', filter_width=25)
+quick_extracted = quick_extracted_raw.copy()
+#divide by the pixel-to-pixel sensitivity variations
+for key in quick_extracted.keys():
+    for o in quick_extracted['MW']['flux'].keys():
+        quick_extracted[key]['flux'][o] = quick_extracted_raw[key]['flux'][o] / pix_sens[o]
+        
+        
 #####################################################################################################################################################
 
 
 
 # (11) RADIAL VELOCITY ##############################################################################################################################
+#preparations, eg
+# f = quick_extracted['seeing1.0']['flux']
+# err = quick_extracted['seeing1.0']['err']
+# (a) using cross-correlation
+#if using cross-correlation, we need to de-blaze the spectra first
 
+rv,rverr = get_RV_from_xcorr(f,err,template,wl,allmask=mask)
 #####################################################################################################################################################
 
 

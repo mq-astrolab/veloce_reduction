@@ -9,18 +9,18 @@ from scipy import signal
 import matplotlib.pyplot as plt
 import scipy.optimize as op
 from scipy import ndimage
-import lmfit
 import warnings
-from lmfit import parameter, minimizer, Model
-from lmfit.models import LinearModel, GaussianModel
+# import lmfit
+# from lmfit import parameter, minimizer, Model
+# from lmfit.models import LinearModel, GaussianModel
 import time
 import datetime
-from astropy.io import ascii
+#from astropy.io import ascii
 from astropy.modeling import models, fitting
-from mpl_toolkits import mplot3d
+#from mpl_toolkits import mplot3d
 
 from veloce_reduction.helper_functions import *
-from readcol import readcol
+from readcol import readcol 
 
 
 # thardata = np.load('/Users/christoph/OneDrive - UNSW/rvtest/thardata.npy').item()
