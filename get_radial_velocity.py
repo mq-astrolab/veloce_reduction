@@ -81,23 +81,27 @@ for m in range(len(wl)):
     
     
     
-def get_RV_from_xcorr(f, err, f0, wl, osf=2, mask=None, blazefunc=None, filter_width=50, bad_threshold=0.05):    
+    
+    
+def get_RV_from_xcorr(f, err, wl, f0, wl0, mask=None, smoothed_flat=None, osf=2, filter_width=25, bad_threshold=0.05, simu=False, debug_level=0):    
     """
     This routine calculates the radial velocity of an observed spectrum relative to a template using cross-correlation. 
     Note that input spectra should be de-blazed already!!!
     If the mask from "find_stripes" has gaps, do the filtering for each segment independently. If no mask is provided, create a simple one on the fly.
     
     INPUT:
-    'f'            : dictionary containing the observed flux (keys = orders)
-    'err'          : dictionary containing the uncertainties in the observed flux (keys = orders)
-    'f0'           : dictionary containing the template (keys = orders) (errors assumed to be negligible)
-    'osf'          : oversampling factor for the logarithmic wavelength rebinning
-    'mask'         : mask-dictionary from "find_stripes" (keys = orders)
-    'blazefunc'    : ?????
-    'filter_width' : number of pixels to disregard at either end of the order (due to edge effects of the smoothing). Should be >~ 2 * width of kernel of gaussian_filter 
-    
+    'f'             : dictionary containing the observed flux (keys = orders)
+    'err'           : dictionary containing the uncertainties in the observed flux (keys = orders)
+    'wl'            : dictionary containing the wavelengths of the observed spectrum (keys = orders)
+    'f0'            : dictionary containing the template (keys = orders) (errors assumed to be negligible)
+    'wl0'           : dictionary containing the wavelengths of the template spectrum (keys = orders)
+    'mask'          : mask-dictionary from "find_stripes" (keys = orders)
+    'smoothed_flat' : if no mask is provided, need to provide the smoothed_flat, so that a mask can be created on the fly
+    'osf'           : oversampling factor for the logarithmic wavelength rebinning
+    'filter_width'  : width of smoothing filter in pixels; needed b/c of edge effects of the smoothing; number of pixels to disregard should be >~ 2 * width of smoothing kernel  
     'bad_threshold' : if no mask is provided, create a mask that requires the flux in the extracted white to be larger than this fraction of the maximum flux in that order
-    'simu'          : boolean - are you using simulated spectra?
+    'simu'          : boolean - are you using ES simulated spectra?
+    'debug_level'   : boolean - for debugging...
     
     OUTPUT:
     'rv'         : dictionary with the measured RVs for each order
@@ -108,25 +112,32 @@ def get_RV_from_xcorr(f, err, f0, wl, osf=2, mask=None, blazefunc=None, filter_w
     23/05/2018 - .....
     """
     
+    #speed of light in m/s
+    c = 2.99792458e8
+    
     rv = {}
     rverr = {}
     
     #loop over orders
     for ord in sorted(f.iterkeys()):
         
+        if debug_level >= 1:
+            print(ord)
+        
         #only use pixels that have enough signal
         if mask is None:
+            normflat = smoothed_flat[ord]/np.max(smoothed_flat[ord])
             ordmask = np.ones(len(normflat), dtype = bool)
             if np.min(normflat) < bad_threshold:
                 ordmask[normflat < bad_threshold] = False
                 #once the blaze function falls below a certain value, exclude what's outside of that pixel column, even if it's above the threshold again, ie we want to only use a single consecutive region
-                leftmask = ordmask[: len(mask)//2]
+                leftmask = ordmask[: len(ordmask)//2]
                 leftkill_index = [i for i,x in enumerate(leftmask) if not x]
                 try:
                     ordmask[: leftkill_index[0]] = False
                 except:
                     pass
-                rightmask = ordmask[len(mask)//2 :]
+                rightmask = ordmask[len(ordmask)//2 :]
                 rightkill_index = [i for i,x in enumerate(rightmask) if not x]
                 if ord == 'order_01' and simu:
                     try:
@@ -141,26 +152,35 @@ def get_RV_from_xcorr(f, err, f0, wl, osf=2, mask=None, blazefunc=None, filter_w
                     except:
                         pass
         else:
-            ordmask  = mask[ord][::-1]
+            #ordmask  = mask[ord][::-1]
+            ordmask  = mask[ord]
         
         #either way, disregard #(edge_cut) pixels at either end; this is slightly dodgy, but the gaussian filtering above introduces edge effects due to mode='reflect'
-        mask[:2*int(filter_width)] = False
-        mask[-2*int(filter_width):] = False
+        ordmask[:2*int(filter_width)] = False
+        ordmask[-2*int(filter_width):] = False
     
-        f0_unblazed = f0[ord] / np.max(f0[ord]) / normflat   #see COMMENT above
-        f_unblazed = f[ord] / np.max(f[ord]) / normflat
+#         f0_unblazed = f0[ord] / np.max(f0[ord]) / normflat   #see COMMENT above
+#         f_unblazed = f[ord] / np.max(f[ord]) / normflat
         
         #create logarithmic wavelength grid
-        logwl = np.log(ref_wl[ord])
-        logwlgrid = np.linspace(np.min(logwl[mask]), np.max(logwl[mask]), osf*np.sum(mask))
+        #logwl0 = np.log(wl0[ord])
+        logwl = np.log(wl[ord])
+        logwlgrid = np.linspace(np.min(logwl[ordmask]), np.max(logwl[ordmask]), osf*np.sum(ordmask))
         delta_log_wl = logwlgrid[1] - logwlgrid[0]
+        
+        #wavelength array must be increasing for "InterpolatedUnivariateSpline" to work --> turn arrays around if necessary!!!
+        if (np.diff(logwl) < 0).any():
+            logwl = logwl[::-1]
+            ordmask = ordmask[::-1]
+            f0[ord] = f0[ord][::-1]
+            f[ord] = f[ord][::-1]
         
         #rebin spectra onto logarithmic wavelength grid
 #         rebinned_f0 = np.interp(logwlgrid,logwl[mask],f0_unblazed[mask])
 #         rebinned_f = np.interp(logwlgrid,logwl[mask],f_unblazed[mask])
-        spl_ref_f0 = interp.InterpolatedUnivariateSpline(logwl[mask], f0_unblazed[mask], k=3)    #slightly slower than linear, but best performance for cubic spline
+        spl_ref_f0 = interp.InterpolatedUnivariateSpline(logwl[ordmask], f0[ord][ordmask], k=3)    #slightly slower than linear, but best performance for cubic spline
         rebinned_f0 = spl_ref_f0(logwlgrid)
-        spl_ref_f = interp.InterpolatedUnivariateSpline(logwl[mask], f_unblazed[mask], k=3)    #slightly slower than linear, but best performance for cubic spline
+        spl_ref_f = interp.InterpolatedUnivariateSpline(logwl[ordmask], f[ord][ordmask], k=3)    #slightly slower than linear, but best performance for cubic spline
         rebinned_f = spl_ref_f(logwlgrid)
     
         # do we want to cross-correlate the entire order???
@@ -175,9 +195,12 @@ def get_RV_from_xcorr(f, err, f0, wl, osf=2, mask=None, blazefunc=None, filter_w
         #now fit Gaussian to central section of CCF
         fitrangesize = osf*6    #this factor was simply eye-balled
         xrange = np.arange(np.argmax(xc)-fitrangesize, np.argmax(xc)+fitrangesize+1, 1)
-        guess = np.array((np.argmax(xc), 10., (xc[np.argmax(xc)]-xc[np.argmax(xc)-fitrangesize])/np.max(xc), 2., xc[np.argmax(xc)-fitrangesize]/np.max(xc), 0.))
+        #parameters: mu, sigma, amp, beta, offset, slope
+        guess = np.array((np.argmax(xc), 5., (xc[np.argmax(xc)]-xc[np.argmax(xc)-fitrangesize]), 2., xc[np.argmax(xc)-fitrangesize], 0.))
+        #guess = np.array((np.argmax(xc), 10., (xc[np.argmax(xc)]-xc[np.argmax(xc)-fitrangesize])/np.max(xc), 2., xc[np.argmax(xc)-fitrangesize]/np.max(xc), 0.))
         #popt, pcov = op.curve_fit(gaussian_with_offset_and_slope, xrange, xc[np.argmax(xc)-fitrangesize : np.argmax(xc)+fitrangesize+1]/np.max(xc[xrange]), p0=guess)
-        popt, pcov = op.curve_fit(gausslike_with_amp_and_offset_and_slope, xrange, xc[np.argmax(xc)-fitrangesize : np.argmax(xc)+fitrangesize+1]/np.max(xc[xrange]), p0=guess)
+        #popt, pcov = op.curve_fit(gausslike_with_amp_and_offset_and_slope, xrange, xc[xrange]/np.max(xc[xrange]), p0=guess)
+        popt, pcov = op.curve_fit(gausslike_with_amp_and_offset_and_slope, xrange, xc[xrange], p0=guess)
         shift = popt[0]
         shift_err = pcov[0,0]
         #convert to RV in m/s
@@ -203,6 +226,11 @@ def get_RV_from_xcorr(f, err, f0, wl, osf=2, mask=None, blazefunc=None, filter_w
     
 ###COMMENT: the template should be stored in an unblazed way already here
 #loop over orders
+
+
+
+
+
 rv = {}
 rverr = {}
 

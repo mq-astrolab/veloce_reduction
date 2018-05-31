@@ -199,6 +199,9 @@ def spectral_format_with_matrix_links(input_arm):
 
 
 #finding files (needs "import glob, os")
+
+
+
 path = '/Users/christoph/UNSW/simulated_spectra/ES/'
 files = glob.glob(path+"veloce_flat_t70000_single*.fit")
 images={}

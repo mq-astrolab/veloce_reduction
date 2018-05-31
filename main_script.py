@@ -12,6 +12,7 @@ from scipy import signal
 import h5py
 import scipy.sparse as sparse
 import glob
+import copy
 #import logging
 import time
 import datetime
@@ -39,15 +40,12 @@ from veloce_reduction.quick_extract import quick_extract, quick_extract_from_ind
 from veloce_reduction.collapse_extract import collapse_extract
 from veloce_reduction.optimal_extraction import optimal_extraction
 from veloce_reduction.wavelength_solution import get_wavelength_solution, get_simu_dispsol
+from flat_fielding import onedim_pixtopix_variations, deblaze_orders
 from get_radial_velocity import get_RV_from_xcorr
 
 
 
 
-
-#GGGIGGG
-#haehaehaexxx
-#haehaehae2222223333333
 
 #path = '/Users/christoph/OneDrive - UNSW/veloce_spectra/test1/'
 #path = '/Users/christoph/OneDrive - UNSW/veloce_spectra/test2/'
@@ -59,7 +57,8 @@ path = '/Users/christoph/OneDrive - UNSW/veloce_spectra/test_20180517/'
 #imgname = '/Users/christoph/OneDrive - UNSW/simulated_spectra/blue_ghost_spectrum_20170803.fits'
 #imgname = '/Users/christoph/OneDrive - UNSW/simulated_spectra/blue_ghost_spectrum_nothar_highsnr_20170906.fits'
 #imgname = '/Users/christoph/OneDrive - UNSW/simulated_spectra/ES/veloce_flat_t70000_single_fib01.fit'
-#imgname = '/Users/christoph/OneDrive - UNSW/simulated_spectra/ES/veloce_high_SNR_solar_template.fit'
+#template_name = '/Users/christoph/OneDrive - UNSW/simulated_spectra/ES/veloce_high_SNR_solar_template.fit'
+template_name = '/Users/christoph/OneDrive - UNSW/simulated_spectra/ES/solar_template_maxsnr.fit'
 imgname = '/Users/christoph/OneDrive - UNSW/simulated_spectra/ES/veloce_full_solar_image_with_2calibs.fit'
 imgname2 = '/Users/christoph/OneDrive - UNSW/simulated_spectra/ES/veloce_solar_red100ms.fit'
 imgname3 = '/Users/christoph/OneDrive - UNSW/simulated_spectra/ES/veloce_full_solar_image_with_2calibs_red1000ms.fit'
@@ -67,6 +66,8 @@ imgname3 = '/Users/christoph/OneDrive - UNSW/simulated_spectra/ES/veloce_full_so
 #flatname = '/Users/christoph/OneDrive - UNSW/simulated_spectra/veloce_flat_highsn2.fit'
 #flatname = '/Users/christoph/OneDrive - UNSW/simulated_spectra/ES/veloce_flat_t70000_single_fib01.fit'
 flatname = '/Users/christoph/OneDrive - UNSW/simulated_spectra/ES/veloce_flat_t70000_nfib19.fit'
+
+flat15name = '/Users/christoph/OneDrive - UNSW/simulated_spectra/ES/veloce_flat_t70000_single_fib15.fit'
 flat02name = '/Users/christoph/OneDrive - UNSW/simulated_spectra/ES/veloce_flat_t70000_single_fib02.fit'
 flat03name = '/Users/christoph/OneDrive - UNSW/simulated_spectra/ES/veloce_flat_t70000_single_fib03.fit'
 flat21name = '/Users/christoph/OneDrive - UNSW/simulated_spectra/ES/veloce_flat_t70000_single_fib21.fit'
@@ -84,6 +85,7 @@ img03 = flat03 + 1.
 img21 = flat21 + 1.
 img22 = flat22 + 1.
 flatimg = flat + 1.
+temp_img = pyfits.getdata(template_name) + 1.
 
 
 
@@ -205,6 +207,8 @@ yy = np.arange(ny)
 
 # (9) extract spectra ###############################################################################################################################
 # extract stripes of user-defined width from the science image, centred on the polynomial fits defined in step (3)
+template_stripes,template_indices = extract_stripes(temp_img, P_id, return_indices=True, slit_height=25)
+
 all_stripes = {}
 all_stripe_indices = {}
 for obsname,imgname in zip(obsnames,stellar_list):
@@ -217,6 +221,10 @@ for obsname,imgname in zip(obsnames,stellar_list):
 
 # (a) Quick-and-Dirty Extraction
 #pix_quick, flux_quick, err_quick = quick_extract(stripes, slit_height=25, RON=10., gain=1., verbose=False, timit=False)
+#pix_quick_template, flux_quick_template, err_quick_template = quick_extract(template_stripes, slit_height=25, RON=1., gain=1., verbose=False, timit=False)
+quick_extracted_raw['template'] = {}
+quick_extracted_raw['template']['pix'], quick_extracted_raw['template']['flux'], quick_extracted_raw['template']['err'] = quick_extract(template_stripes, slit_height=25, RON=1., gain=1., verbose=False, timit=False)
+
 quick_extracted_raw = {}
 for obsname in obsnames:
     quick_extracted_raw[obsname] = {}
@@ -224,7 +232,7 @@ for obsname in obsnames:
 #extract Master White as well
 #flat_pix_quick, flat_flux_quick, flat_err_quick = quick_extract(flat_stripes, slit_height=25, RON=1., gain=1., verbose=False, timit=False)
 quick_extracted_raw['MW'] = {}
-quick_extracted_raw['MW']['pix'], quick_extracted_raw['MW']['flux'], quick_extracted_raw['MW']['err'] = quick_extract(flat_stripes, slit_height=25, RON=1., gain=1., verbose=False, timit=False)
+quick_extracted_raw['MW']['pix'], quick_extracted_raw['MW']['flux'], quick_extracted_raw['MW']['err'] = quick_extract(flat_stripes, slit_height=10, RON=1., gain=1., verbose=False, timit=False)
 #this works fine as well, but is a factor of ~2 slower:
 #pix_quick_fi, flux_quick_fi, err_quick_fi = quick_extract_from_indices(img, stripe_indices, slit_height=25, RON=10., gain=1., verbose=False, timit=False)
 #calculate mean SNR of observation
@@ -298,15 +306,17 @@ pwl,wl = get_wavelength_solution(thflux, thflux2, poly_deg=5, laser=False, polyt
 for obsname in obsnames:
     quick_extracted_raw[obsname]['wl'] = wl
 quick_extracted_raw['MW']['wl'] = wl
+quick_extracted_raw['template']['wl'] = wl
 
 
 #if flat quick-extract or collapse-extract has been performed, do the flat-fielding in 1D now
-filtered_flat, pix_sens = onedim_pixtopix_variations(f_flat, filt='g', filter_width=25)
-quick_extracted = quick_extracted_raw.copy()
+smoothed_flat, pix_sens = onedim_pixtopix_variations(quick_extracted_raw['MW']['flux'], filt='g', filter_width=25)
+#quick_extracted = quick_extracted_raw.copy()
+quick_extracted = copy.deepcopy(quick_extracted_raw)
 #divide by the pixel-to-pixel sensitivity variations
-for key in quick_extracted.keys():
-    for o in quick_extracted['MW']['flux'].keys():
-        quick_extracted[key]['flux'][o] = quick_extracted_raw[key]['flux'][o] / pix_sens[o]
+for obs in sorted(quick_extracted.keys()):
+    for o in sorted(quick_extracted[obs]['flux'].keys()):
+        quick_extracted[obs]['flux'][o] = quick_extracted_raw[obs]['flux'][o] / pix_sens[o]
         
         
 #####################################################################################################################################################
@@ -314,13 +324,17 @@ for key in quick_extracted.keys():
 
 
 # (11) RADIAL VELOCITY ##############################################################################################################################
-#preparations, eg
-# f = quick_extracted['seeing1.0']['flux']
-# err = quick_extracted['seeing1.0']['err']
-# (a) using cross-correlation
+#preparations, eg:
+f = quick_extracted['seeing1.0']['flux'].copy()
+err = quick_extracted['seeing1.0']['err'].copy()
+f0 = quick_extracted['template']['flux'].copy()
+wl0 = wl.copy()
+#(a) using cross-correlation
 #if using cross-correlation, we need to de-blaze the spectra first
-
-rv,rverr = get_RV_from_xcorr(f,err,template,wl,allmask=mask)
+f_dblz, err_dblz = deblaze_orders(f, wl, smoothed_flat, mask, err=err)
+f0_dblz = deblaze_orders(f0, wl0, smoothed_flat, mask, err=None)
+#call RV routine
+rv,rverr = get_RV_from_xcorr(f_dblz, err_dblz, wl, f0_dblz, wl0, mask=mask, filter_width=25, debug_level=0)     #NOTE: 'filter_width' must be the same as used in 'onedim_pixtopix_variations' above
 #####################################################################################################################################################
 
 

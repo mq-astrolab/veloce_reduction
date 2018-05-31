@@ -40,6 +40,9 @@ def create_master_img(imglist, imgtype='', RON=4., gain=1., clip=5., asint=False
     'diffimg'           : boolean - do you want to save the difference image to a fits file? only works if 'remove_outliers' is also set to TRUE
     'noneg'             : boolean - do you want to allow negative pixel values?
     'timit'             : boolean - measure time taken for completion of function?
+    
+    OUTPUT:
+    'master'            : the master image
     """
     
     if timit:
@@ -53,7 +56,10 @@ def create_master_img(imglist, imgtype='', RON=4., gain=1., clip=5., asint=False
         outie_string = ''
         noneg_string = ''
     
+    while imgtype.lower() not in ['white', 'w', 'dark', 'd', 'bias', 'b']:
+                imgtype = raw_input("WARNING: Image type not specified! What kind of images are they ['(b)ias' / '(d)ark' / '(w)hite']: ")
     
+    #proceed if list is not empty
     if len(imglist) > 0:
         
         if remove_outliers:
@@ -80,45 +86,55 @@ def create_master_img(imglist, imgtype='', RON=4., gain=1., clip=5., asint=False
         
         if remove_outliers:
             medimg = np.median(np.array(allimg),axis=0)
-            #make sure we do not have any negative pixels for the sqrt
-            medimgpos = medimg.copy()
-            medimgpos[medimg < 0] = 0.
-            med_sig_arr = np.sqrt(RON*RON + gain*medimgpos)       #expected STDEV for the median image (from LB Eq 2.1)
-#             rms_arr = np.std(np.array(allimg),axis=0)             #but in the very low SNR regime, this takes over, as med_sig_arr will just be RON, and flag a whole bunch of otherwise good pixels
-#             mydev = np.maximum(med_sig_arr,rms_arr)
-#             #check that the median pixel value does not deviate significantly from the minimum pixel value (unlikely!!!)
-#             minimg = np.amin(allimg,axis=0)
-#             min_sig_arr = np.sqrt(RON*RON + gain*minimg)       #expected STDEV for the minimum image (from LB Eq 2.1)
-#             fu_mask = medimg - minimg > clip*min_sig_arr
-            for n,img in enumerate(allimg): 
-                #outie_mask = np.abs(img - medimg) > clip*med_sig_arr
-                outie_mask = img - medimg > clip*med_sig_arr      #do we only want HIGH outliers, ie cosmics?
-                #save info about which image contributes the outlier pixel using unique binary numbers technique
-                master_outie_mask += (outie_mask * 2**n).astype(int)          
-            #see which image(s) produced the outlier(s) and replace outies by mean of pixel value from remaining images
-            n_outie = np.sum(master_outie_mask > 0)
-            print('Correcting '+str(n_outie)+' outliers...')
-            #loop over all outliers
-            for i,j in zip(np.nonzero(master_outie_mask)[0],np.nonzero(master_outie_mask)[1]):
-                #access binary numbers and retrieve component(s)
-                outnum = binary_indices(master_outie_mask[i,j])   #these are the indices (within allimg) of the images that contain outliers
-                dumix = np.arange(len(imglist))
-                #remove the images containing the outliers in order to compute mean from the remaining images
-                useix = np.delete(dumix,outnum)
-                if diffimg:
-                    diff[i,j] = master[i,j] - ( len(outnum) * np.mean( np.array([allimg[q][i,j] for q in useix]) ) + np.sum( np.array([allimg[q][i,j] for q in useix]) ) )
-                #now replace value in master image by the sum of all pixel values in the unaffected pixels 
-                #plus the number of affected images times the mean of the pixel values in the unaffected images
-                master[i,j] = len(outnum) * np.mean( np.array([allimg[q][i,j] for q in useix]) ) + np.sum( np.array([allimg[q][i,j] for q in useix]) )              
-        
-        if norm:
-            master = master / len(imglist)
-            normstring='_norm'
+            #for bias and dark frames just use the median image; for whitesd use something more sophisticated
+            if imgtype[0] in ['b', 'd']:
+                master = medimg
+            #do THIS for whites
+            else:
+                #make sure we do not have any negative pixels for the sqrt
+                medimgpos = medimg.copy()
+                medimgpos[medimg < 0] = 0.
+                med_sig_arr = np.sqrt(RON*RON + gain*medimgpos)       #expected STDEV for the median image (from LB Eq 2.1)
+    #             rms_arr = np.std(np.array(allimg),axis=0)             #but in the very low SNR regime, this takes over, as med_sig_arr will just be RON, and flag a whole bunch of otherwise good pixels
+    #             mydev = np.maximum(med_sig_arr,rms_arr)
+    #             #check that the median pixel value does not deviate significantly from the minimum pixel value (unlikely!!!)
+    #             minimg = np.amin(allimg,axis=0)
+    #             min_sig_arr = np.sqrt(RON*RON + gain*minimg)       #expected STDEV for the minimum image (from LB Eq 2.1)
+    #             fu_mask = medimg - minimg > clip*min_sig_arr
+                for n,img in enumerate(allimg): 
+                    #outie_mask = np.abs(img - medimg) > clip*med_sig_arr
+                    outie_mask = img - medimg > clip*med_sig_arr      #do we only want HIGH outliers, ie cosmics?
+                    #save info about which image contributes the outlier pixel using unique binary numbers technique
+                    master_outie_mask += (outie_mask * 2**n).astype(int)          
+                #see which image(s) produced the outlier(s) and replace outies by mean of pixel value from remaining images
+                n_outie = np.sum(master_outie_mask > 0)
+                print('Correcting '+str(n_outie)+' outliers...')
+                #loop over all outliers
+                for i,j in zip(np.nonzero(master_outie_mask)[0],np.nonzero(master_outie_mask)[1]):
+                    #access binary numbers and retrieve component(s)
+                    outnum = binary_indices(master_outie_mask[i,j])   #these are the indices (within allimg) of the images that contain outliers
+                    dumix = np.arange(len(imglist))
+                    #remove the images containing the outliers in order to compute mean from the remaining images
+                    useix = np.delete(dumix,outnum)
+                    if diffimg:
+                        diff[i,j] = master[i,j] - ( len(outnum) * np.mean( np.array([allimg[q][i,j] for q in useix]) ) + np.sum( np.array([allimg[q][i,j] for q in useix]) ) )
+                    #now replace value in master image by the sum of all pixel values in the unaffected pixels 
+                    #plus the number of affected images times the mean of the pixel values in the unaffected images
+                    master[i,j] = len(outnum) * np.mean( np.array([allimg[q][i,j] for q in useix]) ) + np.sum( np.array([allimg[q][i,j] for q in useix]) )    
+                    master = master / len(imglist)       
+                       
+        #if not remove outliers, at least divide by number of frames
+        else:
+            master = master / len(imglist) 
+            
+#         if norm:
+#             master = master / len(imglist)
+#             normstring='_norm'
             
         if scalable:
-            if not norm:
-                print('ERROR: "scalable" option has to be set together with "norm" option!!!')
-                return
+#             if not norm:
+#                 print('ERROR: "scalable" option has to be set together with "norm" option!!!')
+#                 return
             texp = pyfits.getval(imglist[0], 'exptime')
             master = master / texp
             normstring = normstring + '_scalable'
@@ -141,8 +157,8 @@ def create_master_img(imglist, imgtype='', RON=4., gain=1., clip=5., asint=False
         if savefile:
             dum = file.split('/') 
             path = file[:-len(dum[-1])]
-            while imgtype.lower() not in ['white','dark','bias']:
-                imgtype = raw_input("WARNING: Image type not specified! What kind of images are they ['white' / 'dark' / 'bias']: ")
+#             while imgtype.lower() not in ['white','dark','bias']:
+#                 imgtype = raw_input("WARNING: Image type not specified! What kind of images are they ['white' / 'dark' / 'bias']: ")
             h['modhist'] = 'MASTER '+imgtype.upper()+' - created '+time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())+' (GMT)'
             pyfits.writeto(path+'master_'+imgtype.lower()+normstring+outie_string+intstring+noneg_string+'.fits', master, h, clobber=True)                    
             

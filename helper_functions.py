@@ -351,19 +351,22 @@ def get_datestring():
 
 
 
-def get_mean_snr(flux,err=None):
+def get_mean_snr(flux, err=None, per_order=False):
     """ 
     Calculate the mean SNR of the extracted 1dim spectrum.
     
     INPUT:
-    'flux'   : the 1dim extracted spectrum
-    'err'    : the corresponding uncertainties (if not provided, the SQRT of the flux is used by default)
+    'flux'      : dictionary of the 1dim extracted spectrum (keys = orders)
+    'err'       : dictionary of the corresponding uncertainties (if not provided, the SQRT of the flux is used by default)
+    'per_order' : boolean - do you want to return the mean SNR of each order? 
     
     OUTPUT:
-    'snr'    : the mean snr (per 'super-pixel' / collapsed pixel) of the input spectrum
+    'snr_ord' : he mean snr (per 'super-pixel' / collapsed pixel) per order
+    'snr'     : the mean snr (per 'super-pixel' / collapsed pixel) of the input spectrum
     
     MODHIST:
     18/05/2018 - CMB create
+    30/05/2018 - CMB added 'per_order' keyword
     """
 
     
@@ -386,7 +389,10 @@ def get_mean_snr(flux,err=None):
     
     snr =  np.mean(snr_ord)
     
-    return snr
+    if per_order:
+        return snr_ord
+    else:
+        return snr
 
 
 

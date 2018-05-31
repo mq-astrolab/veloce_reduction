@@ -28,14 +28,14 @@ def onedim_pixtopix_variations(f_flat, filt='gaussian', filter_width=25):
     
     OUTPUT:
     'pix_sens'      : dictionary of the pixel-to-pixel sensitivities (keys = orders)
-    'filtered_flat' : dictionary of the smoothed (ie filtered) whites (keys = orders)
+    'smoothed_flat' : dictionary of the smoothed (ie filtered) whites (keys = orders)
     
     MODHIST:
     24/05/2018 - CMB create
     """
     
     pix_sens = {}
-    filtered_flat = {}
+    smoothed_flat = {}
     
     while filt.lower() not in ['g','gaussian','s','savgol','m','median']:
         print("ERROR: filter choice not recognised!")
@@ -45,8 +45,8 @@ def onedim_pixtopix_variations(f_flat, filt='gaussian', filter_width=25):
     for ord in sorted(f_flat.keys()): 
         if filt.lower() in ['g','gaussian']:
             #Gaussian filter
-            filtered_flat[ord] = ndimage.gaussian_filter(f_flat[ord], filter_width)    
-            pix_sens[ord] = f_flat[ord] / filtered_flat[ord]
+            smoothed_flat[ord] = ndimage.gaussian_filter(f_flat[ord], filter_width)    
+            pix_sens[ord] = f_flat[ord] / smoothed_flat[ord]
         elif filt.lower() in ['s','savgol']:
             print('WARNING: SavGol filter not implemented yet!!!')
             break
@@ -58,15 +58,37 @@ def onedim_pixtopix_variations(f_flat, filt='gaussian', filter_width=25):
             print("ERROR: filter choice still not recognised!")
             break
         
-    return filtered_flat, pix_sens
+    return smoothed_flat, pix_sens
     
     
     
     
     
-def deblaze_orders(f, filtered_flat, mask=None):
+def deblaze_orders(f, wl, smoothed_flat, mask, err=None, degpol=1, gauss_filter_sigma=3., maxfilter_size=100):
+    
+    f_dblz = {}
+    if err is not None:
+        err_dblz = {}
+    
+    #if using cross-correlation to get RVs, we need to de-blaze the spectra first
+    for o in f.keys():
+        #first, divide by the "blaze-function", ie the smoothed flat, which we got from filtering the MASTER WHITE
+        f_dblz[o] = f[o] / (smoothed_flat[o]/np.max(smoothed_flat[o]))
+        #get rough continuum shape by performing a series of filters
+        cont_rough = ndimage.maximum_filter(ndimage.gaussian_filter(f_dblz[o],gauss_filter_sigma), size=maxfilter_size)
+        #now fit polynomial to that rough continuum
+        p = np.poly1d(np.polyfit(wl[o][mask[o]], cont_rough[mask[o]], degpol))
+        #divide by that polynomial
+        f_dblz[o] = f_dblz[o] / (p(wl[o]) / np.median(p(wl[o])[mask[o]]))
+        #need to treat the error arrays in the same way, as need to keep relative error the same
+        if err is not None:
+            err_dblz[o] = err[o] / (smoothed_flat[o]/np.max(smoothed_flat[o]))
+            err_dblz[o] = err_dblz[o] / (p(wl[o]) / np.median(p(wl[o])[mask[o]]))
 
-    return
+    if err is not None:
+        return f_dblz,err_dblz
+    else:
+        return f_dblz
 
 
 

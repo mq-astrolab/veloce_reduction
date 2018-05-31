@@ -19,7 +19,7 @@ import datetime
 from astropy.modeling import models, fitting
 #from mpl_toolkits import mplot3d
 
-from veloce_reduction.helper_functions import *
+from helper_functions import *
 from readcol import readcol 
 
 
@@ -27,6 +27,8 @@ from readcol import readcol
 # laserdata = np.load('/Users/christoph/OneDrive - UNSW/rvtest/laserdata.npy').item()
 # thdata = thardata['flux']['order_01']
 # ldata = laserdata['flux']['order_01']
+
+
 
 
 
@@ -94,6 +96,8 @@ def find_suitable_peaks(data, thresh = 5000., bgthresh = 2000., gauss_filter_sig
         return goodpeaks, mostpeaks, allpeaks, first_mask, second_mask, third_mask
     else:
         return goodpeaks, mostpeaks, allpeaks
+
+
 
 
 
@@ -264,7 +268,7 @@ def fit_emission_lines(data, fitwidth=4, thresh = 5000., bgthresh = 2000., maxth
 
 
 
-###########################################
+
 
 # ###########################################
 # thar_refwlord01, thar_relintord01, flag = readcol('/Users/christoph/OneDrive - UNSW/linelists/test_thar_list_order_01.dat',fsep=';',twod=False)
@@ -274,6 +278,8 @@ def fit_emission_lines(data, fitwidth=4, thresh = 5000., bgthresh = 2000., maxth
 # refdata['order_01']['wl'] = thar_refwlord01[np.argwhere(flag == ' resolved')][::-1]          #note the array is turned around to match other arrays
 # refdata['order_01']['relint'] = thar_relintord01[np.argwhere(flag == ' resolved')][::-1]     #note the array is turned around to match other arrays
 # ###########################################
+
+
 
 
 
@@ -335,6 +341,8 @@ def get_dispsol_from_thar(thardata, refdata, deg_polynomial=5, timit=False, verb
 #     ordnum = str(int(m)-65).zfill(2)
 #     wl['order_'+ordnum] = dispsol['order'+m]['model'](xx)
     
+
+
 
 
 def get_dispsol_from_laser(laserdata, laser_ref_wl, deg_polynomial=5, timit=False, verbose=False, return_stats=False, varbeta=False):
@@ -474,13 +482,13 @@ def get_dispsol_from_laser(laserdata, laser_ref_wl, deg_polynomial=5, timit=Fals
 
 
 
+###########################################################################################################
 # laser_dispsol2,stats2 = get_dispsol_from_laser(laserdata, laser_ref_wl, verbose=True, timit=True, return_stats=True, deg_polynomial=2)
 # laser_dispsol3,stats3 = get_dispsol_from_laser(laserdata, laser_ref_wl, verbose=True, timit=True, return_stats=True, deg_polynomial=3)
 # laser_dispsol5,stats5 = get_dispsol_from_laser(laserdata, laser_ref_wl, verbose=True, timit=True, return_stats=True, deg_polynomial=5)
 # laser_dispsol11,stats11 = get_dispsol_from_laser(laserdata, laser_ref_wl, verbose=True, timit=True, return_stats=True, deg_polynomial=11)
-
-
 ###########################################################################################################
+
 
 
 
@@ -637,7 +645,7 @@ def get_wavelength_solution(thflux, thflux2, poly_deg=5, laser=False, polytype='
 #             fitted_line_pos,fitted_line_sigma,fitted_line_amp = fit_emission_lines(data,return_all_pars=return_all_pars,varbeta=False,timit=False,verbose=False,thresh=thresholds['thresh'][ord],bgthresh=thresholds['bgthresh'][ord],maxthresh=thresholds['maxthresh'][ord])
 #         else:
 #             fitted_line_pos = fit_emission_lines(data,return_all_pars=return_all_pars,varbeta=False,timit=False,verbose=False,thresh=thresholds['thresh'][ord],bgthresh=thresholds['bgthresh'][ord],maxthresh=thresholds['maxthresh'][ord])
-        fitted_line_pos = fit_emission_lines(data,return_all_pars=return_all_pars,varbeta=False,timit=False,verbose=False,thresh=thresholds['thresh'][ord],bgthresh=thresholds['bgthresh'][ord],maxthresh=thresholds['maxthresh'][ord])
+        fitted_line_pos = fit_emission_lines(data,return_all_pars=False,varbeta=False,timit=False,verbose=False,thresh=thresholds['thresh'][ord],bgthresh=thresholds['bgthresh'][ord],maxthresh=thresholds['maxthresh'][ord])
         goodpeaks,mostpeaks,allpeaks = find_suitable_peaks(data,thresh=thresholds['thresh'][ord],bgthresh=thresholds['bgthresh'][ord],maxthresh=thresholds['maxthresh'][ord])    
         
         line_number, refwlord = readcol('/Users/christoph/OneDrive - UNSW/linelists/AAT_folder/ThAr_linelist_order_'+ordnum+'.dat',fsep=';',twod=False)
@@ -736,7 +744,7 @@ def get_wavelength_solution(thflux, thflux2, poly_deg=5, laser=False, polytype='
 
     if return_full:
         #xx = np.arange(4112)            [already done above]
-        xxn = (xx / ((len(data)-1)/2.)) - 1.
+        xxn = (xx / ((len(xx)-1)/2.)) - 1.
         oo = np.arange(1,len(thflux))
         oon = ((oo-1) / (38./2.)) - 1.        #TEMP, TODO, FUGANDA, PLEASE FIX ME!!!!!
         #oon = ((oo-1) / ((len(thflux)-1)/2.)) - 1.   
