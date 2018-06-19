@@ -324,11 +324,11 @@ def sigma_clip(x,tl,th=None,centre='median'):
     
     
     
-def offset_pseudo_gausslike(x, amp_g, amp_l, mu_g, mu_l, sigma_g, sigma_l, beta):
+def offset_pseudo_gausslike(x, G_amplitude, L_amplitude, G_center, L_center, G_sigma, L_sigma, beta):
     """ similar to Pseudo-Voigt-Model (e.g. see here: https://lmfit.github.io/lmfit-py/builtin_models.html), 
         but allows for offset between two functions and allows for beta to vary """
-    G = amp_g * fibmodel(x, mu_g, sigma_g, beta=beta, alpha=0, norm=1)
-    L = amp_l * sigma_l/((mu_l - sigma_l)**2 + sigma_l**2)
+    G = G_amplitude * fibmodel(x, G_center, G_sigma, beta=beta, alpha=0, norm=1)
+    L = L_amplitude * L_sigma/((L_center - L_sigma)**2 + L_sigma**2)
     return G+L
     
      

@@ -359,7 +359,7 @@ def fit_stacked_single_fibre_profile(grid, data, weights=None, pos=None, model='
     if model.lower() == 'skewgauss':
         parms['amplitude'].set(min=0.)
         parms['sigma'].set(min=0.)
-    if model.lower() == 'offset_pseudo':
+    if model.lower() == 'offset_pseudo_gausslike':
         parms.add('amp_g', guess[2], min=0.)
         parms.add('amp_l', guess[2], min=0.)
         parms.add('mu_g', guess[0], min=guess[0]-3, max=guess[0]+3)
