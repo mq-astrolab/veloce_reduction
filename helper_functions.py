@@ -266,12 +266,12 @@ def find_blaze_peaks(flux,P_id):
 
 
 
-def find_nearest(array,value,return_index=False):
-    idx = (np.abs(array-value)).argmin()
+def find_nearest(arr,value,return_index=False):
+    idx = (np.abs(arr-value)).argmin()
     if return_index:
         return idx
     else:
-        return array[idx]        
+        return arr[idx]        
 
 
 
@@ -290,7 +290,7 @@ def sigma_clip(x,tl,th=None,centre='median'):
     INPUT:
     'x'       : the 1D array to be sigma-clipped
     'tl'      : lower threshold (in terms of sigma)
-    'th'      : higher treshold (in terms of sigma) (if only one threshold is given then th=tl=t)
+    'th'      : higher threshold (in terms of sigma) (if only one threshold is given then th=tl=t)
     'centre'  : method to determine the centre ('median' or 'mean')
     
     OUTPUT:
@@ -312,7 +312,7 @@ def sigma_clip(x,tl,th=None,centre='median'):
             bad_high = clipped - np.mean(clipped) > th*rms 
             bad_low = np.mean(clipped) - clipped > tl*rms 
         else:
-            print'ERORR: Method for computing centre must be "median" or "mean"'
+            print('ERROR: Method for computing centre must be "median" or "mean"')
             return
         goodix = ~bad_high & ~bad_low      
         if np.sum(~goodix) == 0:
@@ -394,6 +394,42 @@ def get_mean_snr(flux, err=None, per_order=False):
     else:
         return snr
 
+
+
+def central_parts_of_mask(mask):
+    """
+    This routine reduces the True parts of an order mask to only the large central posrtion if there are multiple True parts.
+    These are the parts we want to use for the cross-correlation to get RVs.
+    
+    INPUT:
+    'mask'    : mask dictionary from "make_mask_dict" (keys = orders)
+    
+    OUTPUT:
+    'cenmask' : mask containing the central true parts only
+    
+    MODHIST:
+    01/06/2018 - CMB create    
+    """
+    
+    cenmask = {}
+    #loop over all masks
+    for o in sorted(mask.keys()):
+        ordmask = mask[o]
+        if ordmask[len(ordmask)//2]:
+            upstep_locations = np.argwhere(np.diff(ordmask.astype(int))==1)
+            downstep_locations = np.argwhere(np.diff(ordmask.astype(int))==-1)
+            cenmask[o] = ordmask.copy()
+            if len(upstep_locations) >= 1:
+                up = np.squeeze(find_nearest(upstep_locations,len(ordmask)//2,return_index=False))
+                cenmask[o][:up+1] = False
+            if len(downstep_locations) >= 1:
+                down = np.squeeze(find_nearest(downstep_locations,len(ordmask)//2,return_index=False))
+                cenmask[o][down+1:] = False           
+        else:
+            print('ERROR: order centre is masked out!!!')
+            return
+
+    return cenmask
 
 
 

@@ -37,7 +37,7 @@ def determine_spatial_profiles_single_order(sc, sr, ordpol, ordmask=None, model=
     if debug_level >= 1:
         print('Fitting fibre profiles for one order...') 
     #loop over all columns for one order and do the profile fitting
-    #'colfits' is a dictionary, that has 4096 keys. Each key is an instance of the 'ModelResult'-class from the 'lmfit' package
+    #'colfits' is a dictionary, that has npix keys. Each key is an instance of the 'ModelResult'-class from the 'lmfit' package
     colfits = {}
     npix = sc.shape[1]
     

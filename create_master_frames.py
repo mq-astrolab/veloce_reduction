@@ -28,7 +28,7 @@ def create_master_img(imglist, imgtype='', RON=4., gain=1., clip=5., asint=False
     
     INPUT:
     'imglist'           : list of filenames of images to co-add
-    'imgtype'           : ['bias' / 'dark' / 'white'] are valid options
+    'imgtype'           : ['bias' / 'dark' / 'white' / 'stellar'] are valid options
     'RON'               : read-out noise in electrons
     'gain'              : camera gain in electrons per ADU
     'clip'              : threshold for outlier identification (in sigmas above/below median)
@@ -56,8 +56,8 @@ def create_master_img(imglist, imgtype='', RON=4., gain=1., clip=5., asint=False
         outie_string = ''
         noneg_string = ''
     
-    while imgtype.lower() not in ['white', 'w', 'dark', 'd', 'bias', 'b']:
-                imgtype = raw_input("WARNING: Image type not specified! What kind of images are they ['(b)ias' / '(d)ark' / '(w)hite']: ")
+    while imgtype.lower() not in ['white', 'w', 'dark', 'd', 'bias', 'b', 'stellar', 's']:
+                imgtype = raw_input("WARNING: Image type not specified! What kind of images are they ['(b)ias' / '(d)ark' / '(w)hite' / '(s)tellar']: ")
     
     #proceed if list is not empty
     if len(imglist) > 0:
@@ -86,7 +86,7 @@ def create_master_img(imglist, imgtype='', RON=4., gain=1., clip=5., asint=False
         
         if remove_outliers:
             medimg = np.median(np.array(allimg),axis=0)
-            #for bias and dark frames just use the median image; for whitesd use something more sophisticated
+            #for bias and dark frames just use the median image; for whites use something more sophisticated
             if imgtype[0] in ['b', 'd']:
                 master = medimg
             #do THIS for whites

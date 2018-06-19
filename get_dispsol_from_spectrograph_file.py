@@ -10,6 +10,8 @@ import pandas
 import math
 
 
+
+
 def compose_matrix(sx,sy,shear,rot,tx,ty):
     m = np.zeros((3,3))
     m[0,0] = sx * math.cos(rot)
@@ -23,6 +25,8 @@ def compose_matrix(sx,sy,shear,rot,tx,ty):
 
 
 
+
+
 def center(df, width, height):
     m = compose_matrix(df['scale_x'], df['scale_y'], df['shear'], df['rotation'], df['translation_x'], df['translation_y'])
     xy = m.dot([width, height, 1])
@@ -30,7 +34,9 @@ def center(df, width, height):
 
 
 
-def get_dispsol_from_spectrograph_file(spectrograph = '/Users/christoph/UNSW/EchelleSimulator/data/spectrographs/VeloceRosso.hdf',outfn = '/Users/christoph/UNSW/dispsol/dispsol_by_fibres_from_zemax.npy',savefile=False):
+
+
+def get_dispsol_from_spectrograph_file(degpol=5, spectrograph = '/Users/christoph/OneDrive - UNSW/EchelleSimulator/data/spectrographs/VeloceRosso.hdf', outfn = '/Users/christoph/OneDrive - UNSW/dispsol/dispsol_by_fibres_from_zemax.npy',savefile=False):
     
     # overview = pandas.read_hdf(spectrograph)
     # data = pandas.read_hdf(specfn, "fiber_1/order100")
@@ -52,14 +58,14 @@ def get_dispsol_from_spectrograph_file(spectrograph = '/Users/christoph/UNSW/Ech
 #             wl = np.array(f[fibkey][ord]['wavelength']) * 1e3        #wavelength in nm
             
             #read from HDF file        
-            data = pandas.read_hdf('/Users/christoph/UNSW/EchelleSimulator/data/spectrographs/VeloceRosso.hdf', fibkey+"/"+ord).sort_values("wavelength")
-            dum = data.apply(center, axis=1, args=(54, 54))
+            data = pandas.read_hdf('/Users/christoph/OneDrive - UNSW/EchelleSimulator/data/spectrographs/VeloceRosso.hdf', fibkey+"/"+ord).sort_values("wavelength")
+            dum = data.apply(center, axis=1, args=(54, 54))     #the (54,54) represents the central coordinates for each fibre (out of a 108x108 box for some reason...)
             dum = np.array(list(map(list, dum)))
             X = dum[:,0]
             Y = dum[:,1]
             
             wl = data['wavelength'] * 1e3
-            fitparms = np.poly1d(np.polyfit(X, wl, 5))
+            fitparms = np.poly1d(np.polyfit(X, wl, degpol))
             
             dispsol[fibkey][ord] = {'x':X, 'y':Y, 'wl':wl, 'fitparms':fitparms}
             
@@ -70,7 +76,9 @@ def get_dispsol_from_spectrograph_file(spectrograph = '/Users/christoph/UNSW/Ech
 
     
     
-def make_dispsol_by_orders(dispsol,outfn = '/Users/christoph/UNSW/dispsol/dispsol_by_orders_from_zemax.npy',savefile=False):
+    
+    
+def make_dispsol_by_orders(dispsol,outfn = '/Users/christoph/OneDrive - UNSW/dispsol/dispsol_by_orders_from_zemax.npy',savefile=False):
     by_orders = {}
     for fibkey in dispsol.keys():
         for ord in dispsol[fibkey].keys():
@@ -87,11 +95,13 @@ def make_dispsol_by_orders(dispsol,outfn = '/Users/christoph/UNSW/dispsol/dispso
             
     return by_orders    
         
+       
+       
         
         
-def make_final_dispsol(savefile=False,outfn = '/Users/christoph/UNSW/dispsol/mean_dispsol_by_orders_from_zemax.npy'):        
+def make_mean_dispsol(degpol=5, savefile=False, outfn = '/Users/christoph/OneDrive - UNSW/dispsol/mean_dispsol_by_orders_from_zemax.npy'):        
     #dbf = np.load('/Users/christoph/UNSW/dispsol/dispsol_by_fibres_from_zemax.npy').item()
-    dbo = np.load('/Users/christoph/UNSW/dispsol/dispsol_by_orders_from_zemax.npy').item()
+    dbo = np.load('/Users/christoph/OneDrive - UNSW/dispsol/dispsol_by_orders_from_zemax.npy').item()
     
     xx = np.arange(4096)
     
@@ -107,13 +117,15 @@ def make_final_dispsol(savefile=False,outfn = '/Users/christoph/UNSW/dispsol/mea
             xarr = []
             yarr = []
             for fibkey in sorted(dbo[ord].iterkeys()):
-                #only use fibres 3-21 (19 stellar fibres in current pseudo-slit layout)
                 dum = fibkey[-2:]
                 try:
                     fibnum = int(dum)
                 except:
                     fibnum = int(dum[-1])
-                if fibnum in range(3,22):
+#                #only use fibres 3-21 (19 stellar fibres in current pseudo-slit layout)
+#                if fibnum in range(3,22):
+                #UPDATE after pseusolit rearrangement: only use fibres 06-24 (19 stellar fibres in current pseudo-slit layout)
+                if fibnum in range(6,25):
                     xarr.append(dbo[ord][fibkey]['x'][i])
                     yarr.append(dbo[ord][fibkey]['y'][i])
             mean_x[ord].append(np.mean(xarr))
@@ -123,7 +135,7 @@ def make_final_dispsol(savefile=False,outfn = '/Users/christoph/UNSW/dispsol/mea
     mean_dispsol = {}
     
     for ord in dbo.keys(): 
-        fitparms = np.poly1d(np.polyfit(mean_x[ord], dbo[ord]['fiber_1']['wl'], 5))     #this works because all fibres have the same 'wavelength' array
+        fitparms = np.poly1d(np.polyfit(mean_x[ord], dbo[ord]['fiber_1']['wl'], degpol))     #this works because all fibres have the same 'wavelength' array
         x = np.array(mean_x[ord])
         y = np.array(mean_y[ord])
         wl = np.array(dbo[ord]['fiber_1']['wl'])
@@ -139,4 +151,14 @@ def make_final_dispsol(savefile=False,outfn = '/Users/christoph/UNSW/dispsol/mea
     return mean_dispsol    
         
         
-      
+   
+   
+   
+
+
+
+
+
+
+
+

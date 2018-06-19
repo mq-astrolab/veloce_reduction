@@ -68,6 +68,7 @@ imgname3 = '/Users/christoph/OneDrive - UNSW/simulated_spectra/ES/veloce_full_so
 flatname = '/Users/christoph/OneDrive - UNSW/simulated_spectra/ES/veloce_flat_t70000_nfib19.fit'
 
 flat15name = '/Users/christoph/OneDrive - UNSW/simulated_spectra/ES/veloce_flat_t70000_single_fib15.fit'
+
 flat02name = '/Users/christoph/OneDrive - UNSW/simulated_spectra/ES/veloce_flat_t70000_single_fib02.fit'
 flat03name = '/Users/christoph/OneDrive - UNSW/simulated_spectra/ES/veloce_flat_t70000_single_fib03.fit'
 flat21name = '/Users/christoph/OneDrive - UNSW/simulated_spectra/ES/veloce_flat_t70000_single_fib21.fit'
@@ -151,7 +152,7 @@ MW = create_master_img(white_list_bc_dc, clip=5., RON=10., gain=1., imgtype='whi
 
 # (3) order tracing #################################################################################################################################
 # find orders roughly
-P,tempmask = find_stripes(MW, deg_polynomial=2, min_peak=0.05, gauss_filter_sigma=3.)
+P,tempmask = find_stripes(MW, deg_polynomial=2, min_peak=0.05, gauss_filter_sigma=3., simu=True)
 # assign physical diffraction order numbers (this is only a dummy function for now) to order-fit polynomials and bad-region masks
 P_id = make_P_id(P)
 mask = make_mask_dict(tempmask)
@@ -220,12 +221,12 @@ for obsname,imgname in zip(obsnames,stellar_list):
 ### Now extract one-dimensional spectrum via (a) quick-and dirty collapsing of stripes, (b) tramline extraction, or (c) optimal extraction ###
 
 # (a) Quick-and-Dirty Extraction
+quick_extracted_raw = {}
 #pix_quick, flux_quick, err_quick = quick_extract(stripes, slit_height=25, RON=10., gain=1., verbose=False, timit=False)
 #pix_quick_template, flux_quick_template, err_quick_template = quick_extract(template_stripes, slit_height=25, RON=1., gain=1., verbose=False, timit=False)
 quick_extracted_raw['template'] = {}
 quick_extracted_raw['template']['pix'], quick_extracted_raw['template']['flux'], quick_extracted_raw['template']['err'] = quick_extract(template_stripes, slit_height=25, RON=1., gain=1., verbose=False, timit=False)
 
-quick_extracted_raw = {}
 for obsname in obsnames:
     quick_extracted_raw[obsname] = {}
     quick_extracted_raw[obsname]['pix'], quick_extracted_raw[obsname]['flux'], quick_extracted_raw[obsname]['err'] = quick_extract(all_stripes[obsname], slit_height=25, RON=1., gain=1., verbose=False, timit=False)
@@ -324,17 +325,23 @@ for obs in sorted(quick_extracted.keys()):
 
 
 # (11) RADIAL VELOCITY ##############################################################################################################################
-#preparations, eg:
-f = quick_extracted['seeing1.0']['flux'].copy()
-err = quick_extracted['seeing1.0']['err'].copy()
-f0 = quick_extracted['template']['flux'].copy()
-wl0 = wl.copy()
-#(a) using cross-correlation
-#if using cross-correlation, we need to de-blaze the spectra first
-f_dblz, err_dblz = deblaze_orders(f, wl, smoothed_flat, mask, err=err)
-f0_dblz = deblaze_orders(f0, wl0, smoothed_flat, mask, err=None)
-#call RV routine
-rv,rverr = get_RV_from_xcorr(f_dblz, err_dblz, wl, f0_dblz, wl0, mask=mask, filter_width=25, debug_level=0)     #NOTE: 'filter_width' must be the same as used in 'onedim_pixtopix_variations' above
+# #preparations, eg:
+# f = quick_extracted['seeing1.0']['flux'].copy()
+# err = quick_extracted['seeing1.0']['err'].copy()
+# f0 = quick_extracted['template']['flux'].copy()
+# wl0 = wl.copy()
+# #(a) using cross-correlation
+# #if using cross-correlation, we need to de-blaze the spectra first
+# f_dblz, err_dblz = deblaze_orders(f, wl, smoothed_flat, mask, err=err)
+# f0_dblz = deblaze_orders(f0, wl0, smoothed_flat, mask, err=None)
+# #we also only want to use the central TRUE parts of the masks, ie want ONE consecutive stretch per order
+# cenmask = central_parts_of_mask(mask)
+# #call RV routine
+# rv,rverr = get_RV_from_xcorr(f_dblz, err_dblz, wl, f0_dblz, wl0, mask=cenmask, filter_width=25, debug_level=0)     #NOTE: 'filter_width' must be the same as used in 'onedim_pixtopix_variations' above
+
+
+rv,rverr = get_rvs_from_xcorr(quick_extracted, obsnames, mask, smoothed_flat, debug_level=0)
+
 #####################################################################################################################################################
 
 

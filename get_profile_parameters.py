@@ -12,7 +12,7 @@ from veloce_reduction.order_tracing import *
 
 def make_fibparms_by_fib(savefile=True):
 
-    path = '/Users/christoph/UNSW/fibre_profiles/'
+    path = '/Users/christoph/OneDrive - UNSW/fibre_profiles/'
     fp_files = glob.glob(path+"sim/"+"fibre_profiles*.npy")
     #mask_files = glob.glob(path+"masks/"+"mask*.npy")
     
@@ -23,7 +23,7 @@ def make_fibparms_by_fib(savefile=True):
         fib = 'fibre_'+fibnum
         fp = np.load(file).item()
         mask = np.load(path+"masks/"+"mask_"+fibnum+".npy").item()
-        flatname = '/Users/christoph/UNSW/simulated_spectra/ES/veloce_flat_t70000_single_fib'+fibnum+'.fit'
+        flatname = '/Volumes/BERGRAID/data/simu/veloce_flat_t70000_single_fib'+fibnum+'.fit'
         flat = pyfits.getdata(flatname)
         img = flat + 1.
     
@@ -69,7 +69,7 @@ def make_fibparms_by_fib(savefile=True):
             fibparms[fib][ord]['onchip'] = onchip
     
     if savefile:
-        np.save('/Users/christoph/UNSW/fibre_profiles/sim/fibparms_by_fib.npy', fibparms) 
+        np.save('/Users/christoph/OneDrive - UNSW/fibre_profiles/sim/fibparms_by_fib.npy', fibparms) 
     
     return fibparms
 
@@ -89,7 +89,7 @@ def make_fibparms_by_ord(by_fib, savefile=True):
             by_orders[ord][fibkey] = dum
     
     if savefile:
-        np.save('/Users/christoph/UNSW/fibre_profiles/sim/fibparms_by_ord.npy', by_orders) 
+        np.save('/Users/christoph/OneDrive - UNSW/fibre_profiles/sim/fibparms_by_ord.npy', by_orders) 
     
     return by_orders
     

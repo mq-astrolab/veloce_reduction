@@ -7,24 +7,23 @@ Created on 11 May 2018
 
 import numpy as np
 import astropy.io.fits as pyfits
-import time
+#import time
 import os
-
+import scipy.interpolate as interp
 import matplotlib.pyplot as plt
 
 #from matplotlib.colors import LogNorm
 
 from veloce_reduction.helper_functions import get_iterable, find_nearest, get_datestring
-from extract_spectrum import pos
 
-from matplotlib.cm import cmap_d
+#from matplotlib.cm import cmap_d
 from plotting_helpers import circles
 
 # C = []
 # I = []
 # O = []
 # tot = []
-# seeing = np.arange(.5,5,.1)
+# seeing = np.arange(.5,5.1,.1)
 # # for fwhm in seeing:
 # #     fluxes = flux_ratios_from_seeing(fwhm, return_values=True)
 # #     C.append(fluxes[1])
@@ -320,7 +319,8 @@ def plot_pseudoslit(offsets, saveplot=False):
 
 
 
-def make_pseudo_obs(seeing, simpath='/Volumes/BERGRAID/data/simu/', nfib=19, outpath='/Volumes/BERGRAID/data/simu/composite/', savefile=True, verbose=False, debug_level=0, timit=False):    
+def make_pseudo_obs(seeing=None, simpath='/Volumes/BERGRAID/data/simu/', nfib=19, outpath='/Volumes/BERGRAID/data/simu/composite/', fixed_offsets=False, fixoff=0., 
+                    fixed_slitamps=False, slitamps=1., norm_slitamps=False, template=False, add_laser=False, savefile=True, verbose=False, debug_level=0, timit=False):    
     """
     This routine creates simulated observations by 
     (1) calculating the flux-ratios / relative intensities in the individual fibres,
@@ -328,34 +328,66 @@ def make_pseudo_obs(seeing, simpath='/Volumes/BERGRAID/data/simu/', nfib=19, out
     (3) adding together the individual-fibre spectra from my EchelleSimulator library using the appropriate relative intensities.
     
     INPUT:
-    'seeing'      : FWHM values of desired simulated seeing condition(s) - can be scalar or array
-    'simpath'     : path to my EchelleSimulator spectrum library
-    'nfib'        : the number of (stellar) fibres to use
-    'outpath'     : root-directory for the output files (sub-directories will be created every time this routine is run because of the random-normal pseudo-slit alignments)
-    'savefile'    : boolean - do you want to save the simulated spectra as FITS files?
-    'verbose'     : boolean - for debugging...
-    'debug_level' : boolean - for debugging...
-    'timit'       : boolean - do you want to time the execution time?
+    'seeing'           : FWHM values of desired simulated seeing condition(s) - can be scalar or array
+    'simpath'          : path to my EchelleSimulator spectrum library
+    'nfib'             : the number of (stellar) fibres to use
+    'outpath'          : root-directory for the output files (sub-directories will be created every time this routine is run because of the random-normal pseudo-slit alignments)
+    'fixed_offsets'    : boolean - do you want to simulate fibre-offsets in dispersion direction for the pseudoslit? (set to TRUE if you don't want to simulate offsets, but rather use a constant offset 'fixoff' for all fibres)
+    'fixoff'           : constant offset for all fibres (only used if 'fixed_offsets' is set to TRUE)
+    'fixed_slitamps'   : boolean - do you want to simulate the effect of seeing or provide fixed relative intensities? (if TRUE, the relative intensities are taken from 'slitamps'; if set to FALSE
+                         the relative intensities are calculated using the provided seeing values)     
+    'slitamps'         : constant slitamps for all fibres (=relative intensities) (only used if 'fixed_slitamps' is set to TRUE)
+    'norm_slitamps'    : boolean - do you want to 'normalize' the slitamps so they add up to 1? (only used if 'fixed_slitamps' is set to TRUE)     
+    'template'         : boolean - is this going to be a template? in that case use the 'maxsnr' spectra...
+    'add_laser'        : boolean - do you want to add the LFC in fibre 1?
+    'savefile'         : boolean - do you want to save the simulated spectra as FITS files?
+    'verbose'          : boolean - for debugging...
+    'debug_level'      : boolean - for debugging...
+    'timit'            : boolean - do you want to clock the run-time?
     
     OUTPUT:
-    'master_dict' : dictionary containing the simulated spectra for all seeing values (only if the 'savefile' keyword is not set)
+    'master_dict'      : dictionary containing the simulated spectra for all seeing values (only if the 'savefile' keyword is not set)
     
-    TODO: add SNR   -   for now this is for a given (fixed) observing time, i.e. the total flux captured by the IFU drops as the seeing increases
+    TODO: 
+    add SNR   -   for now this is for a given (fixed) observing time, i.e. the total flux captured by the IFU drops as the seeing increases
     
     MODHIST:
     16/05/2018 - CMB create
+    08/06/2018 - CMB added 'add_laser' keyword; also changed the addition of 1 to the first image only
+    13/06/2018 - CMB added 'template' keyword (uses the 'maxsnr' simulated spectra)
+    14/06/2018 - CMB added "slitamps.txt" output file; also added 'fixed_slitamps', 'slitamps', and 'norm_slitamps' keywords
     """
     
     ##### (1) #####
-    #first, calculate flux_ratios (ie relative intensities) for the different fibres from given seeing
-    fr = flux_ratios_from_seeing(seeing, verbose=verbose)
-    
-    #then get an array of the relative intensities in the pseudo-slit
-    slitamps = get_pseudo_slitamps(fr['central'], fr['inner'], fr['outer1'], fr['outer2'])
+    if not fixed_slitamps:
+        if seeing is not None:
+            #first, calculate flux_ratios (ie relative intensities) for the different fibres from given seeing
+            fr = flux_ratios_from_seeing(seeing, verbose=verbose)
+            #then get an array of the relative intensities in the pseudo-slit
+            slitamps = get_pseudo_slitamps(fr['central'], fr['inner'], fr['outer1'], fr['outer2'])
+        else:
+            print('ERROR: "fixed_slitamps" = False, but seeing not provided!!!')
+            return
+    else:
+        if len(get_iterable(slitamps))==1:
+            slitamps = np.repeat(slitamps, nfib).astype(float)
+#         #reshape to accommodate the possibility of having multiple seeing condittions below
+#         slitamps = np.reshape(slitamps, (19,1))
+        if norm_slitamps:
+            slitamps = slitamps.astype(float) / np.sum(slitamps)
     
     ##### (2) #####
     #simulate fibre-offsets by using RV offsets
-    offsets = make_pseudoslits()
+    if not fixed_offsets:
+        offsets = make_pseudoslits()
+    else:
+        if len(get_iterable(fixoff))==1:
+            offsets = np.repeat(fixoff, nfib)
+        elif len(get_iterable(fixoff))==nfib:
+            offsets = np.array(fixoff)
+        else:
+            print('ERROR! input values for fibre offsets do not have correct length')
+            return
     
     if debug_level >= 1:
         plot_pseudoslit(offsets)
@@ -367,13 +399,191 @@ def make_pseudo_obs(seeing, simpath='/Volumes/BERGRAID/data/simu/', nfib=19, out
     redblue[offsets > 0] = 'red'
     redblue[offsets < 0] = 'blue'
     redblue[offsets == 0] = ''
+    if add_laser:
+        laserstr = '_laser'
+    else:
+        laserstr = ''
+    if template:
+        tstring = '_template'
+        maxsnr_string = '_maxsnr'
+    else:
+        tstring = ''
+        maxsnr_string = ''
+    
+    if savefile:
+        #create new sub-folder with info files containing info on the fibre offsets and the slitamps (=relative intensities)
+        datestring = get_datestring()
+        dum = 1
+        newpath = outpath + 'tests_' + datestring
+        dumpath = outpath + 'tests_' + datestring
+        while os.path.exists(dumpath):
+            dum += 1
+            dumpath = newpath + '_' + str(dum)
+        if dum > 1:
+            newpath = newpath + '_' + str(dum)
+        #create new folder
+        os.makedirs(newpath)
+        #write OFFSETS file
+        outfn = newpath + '/' + 'offsets.txt' 
+        outfile = open(outfn, 'w')
+        outfile.writelines(["%s\n" % item for item in offsets.astype(str)])
+        outfile.close()
+        #write SLITAMPS file
+        outfn = newpath + '/' + 'slitamps.txt' 
+        outfile = open(outfn, 'w')
+        outfile.writelines(["%s\n" % item for item in slitamps.astype(str)])
+        outfile.close()
+        
+    else:
+        master_dict = {}
+    
+    if seeing is not None:
+        for i,fwhm in enumerate(get_iterable(seeing)):
+            if verbose:
+                print('SEEING-LOOP: ',fwhm)
+            #use fibre-slots 6 to 24
+            for n in range(nfib):
+                fibslot = str(n+6).zfill(2)
+                img = pyfits.getdata(simpath+'fib'+fibslot+'_'+redblue[n]+strshifts[n]+'ms'+maxsnr_string+'.fit') 
+                if n==0:
+                    master = (img.copy().astype(float) * slitamps[n,i]) + 1.
+                    h = pyfits.getheader(simpath+'fib'+fibslot+'_'+redblue[n]+strshifts[n]+'ms'+maxsnr_string+'.fit')
+                else:
+                    master += img * slitamps[n,i]
+            if add_laser:
+                laser_img = pyfits.getdata(simpath + 'veloce_laser_comb.fit')
+                master += laser_img/5.
+            if savefile:
+                #save to file
+                pyfits.writeto(newpath+'/seeing'+fwhm.astype(str)+laserstr+tstring+'.fit', master, h, clobber=True)
+            else:
+                master_dict['seeing'+fwhm.astype(str)] = master
+    else:
+        for n in range(nfib):
+            fibslot = str(n+6).zfill(2)
+            img = pyfits.getdata(simpath+'fib'+fibslot+'_'+redblue[n]+strshifts[n]+'ms'+maxsnr_string+'.fit') 
+            if n==0:
+                master = (img.copy().astype(float) * slitamps[n]) + 1.
+                h = pyfits.getheader(simpath+'fib'+fibslot+'_'+redblue[n]+strshifts[n]+'ms'+maxsnr_string+'.fit')
+            else:
+                master += img * slitamps[n]
+        if add_laser:
+            laser_img = pyfits.getdata(simpath + 'veloce_laser_comb.fit')
+            master += laser_img/5.
+        if savefile:
+            #save to file
+            pyfits.writeto(newpath+'/syntobs'+laserstr+tstring+'.fit', master, h, clobber=True)
+        else:
+            master_dict['syntobs'+tstring] = master
+    
+    if savefile:
+        #print('Offsets: ',offsets)
+        return
+    else:
+        return master_dict
+
+
+
+
+
+def make_pseudo_obs_with_noise(seeing, snrs=None, RON=0., simpath='/Volumes/BERGRAID/data/simu/', nfib=19, outpath='/Volumes/BERGRAID/data/simu/composite/', fixed_offsets=False, fixoff=0.,
+                               fixed_slitamps=False, slitamps=1., norm_slitamps=False, template=False, add_laser=False, savefile=True, verbose=False, debug_level=0, timit=False):    
+    """
+    This routine creates simulated observations by 
+    (1) calculating the flux-ratios / relative intensities in the individual fibres,
+    (2) simulating a pseudo-slit with a random normal distribution of relative offsets of the fibres relative to the centre (ie simulating alignment imperfections),
+    (3) adding together the individual-fibre spectra from my EchelleSimulator library using the appropriate relative intensities.
+    
+    INPUT:
+    'seeing'           : FWHM values of desired simulated seeing condition(s) - can be scalar or array
+    'snrs'             : desired mean signal-to-noise ratio per extracted 1-dim pixel (WARNING: the seeing parameter does not renormalize to the flux captured by the IFU!!!)
+                         floats can be provided for 'snrs', but it will be rounded to integer
+    'RON'              : read-out noise
+    'simpath'          : path to my EchelleSimulator spectrum library
+    'nfib'             : the number of (stellar) fibres to use
+    'outpath'          : root-directory for the output files (sub-directories will be created every time this routine is run because of the random-normal pseudo-slit alignments)
+    'fixed_offsets'    : boolean - do you want to simulate fibre-offsets in dispersion direction for the pseudoslit? (set to TRUE if you don't want to simulate offsets, but rather use a constant offset 'fixoff' for all fibres)
+    'fixoff'           : constant offset for all fibres (only used if 'fixed_offsets' is set to TRUE)
+    'fixed_slitamps'   : boolean - do you want to simulate the effect of seeing or provide fixed relative intensities? (if TRUE, the relative intensities are taken from 'slitamps'; if set to FALSE
+                         the relative intensities are calculated using the provided seeing values)     
+    'slitamps'         : constant slitamps for all fibres (=relative intensities) (only used if 'fixed_slitamps' is set to TRUE)
+    'norm_slitamps'    : boolean - do you want to 'normalize' the slitamps so they add up to 1? (only used if 'fixed_slitamps' is set to TRUE)     
+    'template'         : boolean - is that going to be a template? in that case no noise is added...
+    'add_laser'        : boolean - do you want to add the LFC in fibre 1?
+    'savefile'         : boolean - do you want to save the simulated spectra as FITS files?
+    'verbose'          : boolean - for debugging...
+    'debug_level'      : boolean - for debugging...
+    'timit'            : boolean - do you want to time the execution time?
+    
+    OUTPUT:
+    'master_dict'      : dictionary containing the simulated spectra for all seeing values (only if the 'savefile' keyword is not set)
+    
+    TODO: add SNR   -   for now this is for a given (fixed) observing time, i.e. the total flux captured by the IFU drops as the seeing increases
+    
+    MODHIST:
+    07/06/2018 - CMB create (clone of "make_pseudo_obs")
+    08/06/2018 - CMB added 'add_laser' keyword; also changed the addition of 1 to the first image only
+    14/06/2018 - CMB added "slitamps.txt" output file; also added 'fixed_slitamps', 'slitamps', and 'norm_slitamps' keywords
+    """
+    
+    
+    ##### (1) #####
+    if not fixed_slitamps:
+        if seeing is not None:
+            #first, calculate flux_ratios (ie relative intensities) for the different fibres from given seeing
+            fr = flux_ratios_from_seeing(seeing, verbose=verbose)
+            #then get an array of the relative intensities in the pseudo-slit
+            slitamps = get_pseudo_slitamps(fr['central'], fr['inner'], fr['outer1'], fr['outer2'])
+        else:
+            print('ERROR: "fixed_slitamps" = False, but seeing not provided!!!')
+            return
+    else:
+        if len(get_iterable(slitamps))==1:
+            slitamps = np.repeat(slitamps, nfib)
+        #reshape to accommodate the possibility of having multiple seeing condittions below
+        slitamps = np.reshape(slitamps, (19,1))
+        if norm_slitamps:
+            slitamps = slitamps / np.sum(slitamps)
+    
+    ##### (2) #####
+    #simulate fibre-offsets by using RV offsets
+    if not fixed_offsets:
+        #offsets = make_pseudoslits()
+        print('ERROR: offsets in pixel space have not been implemented yet!!!')
+        return
+    else:
+        if len(get_iterable(fixoff))==1:
+            offsets = np.repeat(fixoff, nfib)
+        elif len(get_iterable(fixoff))==nfib:
+            offsets = np.array(fixoff)
+        else:
+            print('ERROR! input values for fibre offsets do not have correct length')
+            return
+    if not (offsets == 0).all():
+        print('ERROR: offsets in pixel space have not been implemented yet!!!')
+        return
+    
+    if debug_level >= 1:
+        plot_pseudoslit(offsets)
+    
+    ##### (3) #####
+    #some string manipulations for filenames in for loop below
+    strshifts = np.abs(offsets).astype(int).astype(str)
+    redblue = np.empty(nfib).astype(str)
+    redblue[offsets > 0] = 'red'
+    redblue[offsets < 0] = 'blue'
+    redblue[offsets == 0] = ''
+    if add_laser:
+        laserstr = '_laser'
+    else:
+        laserstr = ''
     
     if savefile:
         #create new sub-folder with README file containing info on the fibre offsets
         datestring = get_datestring()
         dum = 1
-        newpath = outpath + 'test_' + datestring
-        dumpath = outpath + 'test_' + datestring
+        newpath = outpath + 'tests_' + datestring
+        dumpath = outpath + 'tests_' + datestring
         while os.path.exists(dumpath):
             dum += 1
             dumpath = newpath + '_' + str(dum)
@@ -386,25 +596,52 @@ def make_pseudo_obs(seeing, simpath='/Volumes/BERGRAID/data/simu/', nfib=19, out
         outfile = open(outfn, 'w')
         outfile.writelines(["%s\n" % item for item in offsets.astype(str)])
         outfile.close()
+        #write SLITAMPS file
+        outfn = newpath + '/' + 'slitamps.txt' 
+        outfile = open(outfn, 'w')
+        outfile.writelines(["%s\n" % item for item in slitamps.astype(str)])
+        outfile.close()
         
     else:
         master_dict = {}
     
-    for i,fwhm in enumerate(seeing):
+    for i,(fwhm,snr) in enumerate(zip(get_iterable(seeing), get_iterable(snrs))):
+        snr = int(np.round(snr))
         if verbose:
-            print('SEEING-LOOP: ',fwhm)
+            print('SEEING: ',fwhm)
+            print('SNR: ',snr)
         #use fibre-slots 6 to 24
         for n in range(nfib):
             fibslot = str(n+6).zfill(2)
-            img = pyfits.getdata(simpath+'fib'+fibslot+'_'+redblue[n]+strshifts[n]+'ms.fit') + 1.
+            img = pyfits.getdata(simpath+'fib'+fibslot+'_'+redblue[n]+strshifts[n]+'ms_maxsnr.fit') + 1.
             if n==0:
                 master = img.copy().astype(float) * slitamps[n,i]
-                h = pyfits.getheader(simpath+'fib'+fibslot+'_'+redblue[n]+strshifts[n]+'ms.fit')
+                h = pyfits.getheader(simpath+'fib'+fibslot+'_'+redblue[n]+strshifts[n]+'ms_maxsnr.fit')
             else:
                 master += img * slitamps[n,i]
+        
+        #now add noise (a "maxsnr" spectrum has a mean SNR of ~555)
+        if not template:
+            fudge = (snr/555.)**2.
+            scaled_master = master * fudge
+            err_amps = np.sqrt(scaled_master + RON*RON)
+            #add noise to the image
+            scaled_noise = make_scaled_white_noise(err_amps)
+            noisy_img = scaled_master + scaled_noise
+        else:
+            #don't want to add noise for the templates
+            noisy_img = master.copy()
+        
+        #remove any negative pixels    
+        noisy_img[noisy_img < 0] = 0.
+        
+        if add_laser:
+            laser_img = pyfits.getdata(simpath + 'veloce_laser_comb.fit')
+            noisy_img += laser_img/5.
+        
         if savefile:
             #save to file
-            pyfits.writeto(newpath+'seeing'+fwhm.astype(str)+'.fits', master, h, clobber=True)
+            pyfits.writeto(newpath+'/seeing'+fwhm.astype(str)+'_snr_'+str(snr)+laserstr+'.fit', noisy_img, h, clobber=True)
         else:
             master_dict['seeing'+fwhm.astype(str)] = master
     
@@ -418,7 +655,63 @@ def make_pseudo_obs(seeing, simpath='/Volumes/BERGRAID/data/simu/', nfib=19, out
 
 
 
+def make_scaled_white_noise(err_amps):
+    ny,nx = err_amps.shape
+    #noise with sigma=1
+    noise = np.resize(np.random.normal(0, 1, nx*ny),(ny,nx))
+    #scale noise with "error-amplitudes"
+    scaled_noise = noise * err_amps
+    return scaled_noise
 
+
+
+
+
+# def shift_simuspec(shift, fibnum, simpath='/Volumes/BERGRAID/data/simu/', fibnum=15, outpath='/Volumes/BERGRAID/data/simu/composite/', savefile=True, verbose=False, debug_level=0, timit=False):    
+#     """WORK IN PROGRESS"""
+#     
+#     redblue = ''
+#     #positive (ie right) shift in pixels is towards smaller wavelengths for simulated spectra, ie blue-shift
+#     if shift < 0:
+#         redblue = 'red'
+#     if shift > 0:
+#         redblue = 'blue'
+#     
+#     
+#     if savefile:
+#         #create new sub-folder with README file containing info on the simulated observations
+#         datestring = get_datestring()
+#         dum = 1
+#         newpath = outpath + 'tests_' + datestring
+#         dumpath = outpath + 'tests_' + datestring
+#         while os.path.exists(dumpath):
+#             dum += 1
+#             dumpath = newpath + '_' + str(dum)
+#         if dum > 1:
+#             newpath = newpath + '_' + str(dum)
+#         #create new folder
+#         os.makedirs(newpath)
+#         #write README file
+#         outfn = newpath + '/' + 'README.txt' 
+#         outfile = open(outfn, 'w')
+#         outfile.write('Fibre '+str(fibnum).zfill(2)+'\n')
+#         outfile.write(redblue+'-shifted by '+str(shift)+' pixels\n')
+#         #outfile.writelines(["%s\n" % item for item in offsets.astype(str)])
+#         outfile.close()
+#     
+#     #read unshifted image
+#     fibslot = str(fibnum).zfill(2)
+#     img = pyfits.getdata(simpath+'fib'+fibslot+'_0ms_maxsnr.fit') + 1.
+#     
+#     ny,nx = img.shape
+#     xx = np.arange(nx)
+#     #shift x-axis
+#     xx_shifted = xx + shift
+#     #then interpolate back onto original x-axis
+#     spl = interp.InterpolatedUnivariateSpline(xx_shifted, spec, k=3)    #slightly slower than linear, but best performance for cubic spline
+#     shifted_spec = spl(xx)
+# 
+#     return
 
 
 

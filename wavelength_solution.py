@@ -765,9 +765,14 @@ def get_wavelength_solution(thflux, thflux2, poly_deg=5, laser=False, polytype='
 
 
 
-def get_simu_dispsol():
+def get_simu_dispsol(fibre=None, path='/Users/christoph/OneDrive - UNSW/dispsol/'):
     #read dispersion solution from file
-    dispsol = np.load('/Users/christoph/OneDrive - UNSW/dispsol/mean_dispsol_by_orders_from_zemax.npy').item()
+    if fibre is None:
+        dispsol = np.load(path + 'mean_dispsol_by_orders_from_zemax.npy').item()
+        orders = dispsol.keys()
+    else:
+        dbf = np.load(path + 'dispsol_by_fibres_from_zemax.npy').item()
+        orders = dbf['fiber_1'].keys()
     
     #read extracted spectrum from files (obviously this needs to be improved)
     xx = np.arange(4096)
@@ -776,10 +781,13 @@ def get_simu_dispsol():
     # order01 corresponds to m=66
     # order43 corresponds to m=108
     wl = {}
-    for ord in dispsol.keys():
+    for ord in orders:
         m = ord[5:]
         ordnum = str(int(m)-65).zfill(2)
-        wl['order_'+ordnum] = dispsol['order'+m]['model'](xx)
+        if fibre is None:
+            wl['order_'+ordnum] = dispsol['order'+m]['model'](xx)
+        else:
+            wl['order_'+ordnum] = dbf['fiber_'+str(fibre)][ord]['fitparms'](xx)
 
     return wl
 

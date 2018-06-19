@@ -14,12 +14,12 @@ fibparms = np.load('/Users/christoph/OneDrive - UNSW/fibre_profiles/sim/fibparms
 
 
 
-def make_norm_profiles(x, ord, col, fibparms, slope=False, offset=False):  
+def make_norm_profiles(x, ord, col, fibparms, nfib=19, slope=False, offset=False):  
     
     xx = np.arange(4096)
     
     #same number of fibres for every order, of course
-    nfib = len(fibparms['order_02'])   
+    #nfib = len(fibparms['order_02'])   
     
     #do we want to include extra "fibres" to take care of slope and/or offset? Default is NO for both (as this should be already taken care of globally)
     if offset:
