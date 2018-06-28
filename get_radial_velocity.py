@@ -83,6 +83,20 @@ flatdata = ascii.read('/Users/christoph/OneDrive - UNSW/rvtest/tramline_extracte
     
 
 def get_rvs_from_xcorr(extracted_spectra, obsnames, mask, smoothed_flat, debug_level=0):
+    """
+    This is a wrapper for the actual RV routine "get_RV_from_xcorr", which is called for all observations within 'obsnames'.
+    
+    INPUT:
+    'extracted_spectra'  : dictionary containing keys 'pix', 'wl', 'flux', and 'err' for every observation (each containing keys=orders), plus the template and the master white
+    'obsnames'           : list containing the names of the observations
+    'mask'               : dictionary of masks from 'find_stripes' (with the keys being the orders)
+    'smoothed_flat'      : dictionary containing the smoothed master white for each order (with the keys being the orders)
+    'debug_level'        : boolean - for debugging...
+    
+    OUTPUT:
+    'rv'     : RVs (dictionary with 'obsnames' --> 'orders' as keys)
+    'rverr'  : RV errors ((dictionary with 'obsnames' --> 'orders' as keys)
+    """
     
     rv = {}
     rverr = {}
@@ -143,6 +157,7 @@ def get_RV_from_xcorr(f, err, wl, f0, wl0, mask=None, smoothed_flat=None, osf=2,
     MODHIST:
     Dec 2017 - CMB create
     04/06/2018 - CMB fixed bug when turning around arrays (need to use new variable)
+    28/06/2018 - CMB fixed bug with interpolation of log wls
     """
     
     #speed of light in m/s
@@ -196,8 +211,8 @@ def get_RV_from_xcorr(f, err, wl, f0, wl0, mask=None, smoothed_flat=None, osf=2,
 #         f_unblazed = f[ord] / np.max(f[ord]) / normflat
         
         #create logarithmic wavelength grid
-        #logwl0 = np.log(wl0[ord])
         logwl = np.log(wl[ord])
+        logwl0 = np.log(wl0[ord])
         if relgrid:
             logwlgrid = np.linspace(np.min(logwl[ordmask]), np.max(logwl[ordmask]), osf*np.sum(ordmask))
             delta_log_wl = logwlgrid[1] - logwlgrid[0]
@@ -209,11 +224,13 @@ def get_RV_from_xcorr(f, err, wl, f0, wl0, mask=None, smoothed_flat=None, osf=2,
         #wavelength array must be increasing for "InterpolatedUnivariateSpline" to work --> turn arrays around if necessary!!!
         if (np.diff(logwl) < 0).any():
             logwl_sorted = logwl[::-1].copy()
+            logwl0_sorted = logwl0[::-1].copy()
             ordmask_sorted = ordmask[::-1].copy()
             ord_f0_sorted = f0[ord][::-1].copy()
             ord_f_sorted = f[ord][::-1].copy()
         else:
             logwl_sorted = logwl.copy()
+            logwl0_sorted = logwl0.copy()
             ordmask_sorted = ordmask.copy()
             ord_f0_sorted = f0[ord].copy()
             ord_f_sorted = f[ord].copy()
@@ -221,7 +238,7 @@ def get_RV_from_xcorr(f, err, wl, f0, wl0, mask=None, smoothed_flat=None, osf=2,
         #rebin spectra onto logarithmic wavelength grid
 #         rebinned_f0 = np.interp(logwlgrid,logwl[mask],f0_unblazed[mask])
 #         rebinned_f = np.interp(logwlgrid,logwl[mask],f_unblazed[mask])
-        spl_ref_f0 = interp.InterpolatedUnivariateSpline(logwl_sorted[ordmask_sorted], ord_f0_sorted[ordmask_sorted], k=3)    #slightly slower than linear, but best performance for cubic spline
+        spl_ref_f0 = interp.InterpolatedUnivariateSpline(logwl0_sorted[ordmask_sorted], ord_f0_sorted[ordmask_sorted], k=3)    #slightly slower than linear, but best performance for cubic spline
         rebinned_f0 = spl_ref_f0(logwlgrid)
         spl_ref_f = interp.InterpolatedUnivariateSpline(logwl_sorted[ordmask_sorted], ord_f_sorted[ordmask_sorted], k=3)    #slightly slower than linear, but best performance for cubic spline
         rebinned_f = spl_ref_f(logwlgrid)

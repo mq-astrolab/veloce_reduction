@@ -8,6 +8,7 @@ import numpy as np
 import h5py
 import pandas
 import math
+#from scipy import odr
 
 
 
@@ -36,7 +37,8 @@ def center(df, width, height):
 
 
 
-def get_dispsol_from_spectrograph_file(degpol=5, spectrograph = '/Users/christoph/OneDrive - UNSW/EchelleSimulator/data/spectrographs/VeloceRosso.hdf', outfn = '/Users/christoph/OneDrive - UNSW/dispsol/dispsol_by_fibres_from_zemax.npy',savefile=False):
+def get_dispsol_from_spectrograph_file(degpol=5, spectrograph = '/Users/christoph/OneDrive - UNSW/EchelleSimulator/data/spectrographs/VeloceRosso.hdf', 
+                                       outfn = '/Users/christoph/OneDrive - UNSW/dispsol/dispsol_by_fibres_from_zemax.npy',savefile=False):
     
     # overview = pandas.read_hdf(spectrograph)
     # data = pandas.read_hdf(specfn, "fiber_1/order100")
@@ -58,7 +60,7 @@ def get_dispsol_from_spectrograph_file(degpol=5, spectrograph = '/Users/christop
 #             wl = np.array(f[fibkey][ord]['wavelength']) * 1e3        #wavelength in nm
             
             #read from HDF file        
-            data = pandas.read_hdf('/Users/christoph/OneDrive - UNSW/EchelleSimulator/data/spectrographs/VeloceRosso.hdf', fibkey+"/"+ord).sort_values("wavelength")
+            data = pandas.read_hdf(spectrograph, fibkey+"/"+ord).sort_values("wavelength")
             dum = data.apply(center, axis=1, args=(54, 54))     #the (54,54) represents the central coordinates for each fibre (out of a 108x108 box for some reason...)
             dum = np.array(list(map(list, dum)))
             X = dum[:,0]
@@ -154,8 +156,123 @@ def make_mean_dispsol(degpol=5, savefile=False, outfn = '/Users/christoph/OneDri
    
    
    
+def get_fibpos_from_spectrograph_file(spectrograph = '/Users/christoph/OneDrive - UNSW/EchelleSimulator/data/spectrographs/VeloceRosso.hdf', 
+                                      outfn = '/Users/christoph/OneDrive - UNSW/dispsol/fibpos_from_zemax.npy', savefile=False):
+    
+    # overview = pandas.read_hdf(spectrograph)
+    # data = pandas.read_hdf(specfn, "fiber_1/order100")
+    
+    f = h5py.File(spectrograph, 'r+')
+    
+    fibpos = {}
+    
+    #first and second keys ('CCD' and 'spectrograph') are excluded as they are empty
+    for fibkey in list(f.keys())[2:]:
+        fib = 'fibre_'+str(fibkey).split('_')[-1].zfill(2)
+        print(fib)
+        fibpos[fib] = {}
+        for ord in list(f[fibkey].keys())[0:43]:
+            #print(ord)
+            fibpos[fib][ord] = {}            
+            #read from HDF file        
+            data = pandas.read_hdf(spectrograph, fibkey+"/"+ord).sort_values("wavelength")
+            dum = data.apply(center, axis=1, args=(54, 54))     #the (54,54) represents the central coordinates for each fibre (out of a 108x108 box for some reason...)
+            dum = np.array(list(map(list, dum)))
+            fibpos[fib][ord]['x'] = dum[:,0]
+            fibpos[fib][ord]['y'] = dum[:,1]
+                    
+    if savefile:
+        np.save(outfn, fibpos)         
+            
+    return fibpos
 
 
+
+
+
+def get_slit_tilts(fibposfile='/Users/christoph/OneDrive - UNSW/dispsol/fibpos_from_zemax.npy', outpath = '/Users/christoph/OneDrive - UNSW/dispsol/slit_tilts/', return_allslits=False, saveplots=False):
+    
+    if fibposfile is not None:
+        fibpos = np.load(fibposfile).item()
+    else:
+        fibpos = get_fibpos_from_spectrograph_file()
+    
+    allslits = {}
+    
+    for ord in sorted(fibpos['fibre_01'].keys()):
+        
+        o = 'order_'+str(ord).split('r')[-1].zfill(2)
+        
+        allslits[o] = {}
+        x = np.zeros((28,50))   # 28 fibres, 50 positions along order provided in spectrograph file
+        y = np.zeros((28,50))   # 28 fibres, 50 positions along order provided in spectrograph file
+    
+        for i,fib in enumerate(sorted(fibpos.keys())):
+            for j in range(50):   
+                
+                x[i,j] = fibpos[fib][ord]['x'][j]
+                y[i,j] = fibpos[fib][ord]['y'][j]
+                
+        allslits[o]['x'] = x
+        allslits[o]['y'] = y
+        
+        if saveplots:
+            #make some nice plots
+            outfn = outpath + 'slit_tilts_' + o + '.png'
+            fig1 = plt.figure()
+            xleft = allslits[o]['x'][:,0] - np.mean(allslits[o]['x'][:,0]) - 2
+            xcen = allslits[o]['x'][:,24] - np.mean(allslits[o]['x'][:,24]) 
+            xright = allslits[o]['x'][:,48] - np.mean(allslits[o]['x'][:,48]) + 2
+            yleft = allslits[o]['y'][:,0] - np.mean(allslits[o]['y'][:,0]) 
+            ycen = allslits[o]['y'][:,24] - np.mean(allslits[o]['y'][:,24]) 
+            yright = allslits[o]['y'][:,48] - np.mean(allslits[o]['y'][:,48]) 
+            #linear fits
+            pleft = np.poly1d(np.polyfit(xleft, yleft, 1))
+            pcen = np.poly1d(np.polyfit(xcen, ycen, 1))
+            pright = np.poly1d(np.polyfit(xright, yright, 1))
+            #angles
+            phi_left = 360.*np.arctan(pleft[1])/(2.*np.pi)
+            tilt_left = np.sign(phi_left) * (90. - (np.sign(phi_left) * phi_left))
+            phi_cen = 360.*np.arctan(pcen[1])/(2.*np.pi)
+            tilt_cen = np.sign(phi_cen) * (90. - (np.sign(phi_cen) * phi_cen))
+            phi_right = 360.*np.arctan(pright[1])/(2.*np.pi)
+            tilt_right = np.sign(phi_right) * (90. - (np.sign(phi_right) * phi_right))
+            #plot!!!
+            plotx = np.arange(-5,5.5,1)
+            plt.plot(xleft, yleft,'ro-')
+            plt.plot(xcen, ycen,'ko-')
+            plt.plot(xright, yright,'bo-')
+            #overplot linear fits
+            plt.plot(plotx,pleft(plotx),'r--',label='tilt = '+str(np.round(tilt_left,2))+'$^\circ$')
+            plt.plot(plotx,pcen(plotx),'k--',label='tilt = '+str(np.round(tilt_cen,2))+'$^\circ$')
+            plt.plot(plotx,pright(plotx),'b--',label='tilt = '+str(np.round(tilt_right,2))+'$^\circ$')
+            plt.legend()
+            plt.xlim(-4,4)
+            plt.ylim(-30,30)
+            plt.title(o)
+            plt.xlabel('pixel')
+            plt.ylabel('pixel')
+            plt.savefig(outfn)
+            plt.close(fig1)
+            
+            outfn = outpath + 'all_slit_tilts_' + o + '.png'
+            fig1 = plt.figure()
+            for i in range(50):
+                plt.plot(allslits[o]['x'][:,i] - np.mean(allslits[o]['x'][:,i]), allslits[o]['y'][:,i] - np.mean(allslits[o]['y'][:,i]),'.-')
+            plt.title(o)
+            plt.xlabel('pixel')
+            plt.ylabel('pixel')
+            plt.savefig(outfn)
+            plt.close(fig1)
+    
+    
+    if return_allslits:
+        return allslits
+    else:
+        return
+        
+        
+    
 
 
 

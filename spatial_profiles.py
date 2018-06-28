@@ -25,7 +25,7 @@ def determine_spatial_profiles_single_order(sc, sr, ordpol, ordmask=None, model=
     'sampling_size'  : how many pixels (in dispersion direction) either side of current i-th pixel do you want to consider? 
                        (ie stack profiles for a total of 2*sampling_size+1 pixels...)
     'RON'            : read-out noise per pixel
-    'return_stats'   : boolean - do you want to return fit statistics (ie AIC, BIC, CHISQ and REDCHISQ)?
+    'return_stats'   : boolean - do you want to return goodness of fit statistics (ie AIC, BIC, CHISQ and REDCHISQ)?
     'debug_level'    : for debugging...
     
     OUTPUT:
@@ -360,12 +360,12 @@ def fit_stacked_single_fibre_profile(grid, data, weights=None, pos=None, model='
         parms['amplitude'].set(min=0.)
         parms['sigma'].set(min=0.)
     if model.lower() == 'offset_pseudo_gausslike':
-        parms.add('amp_g', guess[2], min=0.)
-        parms.add('amp_l', guess[2], min=0.)
-        parms.add('mu_g', guess[0], min=guess[0]-3, max=guess[0]+3)
-        parms.add('mu_l', guess[0], min=guess[0]-3, max=guess[0]+3)
-        parms.add('sigma_g', guess[1], min=0.1, max=10.)
-        parms.add('sigma_l', guess[1], min=0.1, max=10.)
+        parms.add('G_amplitude', guess[2], min=0.)
+        parms.add('L_amplitude', guess[2], min=0.)
+        parms.add('G_center', guess[0], min=guess[0]-3, max=guess[0]+3)
+        parms.add('L_center', guess[0], min=guess[0]-3, max=guess[0]+3)
+        parms.add('G_sigma', guess[1], min=0.1, max=10.)
+        parms.add('L_sigma', guess[1], min=0.1, max=10.)
         parms.add('beta', guess[3], min=1., max=4.)
         
         

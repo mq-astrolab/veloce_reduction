@@ -11,7 +11,7 @@ import scipy.optimize as op
 from scipy import ndimage
 import warnings
 import lmfit
-from lmfit import parameter, minimizer, Model
+from lmfit import parameter, Parameters, minimizer, Model
 from lmfit.models import *
 #import time
 #import datetime
@@ -32,21 +32,22 @@ from readcol import readcol
 
 
 
-def find_suitable_peaks(data, thresh = 5000., bgthresh = 2000., maxthresh = None, gauss_filter_sigma=1., return_masks=False, debug_level=0, timit=False):
+def find_suitable_peaks(rawdata, thresh = 5000., bgthresh = 2000., maxthresh = None, gauss_filter_sigma=1., remove_bg=False, return_masks=False, debug_level=0, timit=False):
     """
     This routine finds (rough, to within 1 pixel) peak locations in 1D data.
     Detection threshold, background threshold, maximum threshold, and smoothing kernel width can be provided as keyword parameters.
 
     INPUT:
-    'data'   : one-dimensional data array
+    'rawdata'   : one-dimensional (raw) data array
 
     KEYWORD PARAMETERS:
     'thresh'              : minimum height of peak in the FILTERED data to be considered a good peak
     'bgthresh'            : minimum height of peak in the filtered data to be considered a real (but not good) peak
     'maxthresh'           : maximum height of peak in the filtered data to be included (ie you can exclude saturated peaks etc)
     'gauss_filter_sigma'  : width of the Gaussian smoothing kernel (swet to 0 if you want no smoothing)
+    'remove_bg'           : boolean - do you want to run a crude background removal before identifying peaks?
     'return_masks'        : boolean - do you want to return the masks as well as the data arrays?
-    'debug_level'         : for debugging...
+    'debug_level'         : boolean - for debugging...
     'timit'               : boolean - do you want to clock execution run-time?
 
     OUTPUT:
@@ -57,13 +58,23 @@ def find_suitable_peaks(data, thresh = 5000., bgthresh = 2000., maxthresh = None
     'second_mask' : mask that masks out saturated lines above maxthresh from mostpeaks (ONLY IF 'return_masks' is set to TRUE)
     'third_mask'  : mask that masks out lines below thresh from mostpeaks (ONLY IF 'return_masks' is set to TRUE)
     #ie goodpeaks = allpeaks[first_mask][second_mask][third_mask]
+    
+    TODO:
+    (1) make a relative threshold criterion
     """
 
     #this routine is extremely fast, no need to optimise for speed
     if timit:
         start_time = time.time()
     
-    xx = np.arange(len(data))
+    xx = np.arange(len(rawdata))
+    
+    #run a crude background removal first:
+    if remove_bg:
+        bgfit = ndimage.gaussian_filter(ndimage.minimum_filter(rawdata,size=50.), 10.)
+    else:
+        bgfit = np.zeros(len(rawdata))
+    data = rawdata - bgfit
     
     #smooth data to make sure we are not finding noise peaks, and add tiny slope to make sure peaks are found even when pixel-values are like [...,3,6,18,41,41,21,11,4,...]
     filtered_data = ndimage.gaussian_filter(data.astype(np.float), gauss_filter_sigma) + xx*1e-4
@@ -297,25 +308,41 @@ def fit_emission_lines(data, fitwidth=4, thresh = 5000., bgthresh = 2000., maxth
 
 
 
-def fit_emission_lines_lmfit(data, fitwidth=4, thresh=5000., bgthresh=2000., maxthresh=None, laser=False, model='gauss',
-                       timit=False, verbose=False, return_all_pars=False, return_qualflag=False):
+def fit_emission_lines_lmfit(data, fitwidth=None, thresh=5000., bgthresh=2000., maxthresh=None, laser=False, model='gauss', no_weights=False,
+                             offset=False, return_all_pars=False, return_qualflag=False, return_stats=False, return_full=False, timit=False, debug_level=0):
     """
+    This routine identifies and fits emission lines in a 1dim spectrum (ie generally speaking it finds and fits peaks in a 1dim array), using the LMFIT package.
+    Detection threshold, background threshold, and maximum threshold can be provided as keyword parameters. Different models for the peak-like function can be selected.
 
-    :param data:
-    :param fitwidth:
-    :param thresh:
-    :param bgthresh:
-    :param maxthresh:
-    :param laser:
-    :param model:
-    :param timit:
-    :param verbose:
-    :param return_all_pars:
-    :param return_qualflag:
-    :return:
+    INPUT:
+    'data'   : one-dimensional data array
 
+    KEYWORD PARAMETERS:
+    'fitwidth'            : range around the identified peaks to be used for the peak-fitting 
+                            (if None, it will automatically be determined by the minimum spacing between peaks - this option should only be used for lLFC spectra)
+    'thresh'              : minimum height of peak in the FILTERED data to be considered a good peak
+    'bgthresh'            : minimum height of peak in the FILTERED data to be considered a real (but not good) peak
+    'maxthresh'           : maximum height of peak in the FILTERED data to be included (ie you can exclude saturated peaks etc)
+    'laser'               : boolean - is this a LFC spectrum? (if set to true, there is no check for blended lines)
+    'model'               : peak-like function model to be used for the fitting; valid options are (check code below for exact names):
+                            [gaussian, gauss-like, double gaussian, lorentzian, voigt, pseudo-voigt, offset pseudo-voigt, offset "pseudo-gausslike", 
+                            moffat, pearson7, students, breit-wigner, lognormal, damped oscillator, damped harmonic oscillator, exp gauss, skew gauss, donaich] 
+    'no_weights'          : boolean - set to TRUE if you DO NOT WANT to use weights (not recommended)                        
+    'offset'              : boolean - do you want to estimate and subtract an offset before fitting?                        
+    'return_all_pars'     : boolean - do you want to return all fit parameters?
+    'return_qualflag'     : boolean - do you want to return a quality flag for each line fit?
+    'return_stats'        : boolean - do you want to return goodness of fit statistics (ie AIC, BIC, CHISQ and REDCHISQ)?
+    'return_full'         : boolean - do you want to return the full "fit_result" class for each line? (WARNING: this ONLY returns the line positions and the full 'fit_result' classes,
+                            ,ie it overwrites the 'return_all_pars' / 'return_qualflag' / 'return_stats' keywords)
+    'debug_level'         : boolean - for debugging...
+    'timit'               : boolean - do you want to clock execution run-time?    
+    
+    OUTPUT:
+    'line_pos_fitted'     : fitted line positions
+    'qualflag'            : quality flag (1=good, 0=bad) for each line (only if 'return_qualflag' is set to TRUE)
+    
     TODO:
-    return goodness of fit statistics
+    (1) make a relative threshold criterion
     """
 
     if timit:
@@ -366,25 +393,32 @@ def fit_emission_lines_lmfit(data, fitwidth=4, thresh=5000., bgthresh=2000., max
 
 
     # find rough peak locations
-    goodpeaks, mostpeaks, allpeaks = find_suitable_peaks(data, thresh=thresh, bgthresh=bgthresh, maxthresh=maxthresh)
+    goodpeaks, mostpeaks, allpeaks = find_suitable_peaks(data, thresh=thresh, bgthresh=bgthresh, maxthresh=maxthresh, remove_bg=True)
 
-    if verbose:
-        print('Fitting ' + str(len(goodpeaks)) + ' emission lines...')
+    #determine fit-window if not explicitly given
+    if fitwidth is None:
+        fitwidth = np.min(np.diff(goodpeaks))//2
+    
+    print('Fitting ' + str(len(goodpeaks)) + ' emission lines...')
 
+    #prepare output variables
     line_pos_fitted = []
-    if return_all_pars:
-        line_amp_fitted = []
-        line_sigma_fitted = []
-        if varbeta:
-            line_beta_fitted = []
-    if return_qualflag:
-        qualflag = []
-
+    if return_full:
+        full_results = []
+    else:
+        if return_qualflag:
+            qualflag = []
+        if return_all_pars:
+            allpars = []
+        if return_stats:
+            stats = []
+    
+    
+    #loop over all lines
     for xguess in goodpeaks:
-        #         if verbose:
-        #             print('xguess = ',xguess)
-        ################################################################################################################################################################################
-        # METHOD 1 (using curve_fit; slightly faster than method 2, but IDK how to make sure the fit converged (as with .ier below))
+        
+        if debug_level >= 2:
+            print('xguess = ',xguess)
 
         if not laser:
             # check if there are any other peaks in the vicinity of the peak in question (exclude the peak itself)
@@ -406,112 +440,43 @@ def fit_emission_lines_lmfit(data, fitwidth=4, thresh=5000., bgthresh=2000., max
         npeaks = len(peaks)
         xrange = xx[peaks[0] - fitwidth: peaks[-1] + fitwidth + 1]  # this should satisfy: len(xrange) == len(checkrange) - 2*fitwidth + len(peaks)
 
-        # if npeaks == 1:
-        #     if varbeta:
-        #         guess = np.array([xguess, 1., data[xguess], 2.])
-        #         popt, pcov = op.curve_fit(fibmodel_with_amp, xrange, data[xrange], p0=guess,
-        #                                   bounds=([xguess - 2, 0, 0, 1], [xguess + 2, np.inf, np.inf, 4]))
-        #     else:
-        #         guess = np.array([xguess, 1., data[xguess]])
-        #         popt, pcov = op.curve_fit(CMB_pure_gaussian, xrange, data[xrange], p0=guess,
-        #                                   bounds=([xguess - 2, 0, 0], [xguess + 2, np.inf, np.inf]))
-        #     fitted_pos = popt[0]
-        #     if return_all_pars:
-        #         fitted_sigma = popt[1]
-        #         fitted_amp = popt[2]
-        #         if varbeta:
-        #             fitted_beta = popt[3]
-        # else:
-        #     guess = []
-        #     lower_bounds = []
-        #     upper_bounds = []
-        #     for i in range(npeaks):
-        #         if varbeta:
-        #             guess.append(np.array([peaks[i], 1., data[peaks[i]], 2.]))
-        #             lower_bounds.append([peaks[i] - 2, 0, 0, 1])
-        #             upper_bounds.append([peaks[i] + 2, np.inf, np.inf, 4])
-        #         else:
-        #             guess.append(np.array([peaks[i], 1., data[peaks[i]]]))
-        #             lower_bounds.append([peaks[i] - 2, 0, 0])
-        #             upper_bounds.append([peaks[i] + 2, np.inf, np.inf])
-        #     guess = np.array(guess).flatten()
-        #     lower_bounds = np.array(lower_bounds).flatten()
-        #     upper_bounds = np.array(upper_bounds).flatten()
-        #     if varbeta:
-        #         popt, pcov = op.curve_fit(multi_fibmodel_with_amp, xrange, data[xrange], p0=guess,
-        #                                   bounds=(lower_bounds, upper_bounds))
-        #     else:
-        #         popt, pcov = op.curve_fit(CMB_multi_gaussian, xrange, data[xrange], p0=guess,
-        #                                   bounds=(lower_bounds, upper_bounds))
-        #
-        #         # now figure out which peak is the one we wanted originally
-        #     q = np.argwhere(peaks == xguess)[0]
-        #     if varbeta:
-        #         fitted_pos = popt[q * 4]
-        #         if return_all_pars:
-        #             fitted_sigma = popt[q * 4 + 1]
-        #             fitted_amp = popt[q * 4 + 2]
-        #             fitted_beta = popt[q * 4 + 3]
-        #     else:
-        #         fitted_pos = popt[q * 3]
-        #         if return_all_pars:
-        #             fitted_sigma = popt[q * 3 + 1]
-        #             fitted_amp = popt[q * 3 + 2]
-        #
-        # # make sure we actually found a good peak
-        # if abs(fitted_pos - xguess) >= 2.:
-        #     line_pos_fitted.append(xguess)
-        #     if return_qualflag:
-        #         qualflag.append(0)
-        #     if return_all_pars:
-        #         line_sigma_fitted.append(fitted_sigma)
-        #         line_amp_fitted.append(fitted_amp)
-        #         if varbeta:
-        #             line_beta_fitted.append(fitted_beta)
-        # else:
-        #     line_pos_fitted.append(fitted_pos)
-        #     if return_qualflag:
-        #         qualflag.append(1)
-        #     if return_all_pars:
-        #         line_sigma_fitted.append(fitted_sigma)
-        #         line_amp_fitted.append(fitted_amp)
-        #         if varbeta:
-        #             line_beta_fitted.append(fitted_beta)
-        ################################################################################################################################################################################
+        
 
         ################################################################################################################################################################################
-        #METHOD 2 (using lmfit) (NOTE THAT THE TWO METHODS HAVE different amplitudes for the Gaussian b/c of different normalization, but we are only interested in the position)
-        #xguess = int(xguess)
+        #using LMFIT package:
 
         if npeaks == 1:
 
+            #estimate and subtract an offset if desired
+            if offset:
+                off = np.mean([data[xrange][0],data[xrange][1],data[xrange][-1],data[xrange][-2]])
+            else:
+                off = 0.
+            fitdata = data[xrange] - off
+
             # create instance of Parameters-class needed for fitting with LMFIT
             if model.lower() in ('gausslike', 'offset_pseudo', 'offset_pseudo_gausslike', 'double', 'dbl', 'dg', 'dbl_gauss', 'double_gaussian'):
-                parms = Parameters()
+                parms = lmfit.Parameters()
             else:
-                parms = mod.guess(data[xrange], x=xrange)
+                parms = mod.guess(fitdata, x=xrange)
 
-            # fill Parameters() instance
+            # fill/tweak initial Parameters() instance
             if model.lower() in ('gauss', 'gaussian'):
                 parms['amplitude'].set(min=0.)
                 parms['sigma'].set(min=0.)
             if model.lower() in ('double', 'dbl', 'dg', 'dbl_gauss', 'double_gaussian'):
-                parms = mod1.guess(data[xrange], x=xrange)
-                parms.update(mod2.guess(data[xrange], x=xrange))
+                parms = mod1.guess(fitdata, x=xrange)
+                parms.update(mod2.guess(fitdata, x=xrange))
                 parms['second_amplitude'].set(0., vary=True)
                 parms['first_center'].set(min=xguess - 3, max=xguess + 3)
                 parms['second_center'].set(min=xguess - 3, max=xguess + 3)
             if model.lower() == 'gausslike':
                 gmod = GaussianModel()
-                gparms = gmod.guess(data[xrange],xrange)
+                gparms = gmod.guess(fitdata,xrange)
                 parms.add('mu', xguess, min=xguess - 3, max=xguess + 3)
                 parms.add('sigma', gparms['sigma'].value, min=0.2)
                 parms.add('amp', data[xguess], min=0.)
                 parms.add('beta', 2., min=1., max=4.)
-                # if offset:
-                #     parms.add('offset', guess[4], min=0., max=65535.)
-                #     # parms.add('offset', guess[4], min=0.)
-                #     # parms.add('slope', guess[5], min=-0.5, max=0.5)
             if model.lower() == 'moffat':
                 parms['amplitude'].set(min=0.)
                 parms['sigma'].set(min=0.)
@@ -521,15 +486,15 @@ def fit_emission_lines_lmfit(data, fitwidth=4, thresh=5000., bgthresh=2000., max
                 parms['amplitude'].set(min=0.)
                 parms['sigma'].set(min=0.)
             if model.lower() == 'lognormal':
-                parms['sigma'].set(value=1e-4, vary=True, expr='')
-                parms['center'].set(value=np.log(guess[0]), vary=True, expr='')
-                parms['amplitude'].set(1., vary=True, min=0., expr='')
+                #parms['sigma'].set(value=1e-4, vary=True, expr='')
+                parms['center'].set(value=np.log(xguess), vary=True, expr='', min=0., max=8.5)
+                parms['amplitude'].set(data[xguess], vary=True, min=0., expr='')
             # if model.lower() == 'dampedosc':
             #     parms['sigma'].set(1e-4, vary=True, expr='')
             #     parms['amplitude'].set(1e-4, vary=True, min=0., expr='')
             if model.lower() == 'offset_pseudo':
-                parms = gmod.guess(data[xrange], x=xrange)
-                parms.update(lmod.guess(data[xrange], x=xrange))
+                parms = gmod.guess(fitdata, x=xrange)
+                parms.update(lmod.guess(fitdata, x=xrange))
                 parms['G_amplitude'].set(parms['G_amplitude'] / 2., min=0., vary=True)
                 parms['L_amplitude'].set(parms['L_amplitude'] / 2., min=0., vary=True)
                 parms['G_center'].set(min=xguess - 3, max=xguess + 3)
@@ -540,17 +505,27 @@ def fit_emission_lines_lmfit(data, fitwidth=4, thresh=5000., bgthresh=2000., max
             if model.lower() == 'offset_pseudo_gausslike':
                 gmod = GaussianModel(prefix='G_')
                 lmod = LorentzianModel(prefix='L_')
-                parms = gmod.guess(data[xrange], x=xrange)
-                parms.update(lmod.guess(data[xrange], x=xrange))
+                parms = gmod.guess(fitdata, x=xrange)
+                parms.update(lmod.guess(fitdata, x=xrange))
                 parms['G_amplitude'].set(parms['G_amplitude'] / 2., min=0., vary=True)
                 parms['L_amplitude'].set(parms['L_amplitude'] / 2., min=0., vary=True)
                 parms['G_center'].set(min=xguess - 3, max=xguess + 3)
                 parms['L_center'].set(min=xguess - 3, max=xguess + 3)
                 parms.add('beta', 2., min=1., max=4.)
 
+            
+            #perform the actual fit (get weights from array before offset subtraction)
+            if not no_weights:
+                fit_result = mod.fit(fitdata, parms, x=xrange, weights=np.sqrt(data[xrange]))
+            else:
+                fit_result = mod.fit(fitdata, parms, x=xrange)
 
-            #perform the actual fit
-            fit_result = mod.fit(data[xrange], parms, x=xrange)
+            #goodness of fit statistics
+            fitstats = {}
+            fitstats['aic'] = fit_result.aic
+            fitstats['bic'] = fit_result.bic
+            fitstats['chi2'] = fit_result.chisqr
+            fitstats['chi2red'] = fit_result.redchi 
 
             #fill bestpos variable depending on model used
             if model.lower() not in ('offset_pseudo', 'offset_pseudo_gausslike', 'double', 'dbl', 'dg', 'dbl_gauss', 'double_gaussian'):
@@ -573,40 +548,63 @@ def fit_emission_lines_lmfit(data, fitwidth=4, thresh=5000., bgthresh=2000., max
                 plt.show()
                 print('WARNING: Bad fit encountered!')
                 choice = raw_input('Do you wish to continue? [y/n]')
+                #choice = 'y'
                 if choice.lower() == 'y':
                     line_pos_fitted.append(xguess)
-                    if return_qualflag:
-                        qualflag.append(0)
+                    if return_full:
+                        full_results.append(fit_result)
+                    else:
+                        if return_qualflag:
+                            qualflag.append(0)
+                        if return_all_pars:
+                            allpars.append(fit_result.params)
+                        if return_stats:
+                            stats.append(fitstats)    
                 else:
                     return
-            elif (abs(bestpos - xguess) >= 2.).all():
+            elif np.all(abs(bestpos - xguess) >= 2.):
+                fit_result.plot()
+                plt.show()
                 print('WARNING: Bad fit encountered!')
                 choice = raw_input('Do you wish to continue? [y/n]')
+                #choice = y
                 if choice.lower() == 'y':
                     line_pos_fitted.append(xguess)
-                    if return_qualflag:
-                        qualflag.append(0)
+                    if return_full:
+                        full_results.append(fit_result)
+                    else:
+                        if return_qualflag:
+                            qualflag.append(0)
+                        if return_all_pars:
+                            allpars.append(fit_result.params)
+                        if return_stats:
+                            stats.append(fitstats)
                 else:
                     return
             else:
                 line_pos_fitted.append(bestpos)
-                if return_qualflag:
-                    qualflag.append(1)
-                if return_all_pars:
-                    allpars.append(fit_result)
+                if return_full:
+                    full_results.append(fit_result)
+                else:
+                    if return_qualflag:
+                        qualflag.append(0)
+                    if return_all_pars:
+                        allpars.append(fit_result.params)
+                    if return_stats:
+                        stats.append(fitstats)
 
-            # # #this way you can quickly plot the indidvidual fits for debugging
-            # plot_osf = 10
-            # plot_os_grid = np.linspace(xrange[0], xrange[-1], plot_osf * (len(xrange) - 1) + 1)
-            # guessmodel = mod.eval(fit_result.init_params, x=plot_os_grid)
-            # bestmodel = mod.eval(fit_result.params, x=plot_os_grid)
-            # plt.figure()
-            # plt.title('model = ' + model.title())
-            # plt.xlabel('pixel number (dispersion direction)')
-            # plt.plot(xrange, data[xrange], 'b.')
-            # plt.plot(plot_os_grid, guessmodel, 'k--', label='initial guess')
-            # plt.plot(plot_os_grid, bestmodel, 'r-', label='best-fit model')
-            # plt.legend()
+#             # # #this way you can quickly plot the indidvidual fits for debugging
+            plot_osf = 10
+            plot_os_grid = np.linspace(xrange[0], xrange[-1], plot_osf * (len(xrange) - 1) + 1)
+            guessmodel = mod.eval(fit_result.init_params, x=plot_os_grid)
+            bestmodel = mod.eval(fit_result.params, x=plot_os_grid)
+            plt.figure()
+            plt.title('model = ' + model.title())
+            plt.xlabel('pixel number (dispersion direction)')
+            plt.plot(xrange, fitdata, 'bo')
+            plt.plot(plot_os_grid, guessmodel, 'k--', label='initial guess')
+            plt.plot(plot_os_grid, bestmodel, 'r-', label='best-fit model')
+            plt.legend()
 
 
         else:
@@ -614,7 +612,7 @@ def fit_emission_lines_lmfit(data, fitwidth=4, thresh=5000., bgthresh=2000., max
             return
         ################################################################################################################################################################################
 
-    if verbose:
+    if debug_level >= 1:
         plt.figure()
         plt.plot(xx, data)
         # plt.vlines(thar_pos_guess, 0, np.max(data))
@@ -624,25 +622,32 @@ def fit_emission_lines_lmfit(data, fitwidth=4, thresh=5000., bgthresh=2000., max
     if timit:
         print('Time taken for fitting emission lines: ' + str(time.time() - start_time) + ' seconds...')
 
-    if return_all_pars:
-        if varbeta:
-            if return_qualflag:
-                return np.array(line_pos_fitted), np.array(line_sigma_fitted), np.array(line_amp_fitted), np.array(
-                    line_beta_fitted), np.array(qualflag)
-            else:
-                return np.array(line_pos_fitted), np.array(line_sigma_fitted), np.array(line_amp_fitted), np.array(
-                    line_beta_fitted)
-        else:
-            if return_qualflag:
-                return np.array(line_pos_fitted), np.array(line_sigma_fitted), np.array(line_amp_fitted), np.array(
-                    qualflag)
-            else:
-                return np.array(line_pos_fitted), np.array(line_sigma_fitted), np.array(line_amp_fitted)
+    #return results
+    if return_full:
+        return full_results 
     else:
-        if return_qualflag:
-            return np.array(line_pos_fitted), np.array(qualflag)
+        if return_stats:
+            if return_all_pars:
+                if return_qualflag:
+                    return np.array(line_pos_fitted), allpars, np.array(qualflag), stats
+                else:
+                    return np.array(line_pos_fitted), allpars, stats
+            else:
+                if return_qualflag:
+                    return np.array(line_pos_fitted), np.array(qualflag), stats
+                else:
+                    return np.array(line_pos_fitted), stats
         else:
-            return np.array(line_pos_fitted)
+            if return_all_pars:
+                if return_qualflag:
+                    return np.array(line_pos_fitted), allpars, np.array(qualflag)
+                else:
+                    return np.array(line_pos_fitted), allpars
+            else:
+                if return_qualflag:
+                    return np.array(line_pos_fitted), np.array(qualflag)
+                else:
+                    return np.array(line_pos_fitted)
 
 
 

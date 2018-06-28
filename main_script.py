@@ -39,7 +39,7 @@ from veloce_reduction.spatial_profiles import fit_profiles_from_indices, make_mo
 from veloce_reduction.quick_extract import quick_extract, quick_extract_from_indices
 from veloce_reduction.collapse_extract import collapse_extract
 from veloce_reduction.optimal_extraction import optimal_extraction
-from veloce_reduction.wavelength_solution import get_wavelength_solution, get_simu_dispsol
+from veloce_reduction.wavelength_solution import get_wavelength_solution, get_simu_dispsol, fit_emission_lines_lmfit, find_suitable_peaks
 from veloce_reduction.flat_fielding import onedim_pixtopix_variations, deblaze_orders
 from get_radial_velocity import get_RV_from_xcorr
 

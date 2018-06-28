@@ -8,18 +8,21 @@ Created on 21 Nov. 2017
 from veloce_reduction.helper_functions import fibmodel, fibmodel_with_amp     #, fibmodel_with_amp_and_offset, blaze
 from veloce_reduction.order_tracing import *
 from veloce_reduction.spatial_profiles import fit_single_fibre_profile
-
+import copy
 #read in polynomial coefficients of best-fit individual-fibre-profile parameters
 fibparms = np.load('/Users/christoph/OneDrive - UNSW/fibre_profiles/sim/fibparms_by_ord.npy').item()
 
 
 
-def make_norm_profiles(x, ord, col, fibparms, nfib=19, slope=False, offset=False):  
-    
-    xx = np.arange(4096)
+def make_norm_profiles(x, ord, col, fibparms, fibs='stellar', slope=False, offset=False):  
     
     #same number of fibres for every order, of course
-    #nfib = len(fibparms['order_02'])   
+    if fibs == 'all':
+        nfib = len(fibparms[ord])  
+        userange = np.arange(nfib) 
+    elif fibs == 'stellar':
+        nfib=19
+        userange = np.arange(5,24,1)
     
     #do we want to include extra "fibres" to take care of slope and/or offset? Default is NO for both (as this should be already taken care of globally)
     if offset:
@@ -27,13 +30,16 @@ def make_norm_profiles(x, ord, col, fibparms, nfib=19, slope=False, offset=False
     if slope:
         nfib += 1
     
-    phi = np.zeros((len(x),nfib))
+    phi = np.zeros((len(x),28))
     
-    for k,fib in enumerate(sorted(fibparms[ord].iterkeys())):
+    for k,fib in enumerate(sorted(fibparms[ord].keys())):
         mu = fibparms[ord][fib]['mu_fit'](col)
         sigma = fibparms[ord][fib]['sigma_fit'](col)
         beta = fibparms[ord][fib]['beta_fit'](col)
         phi[:,k] = fibmodel(x, mu, sigma, beta=beta, alpha=0, norm=0)
+    
+    #deprecate phi-array to only use wanted fibres
+    phi = phi[:,userange]
     
     if offset:
         phi[:,-2] = 1.
@@ -41,7 +47,53 @@ def make_norm_profiles(x, ord, col, fibparms, nfib=19, slope=False, offset=False
         phi[:,-1] = x - x[0]
     
     #return normalized profiles
-    return phi/np.sum(phi,axis=0)
+    phinorm =  phi/np.sum(phi,axis=0)
+
+    return phinorm
+
+
+
+def make_norm_profiles_2(x, col, fppo, fibs='stellar', slope=False, offset=False):  
+    """
+    same as "make_norm_profiles", but takes as "fppo" (=fibparms per order) as input, rather
+    than "ord" and the entire "fibparms" dictiobnary
+    """
+    #same number of fibres for every order, of course
+    if fibs == 'all':
+        nfib = len(fibparms[ord])  
+        userange = np.arange(nfib) 
+    elif fibs == 'stellar':
+        nfib=19
+        userange = np.arange(5,24,1)
+    
+    #do we want to include extra "fibres" to take care of slope and/or offset? Default is NO for both (as this should be already taken care of globally)
+    if offset:
+        nfib += 1
+    if slope:
+        nfib += 1
+    
+    phi = np.zeros((len(x),28))
+    
+    for k,fib in enumerate(sorted(fppo.keys())):
+        mu = fppo[fib]['mu_fit'](col)
+        sigma = fppo[fib]['sigma_fit'](col)
+        beta = fppo[fib]['beta_fit'](col)
+        phi[:,k] = fibmodel(x, mu, sigma, beta=beta, alpha=0, norm=0)
+    
+    #deprecate phi-array to only use wanted fibres
+    phi = phi[:,userange]
+    
+    if offset:
+        phi[:,-2] = 1.
+    if slope:
+        phi[:,-1] = x - x[0]
+    
+    #return normalized profiles
+    phinorm =  phi/np.sum(phi,axis=0)
+
+    return phinorm
+
+
 
 
 def make_norm_profiles_temp(x, ord, col, fibparms, slope=False, offset=False):  

@@ -61,7 +61,7 @@ def fibmodel_fwhm(xarr, mu, fwhm, beta=2, alpha=0, norm=0):
             return phi * (1. + special.erf(alpha * xarr / np.sqrt(2.)))
 
 
-# model for the fibre profiles
+# model for the fibre profiles (gauss-like function)
 def fibmodel(xarr, mu, sigma, beta=2, alpha=0, norm=0):
         
     #define constant (FWHM vs sigma, because FWHM = sigma * 2*sqrt(2*log(2))
@@ -758,4 +758,6 @@ def central_parts_of_mask(mask):
 #     return x, w, b, matrices
 
 
-
+def linfunc(p, x):
+    c,m = p
+    return m*x + c
