@@ -346,7 +346,7 @@ def make_pseudo_obs(seeing=None, simpath='/Volumes/BERGRAID/data/simu/', nfib=19
     'timit'            : boolean - do you want to clock the run-time?
     
     OUTPUT:
-    'master_dict'      : dictionary containing the simulated spectra for all seeing values (only if the 'savefile' keyword is not set)
+    'master_dict'      : dictionary containing the simulated spectra for all seeing values (only if the 'savefile' keyword is not set, otherwise results are saved to FITS file(s))
     
     TODO: 
     add SNR   -   for now this is for a given (fixed) observing time, i.e. the total flux captured by the IFU drops as the seeing increases
@@ -371,7 +371,7 @@ def make_pseudo_obs(seeing=None, simpath='/Volumes/BERGRAID/data/simu/', nfib=19
     else:
         if len(get_iterable(slitamps))==1:
             slitamps = np.repeat(slitamps, nfib).astype(float)
-#         #reshape to accommodate the possibility of having multiple seeing condittions below
+#         #reshape to accommodate the possibility of having multiple seeing conditions below
 #         slitamps = np.reshape(slitamps, (19,1))
         if norm_slitamps:
             slitamps = slitamps.astype(float) / np.sum(slitamps)
@@ -516,7 +516,7 @@ def make_pseudo_obs_with_noise(seeing, snrs=None, RON=0., simpath='/Volumes/BERG
     'timit'            : boolean - do you want to time the execution time?
     
     OUTPUT:
-    'master_dict'      : dictionary containing the simulated spectra for all seeing values (only if the 'savefile' keyword is not set)
+    'master_dict'      : dictionary containing the simulated spectra for all seeing values (only if the 'savefile' keyword is not set, otherwise results are saved to FITS file(s))
     
     TODO: add SNR   -   for now this is for a given (fixed) observing time, i.e. the total flux captured by the IFU drops as the seeing increases
     
@@ -655,6 +655,207 @@ def make_pseudo_obs_with_noise(seeing, snrs=None, RON=0., simpath='/Volumes/BERG
 
 
 
+def make_mult_pseudo_obs(offsets=0., slitamps=1., nfib=19, simpath='/Volumes/BERGRAID/data/simu/',  outpath='/Volumes/BERGRAID/data/simu/composite/', norm_slitamps=False, 
+                         template=False, add_laser=False, savefile=True, verbose=False, debug_level=0, timit=False):    
+    """
+    This routine creates simulated observations by adding together the individual-fibre spectra from my EchelleSimulator library using the appropriate relative intensities.
+    It does essentially the same as "make_pseudo_obs", but takes fibre-offsets and slitamps as user-defined inputs (ie as if 'fixed_offsets' and 'fixed_slitamps' were both
+    set to TRUE in "make_pseudo_obs", and no 'seeing' array was provided).
+    
+    INPUT:
+    'offsets'          : constant offset for all fibres (can be scalar (all fibres have same offset), or array of size (nobs,nfib))
+    'slitamps'         : constant slitamps for all fibres (=relative intensities) (can be scalar (all fibres have same offset), or array of size (nobs,nfib))
+    'nfib'             : the number of (stellar) fibres to use
+    'simpath'          : path to my EchelleSimulator spectrum library
+    'outpath'          : root-directory for the output files (sub-directories will be created every time this routine is run because of the random-normal pseudo-slit alignments)
+    'norm_slitamps'    : boolean - do you want to 'normalize' the slitamps so they add up to 1? (only used if 'fixed_slitamps' is set to TRUE)     
+    'template'         : boolean - is this going to be a template? in that case use the 'maxsnr' spectra...
+    'add_laser'        : boolean - do you want to add the LFC in fibre 1?
+    'savefile'         : boolean - do you want to save the simulated spectra as FITS files?
+    'verbose'          : boolean - for debugging...
+    'debug_level'      : boolean - for debugging...
+    'timit'            : boolean - do you want to clock the run-time?
+    
+    OUTPUT:
+    'master_dict'      : dictionary containing the simulated spectra for all seeing values (only if the 'savefile' keyword is not set, otherwise results are saved to FITS file(s))
+    
+    TODO: 
+    add SNR   -   for now this is for a given (fixed) observing time, i.e. the total flux captured by the IFU drops as the seeing increases
+    
+    MODHIST:
+    02/07/2018 - CMB create (clone of "make_pseudo_obs")
+    """
+    
+    
+    ##### (1) #####
+    # fibre-offsets formatting
+    # (i) if a scalar is provided; nobs=1, use for all fibres
+    if len(get_iterable(offsets)) == 1:
+        nobs_from_offsets = 1
+        offsets = np.repeat(offsets, nfib)
+        #how can you do this for multiple obs?
+        if debug_level >= 1:
+            plot_pseudoslit(offsets)
+    # (ii) if a nfib-element array is provided; nobs=1
+    elif np.array(offsets).ndim == 1:
+        if offsets.shape[0] == nfib:
+            nobs_from_offsets = 1
+            offsets = np.array(offsets)
+        else:
+            print('ERROR: "offsets" has the wrong shape!!!')
+            return
+        #how can you do this for multiple obs?
+        if debug_level >= 1:
+            plot_pseudoslit(offsets)
+    # (iii) a (nx,nfib)-element array is provided; nobs=nx
+    else:
+        if offsets.shape[1] != nfib:
+            print('ERROR: "offsets" has the wrong shape!!!')
+            return
+        else:
+            nobs_from_offsets = offsets.shape[0]        
+        
+        
+    ##### (2) #####
+    # slitamps formatting
+    # (i) if a scalar is provided; nobs=1, use for all fibres
+    if len(get_iterable(slitamps)) == 1:
+        nobs_from_slitamps = 1
+        slitamps = np.repeat(slitamps, nfib).astype(float)
+    # (ii) if a nfib-element array is provided; nobs=1
+    elif np.array(slitamps).ndim == 1:
+        if slitamps.shape[0] == nfib:
+            nobs_from_slitamps = 1
+        else:
+            print('ERROR: "slitamps" has the wrong shape!!!')
+            return
+    # (iii) a (nx,nfib)-element array is provided; nobs=nx
+    else:
+        if slitamps.shape[1] != nfib:
+            print('ERROR: "slitamps" has the wrong shape!!!')
+            return
+        else:
+            nobs_from_slitamps = slitamps.shape[0]
+            
+            
+    #make sure we have consistent dimensions between "offsets" and "slitamps"
+    if nobs_from_offsets > nobs_from_slitamps:
+        if nobs_from_slitamps == 1:
+            print('WARNING: number of fibres inferred from "offsets" is LARGER than from "slitamps" !!!')
+            print('Using same slitamps for all observations...')
+            nobs = nobs_from_offsets
+            slitamps_1dim = slitamps.copy()
+            while nobs_from_slitamps < nobs_from_offsets: 
+                slitamps = np.vstack((slitamps,slitamps))
+                nobs_from_slitamps += 1
+        else:
+            print('ERROR: dimensions of "offsets" and "slitamps" do not agree!!!')
+            return
+    elif nobs_from_offsets < nobs_from_slitamps:
+        if nobs_from_offsets == 1:
+            print('WARNING: number of fibres inferred from "offsets" is SMALLER than from "slitamps" !!!')
+            print('Using same offsets for all observations...')
+            nobs = nobs_from_slitamps
+            offsets_1dim = offsets.copy()
+            while nobs_from_offsets < nobs_from_slitamps: 
+                offsets = np.vstack((offsets,offsets_1dim))
+                nobs_from_offsets += 1
+        else:
+            print('ERROR: dimensions of "offsets" and "slitamps" do not agree!!!')
+            return
+    else:
+        nobs = nobs_from_offsets
+                
+        
+    ## reshape to accommodate the possibility of having multiple seeing conditions below
+    # slitamps = np.reshape(slitamps, (19,1))
+
+    if norm_slitamps:
+        slitsums = slitamps.sum(axis=1, keepdims=True)
+        slitamps = slitamps.astype(float) / slitsums
+    
+    
+    if savefile:
+        #create new sub-folder with info files containing info on the fibre offsets and the slitamps (=relative intensities)
+        datestring = get_datestring()
+        dum = 1
+        newpath = outpath + 'tests_' + datestring
+        dumpath = outpath + 'tests_' + datestring
+        while os.path.exists(dumpath):
+            dum += 1
+            dumpath = newpath + '_' + str(dum)
+        if dum > 1:
+            newpath = newpath + '_' + str(dum)
+        #create new folder
+        os.makedirs(newpath)
+    else:
+        master_dict = {}
+    
+    
+    #loop over all observations
+    for i in np.arange(nobs):
+        if verbose:
+            print('Simulating observation '+str(i+1)+'/'+str(nobs))
+            
+        #some string manipulations for filenames in for loop below
+        strshifts = np.abs(offsets[i,:]).astype(int).astype(str)
+        redblue = np.empty(nfib).astype(str)
+        redblue[offsets[i,:] > 0] = 'red'
+        redblue[offsets[i,:] < 0] = 'blue'
+        redblue[offsets[i,:] == 0] = ''
+        if add_laser:
+            laserstr = '_laser'
+        else:
+            laserstr = ''
+        if template:
+            tstring = '_template'
+            maxsnr_string = '_maxsnr'
+        else:
+            tstring = ''
+            maxsnr_string = ''    
+        
+        
+        #write OFFSETS file
+        outfn = newpath + '/' + 'offsets_'+str(i+1).zfill(len(str(nobs)))+'.txt' 
+        outfile = open(outfn, 'w')
+        outfile.writelines(["%s\n" % item for item in offsets[i,:].astype(str)])
+        outfile.close()
+        #write SLITAMPS file
+        outfn = newpath + '/' + 'slitamps_'+str(i+1).zfill(len(str(nobs)))+'.txt' 
+        outfile = open(outfn, 'w')
+        outfile.writelines(["%s\n" % item for item in slitamps[i,:].astype(str)])
+        outfile.close()
+        
+            
+        #use fibre-slots 6 to 24
+        for n in range(nfib):
+            fibslot = str(n+6).zfill(2)
+            img = pyfits.getdata(simpath+'fib'+fibslot+'_'+redblue[n]+strshifts[n]+'ms'+maxsnr_string+'.fit') 
+            if n==0:
+                master = (img.copy().astype(float) * slitamps[i,n]) + 1.
+                h = pyfits.getheader(simpath+'fib'+fibslot+'_'+redblue[n]+strshifts[n]+'ms'+maxsnr_string+'.fit')
+            else:
+                master += img * slitamps[i,n]
+        if add_laser:
+            laser_img = pyfits.getdata(simpath + 'veloce_laser_comb.fit')
+            master += laser_img/5.
+        if savefile:
+            #save to file
+            pyfits.writeto(newpath+'/syntobs_'+str(i+1).zfill(len(str(nobs)))+laserstr+tstring+'.fit', master, h, clobber=True)
+        else:
+            master_dict['syntobs_'+str(i+1)] = master
+
+    
+    if savefile:
+        #print('Offsets: ',offsets)
+        return
+    else:
+        return master_dict
+
+
+
+
+
 def make_scaled_white_noise(err_amps):
     ny,nx = err_amps.shape
     #noise with sigma=1
@@ -662,6 +863,58 @@ def make_scaled_white_noise(err_amps):
     #scale noise with "error-amplitudes"
     scaled_noise = noise * err_amps
     return scaled_noise
+
+
+
+
+
+def add_rel_scatter_to_slitamps(slitamps, relerr):    
+    ny,nx = slitamps.shape
+    #noise with sigma=1
+    noise = np.resize(np.random.normal(0, 1, nx*ny),(ny,nx))
+    #scale noise with "error-amplitudes"
+    scaled_noise = noise * relerr * slitamps
+    noisy_slitamps = slitamps + scaled_noise
+    return noisy_slitamps
+    
+
+
+
+
+def slitamps_scatter_test(seeing=1.5, ntest=10, relerr=0.1):
+    
+    #use typical seeing condition
+    fr = flux_ratios_from_seeing(seeing, verbose=False)
+    #then get an array of the relative intensities in the pseudo-slit
+    theo_slitamps = get_pseudo_slitamps(fr['central'], fr['inner'], fr['outer1'], fr['outer2'])
+
+    #weird formatting thing
+    n=1
+    nf_slitamps = theo_slitamps.T
+    while n < ntest:
+        nf_slitamps = np.vstack((nf_slitamps,theo_slitamps.T))
+        n += 1
+    
+    ##this is the array that we will pass to "make_mult_pseudo_obs"
+    #allslitamps = []
+
+    for re in relerr:
+        #add some scatter to the slitamps
+        re_slitamps = add_rel_scatter_to_slitamps(nf_slitamps, re)
+        try:
+            allslitamps = np.vstack((allslitamps, re_slitamps))
+        except:
+            allslitamps = re_slitamps
+
+    #make on-the-fly templates
+    dum = make_mult_pseudo_obs(offsets=0., slitamps=allslitamps, nfib=19, norm_slitamps=True, template=True, verbose=True)
+
+    return
+
+
+
+
+
 
 
 

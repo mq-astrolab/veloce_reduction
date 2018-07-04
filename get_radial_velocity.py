@@ -10,46 +10,47 @@ import matplotlib.pyplot as plt
 from astropy.io import ascii
 import scipy.interpolate as interp
 import scipy.optimize as op
+import time
 #from scipy import ndimage
 from veloce_reduction.helper_functions import gausslike_with_amp_and_offset_and_slope, central_parts_of_mask
 from veloce_reduction.wavelength_solution import get_simu_dispsol
 from veloce_reduction.flat_fielding import deblaze_orders
 
 
-#speed of light in m/s
-c = 2.99792458e8
-#oversampling factor for logarithmic wavelength rebinning
-osf = 2
-
-#read dispersion solution from file
-dispsol = np.load('/Users/christoph/OneDrive - UNSW/dispsol/mean_dispsol_by_orders_from_zemax.npy').item()
-
-#read extracted spectrum from files (obviously this needs to be improved)
-xx = np.arange(4096)
-
-#for simulated data only
-wl = get_simu_dispsol()
-    
-
-#re-bin into logarithmic wavelength space for cross-correlation, b/c delta_log_wl = c * delta_v
-refdata = ascii.read('/Users/christoph/OneDrive - UNSW/rvtest/high_SNR_solar_template.txt', names=('pixnum','wl','flux','err'))
-# flux1 = data1['flux']
-# err1 = data1['err']
-#data2 = ascii.read('/Users/christoph/OneDrive - UNSW/rvtest/solar_red100ms.txt', names=('pixnum','wl','flux','err'))
-# flux2 = data2['flux']
-# err2 = data2['err']
-# obsdata = ascii.read('/Users/christoph/OneDrive - UNSW/rvtest/solar_0ms.txt', names=('pixnum','wl','flux','err'))
-# obsdata = ascii.read('/Users/christoph/OneDrive - UNSW/rvtest/solar_red100ms.txt', names=('pixnum','wl','flux','err'))
-obsdata = ascii.read('/Users/christoph/OneDrive - UNSW/rvtest/solar_red1000ms.txt', names=('pixnum','wl','flux','err'))
-# flux3 = data3['flux']
-# err3 = data3['err']
-flatdata = ascii.read('/Users/christoph/OneDrive - UNSW/rvtest/tramline_extracted_flat.txt', names=('pixnum','wl','flux','err'))
-# flatflux = flatdata['flux']
-# flaterr = flatdata['err']
-#wl1 = data1['wl']
-#wl2 = data2['wl']
-# wl = data1['wl']
-# pixnum = data1['pixnum']
+# #speed of light in m/s
+# c = 2.99792458e8
+# #oversampling factor for logarithmic wavelength rebinning
+# osf = 2
+# 
+# #read dispersion solution from file
+# dispsol = np.load('/Users/christoph/OneDrive - UNSW/dispsol/mean_dispsol_by_orders_from_zemax.npy').item()
+# 
+# #read extracted spectrum from files (obviously this needs to be improved)
+# xx = np.arange(4096)
+# 
+# #for simulated data only
+# wl = get_simu_dispsol()
+#     
+# 
+# #re-bin into logarithmic wavelength space for cross-correlation, b/c delta_log_wl = c * delta_v
+# refdata = ascii.read('/Users/christoph/OneDrive - UNSW/rvtest/high_SNR_solar_template.txt', names=('pixnum','wl','flux','err'))
+# # flux1 = data1['flux']
+# # err1 = data1['err']
+# #data2 = ascii.read('/Users/christoph/OneDrive - UNSW/rvtest/solar_red100ms.txt', names=('pixnum','wl','flux','err'))
+# # flux2 = data2['flux']
+# # err2 = data2['err']
+# # obsdata = ascii.read('/Users/christoph/OneDrive - UNSW/rvtest/solar_0ms.txt', names=('pixnum','wl','flux','err'))
+# # obsdata = ascii.read('/Users/christoph/OneDrive - UNSW/rvtest/solar_red100ms.txt', names=('pixnum','wl','flux','err'))
+# obsdata = ascii.read('/Users/christoph/OneDrive - UNSW/rvtest/solar_red1000ms.txt', names=('pixnum','wl','flux','err'))
+# # flux3 = data3['flux']
+# # err3 = data3['err']
+# flatdata = ascii.read('/Users/christoph/OneDrive - UNSW/rvtest/tramline_extracted_flat.txt', names=('pixnum','wl','flux','err'))
+# # flatflux = flatdata['flux']
+# # flaterr = flatdata['err']
+# #wl1 = data1['wl']
+# #wl2 = data2['wl']
+# # wl = data1['wl']
+# # pixnum = data1['pixnum']
 
 
 
@@ -128,7 +129,7 @@ def get_rvs_from_xcorr(extracted_spectra, obsnames, mask, smoothed_flat, debug_l
     
     
     
-def get_RV_from_xcorr(f, err, wl, f0, wl0, mask=None, smoothed_flat=None, osf=2, delta_log_wl=1e-6, relgrid=False, filter_width=25, bad_threshold=0.05, simu=False, debug_level=0):    
+def get_RV_from_xcorr(f, err, wl, f0, wl0, mask=None, smoothed_flat=None, osf=2, delta_log_wl=1e-6, relgrid=False, filter_width=25, bad_threshold=0.05, simu=False, debug_level=0, timit=False):    
     """
     This routine calculates the radial velocity of an observed spectrum relative to a template using cross-correlation. 
     Note that input spectra should be de-blazed already!!!
@@ -149,6 +150,7 @@ def get_RV_from_xcorr(f, err, wl, f0, wl0, mask=None, smoothed_flat=None, osf=2,
     'bad_threshold' : if no mask is provided, create a mask that requires the flux in the extracted white to be larger than this fraction of the maximum flux in that order
     'simu'          : boolean - are you using ES simulated spectra? (only used if mask is not provided)
     'debug_level'   : boolean - for debugging...
+    'timit'         : boolean - for timing the execution run time...
     
     OUTPUT:
     'rv'         : dictionary with the measured RVs for each order
@@ -159,6 +161,9 @@ def get_RV_from_xcorr(f, err, wl, f0, wl0, mask=None, smoothed_flat=None, osf=2,
     04/06/2018 - CMB fixed bug when turning around arrays (need to use new variable)
     28/06/2018 - CMB fixed bug with interpolation of log wls
     """
+    
+    if timit:
+        start_time = time.time()
     
     #speed of light in m/s
     c = 2.99792458e8
@@ -275,6 +280,10 @@ def get_RV_from_xcorr(f, err, wl, f0, wl0, mask=None, smoothed_flat=None, osf=2,
         rv[ord] = c * (shift - (len(xc)//2)) * delta_log_wl
         rverr[ord] = c * shift_err * delta_log_wl
     
+    if timit:
+        delta_t = time.time() - start_time
+        print('Time taken for calculating RV: '+str(np.round(delta_t,2))+' seconds')
+    
     return rv,rverr
     
     
@@ -298,44 +307,48 @@ def get_RV_from_xcorr(f, err, wl, f0, wl0, mask=None, smoothed_flat=None, osf=2,
 
 
 
-
-
-    
-    
-    
-    
-    
-    
-    
-    
-testrv = np.array([value for (key, value) in sorted(rv.items())])
-testerr = np.array([value for (key, value) in sorted(rverr.items())])  
-testw = 1./(testerr**2)
-print(np.average(testrv, weights=testw))
-    
-    
- 
 #############################################################################################################################    
+#############################################################################################################################    
+#############################################################################################################################    
+#############################################################################################################################    
+#############################################################################################################################    
+
     
     
     
-# or do we maybe want to cut it up into chunks, and determine a RV for every chunk???
-dum1 = (rebinned_flux1 - np.median(rebinned_flux1)).reshape((osf*16,256))
-dum3 = (rebinned_flux3 - np.median(rebinned_flux3)).reshape((osf*16,256))
-dumwl = logwlgrid.reshape((osf*16,256))   
-rv = [] 
-for i in range(len(dum1)):
-    ref = dum1[i,:]
-    flux = dum3[i,:]
-    xc = np.correlate(ref, flux, mode='same')
-    #now fit Gaussian to central section of CCF
-    fitrangesize = 9
-    xrange = np.arange(np.argmax(xc)-fitrangesize, np.argmax(xc)+fitrangesize+1, 1)
-    guess = np.array((np.argmax(xc), 3., (xc[np.argmax(xc)]-xc[np.argmax(xc)-fitrangesize])/np.max(xc), xc[np.argmax(xc)-fitrangesize]/np.max(xc), 0.))
-    #maybe use a different model, ie include a varying beta-parameter???
-    popt, pcov = op.curve_fit(gaussian_with_offset_and_slope, xrange, xc[np.argmax(xc)-fitrangesize : np.argmax(xc)+fitrangesize+1]/np.max(xc), p0=guess)
-    shift = popt[0]
-    rv.append(c * (shift - (len(xc)//2)) * delta_log_wl)
+    
+    
+    
+    
+    
+# testrv = np.array([value for (key, value) in sorted(rv.items())])
+# testerr = np.array([value for (key, value) in sorted(rverr.items())])  
+# testw = 1./(testerr**2)
+# print(np.average(testrv, weights=testw))
+#     
+#     
+#  
+# #############################################################################################################################    
+#     
+#     
+#     
+# # or do we maybe want to cut it up into chunks, and determine a RV for every chunk???
+# dum1 = (rebinned_flux1 - np.median(rebinned_flux1)).reshape((osf*16,256))
+# dum3 = (rebinned_flux3 - np.median(rebinned_flux3)).reshape((osf*16,256))
+# dumwl = logwlgrid.reshape((osf*16,256))   
+# rv = [] 
+# for i in range(len(dum1)):
+#     ref = dum1[i,:]
+#     flux = dum3[i,:]
+#     xc = np.correlate(ref, flux, mode='same')
+#     #now fit Gaussian to central section of CCF
+#     fitrangesize = 9
+#     xrange = np.arange(np.argmax(xc)-fitrangesize, np.argmax(xc)+fitrangesize+1, 1)
+#     guess = np.array((np.argmax(xc), 3., (xc[np.argmax(xc)]-xc[np.argmax(xc)-fitrangesize])/np.max(xc), xc[np.argmax(xc)-fitrangesize]/np.max(xc), 0.))
+#     #maybe use a different model, ie include a varying beta-parameter???
+#     popt, pcov = op.curve_fit(gaussian_with_offset_and_slope, xrange, xc[np.argmax(xc)-fitrangesize : np.argmax(xc)+fitrangesize+1]/np.max(xc), p0=guess)
+#     shift = popt[0]
+#     rv.append(c * (shift - (len(xc)//2)) * delta_log_wl)
     
     
 # start_time = time.time()

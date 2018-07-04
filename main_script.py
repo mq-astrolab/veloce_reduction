@@ -41,6 +41,8 @@ from veloce_reduction.collapse_extract import collapse_extract
 from veloce_reduction.optimal_extraction import optimal_extraction
 from veloce_reduction.wavelength_solution import get_wavelength_solution, get_simu_dispsol, fit_emission_lines_lmfit, find_suitable_peaks
 from veloce_reduction.flat_fielding import onedim_pixtopix_variations, deblaze_orders
+from veloce_reduction.relative_intensities import get_relints, get_relints_single_order
+#from veloce_reduction.pseudoslit_simulations import *
 from get_radial_velocity import get_RV_from_xcorr
 
 
@@ -275,6 +277,10 @@ pix,flux,err = collapse_extract(stripes, tramlines, laser=False, RON=4., gain=1.
 # (c) Optimal Extraction
 pix2,flux2,err2 = optimal_extraction(img, P_id, stripes, stripe_indices, RON=4., gain=1., timit=True, individual_fibres=False)
 
+
+
+### in any case, now get relative intensities in fibres
+relints = get_relints(P_id, stripes, mask=mask, sampling_size=25, slit_height=25, timit=True)
 #####################################################################################################################################################
 
 
@@ -326,10 +332,11 @@ for obs in sorted(quick_extracted.keys()):
 
 # (11) RADIAL VELOCITY ##############################################################################################################################
 # #preparations, eg:
-# f = quick_extracted['seeing1.0']['flux'].copy()
-# err = quick_extracted['seeing1.0']['err'].copy()
+# f = quick_extracted['seeing1.5']['flux'].copy()
+# err = quick_extracted['seeing1.5']['err'].copy()
+# wl = quick_extracted['seeing1.5']['wl'].copy()
 # f0 = quick_extracted['template']['flux'].copy()
-# wl0 = wl.copy()
+# wl0 = quick_extracted['template']['wl'].copy()
 # #(a) using cross-correlation
 # #if using cross-correlation, we need to de-blaze the spectra first
 # f_dblz, err_dblz = deblaze_orders(f, wl, smoothed_flat, mask, err=err)
