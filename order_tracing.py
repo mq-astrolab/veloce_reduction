@@ -142,7 +142,7 @@ def find_stripes(flat, deg_polynomial=2, gauss_filter_sigma=3., min_peak=0.05, m
                 if (filtered_flat[start_row,column] - np.median(clipped) < 5.*np.std(clipped)) or (start_row in (0,nx-1)):
                     mask[m,column] = False
             else:
-                if ((p < maskthresh).all()) or (start_row in (0,ny-1)) or (simu==True and m==0 and column < 1070):
+                if ((p < maskthresh).all()) or (start_row in (0,ny-1)) or (simu==True and m==0 and column < 1300):
                     mask[m,column] = False
     # do Polynomial fit for each order
     #logging.info('Fit polynomial of order %d to each stripe' % deg_polynomial)
@@ -341,7 +341,7 @@ def flatten_single_stripe(stripe, slit_height=25, timit=False):
     CMB 06/09/2017
     
     This function stores the non-zero values of the sparse matrix "stripe" in a rectangular array, ie
-    take out the curvature of the order/stripe, potentially only useful for further processing.
+    take out the curvature of the order/stripe, potentially useful for further processing.
 
     INPUT:
     "stripe": sparse 4096x4096 matrix, non-zero for just one stripe/order of user defined width (=2*slit_height in "extract_stripes")
@@ -483,7 +483,7 @@ def flatten_single_stripe_from_indices(img, indices, slit_height=25, timit=False
     CMB 07/03/2018
     
     This function stores the non-zero values of the sparse matrix "stripe" in a rectangular array, ie
-    take out the curvature of the order/stripe, potentially only useful for further processing.
+    take out the curvature of the order/stripe, potentially useful for further processing.
 
     INPUT:
     "img": the image from the FITS file
@@ -589,145 +589,6 @@ def find_maxima(data, gauss_filter_sigma=0., min_peak=0.1, return_values=0):
 
 
 
-def test():    
-    
-    
-
-# np.save('/Users/christoph/UNSW/fibre_profiles/masks/mask_01.npy',mask)
-    
-#     stripe = stripes_03[ord]
-#     ordpol = P_id_03[ord]
-#     sc,sr = flatten_single_stripe(stripe,slit_height=10,timit=False)
-#     colfits = fit_profiles_single_order(sr,sc,ordpol,osf=1,silent=1,timit=timit)
-#     fibre_profiles_03 = {}
-#     fibre_profiles_03[ord] = colfits
-#     np.save('/Users/christoph/UNSW/fibre_profiles/sim/fibre_profiles_03_temp.npy', fibre_profiles_03) 
-#     
-#     stripe = stripes_21[ord]
-#     ordpol = P_id_21[ord]
-#     sc,sr = flatten_single_stripe(stripe,slit_height=10,timit=False)
-#     colfits = fit_profiles_single_order(sr,sc,ordpol,osf=1,silent=1,timit=timit)
-#     fibre_profiles_21 = {}
-#     fibre_profiles_21[ord] = colfits
-#     np.save('/Users/christoph/UNSW/fibre_profiles/sim/fibre_profiles_21_temp.npy', fibre_profiles_21)
-#     
-#     stripe = stripes_22[ord]
-#     ordpol = P_id_22[ord]
-#     sc,sr = flatten_single_stripe(stripe,slit_height=10,timit=False)
-#     colfits = fit_profiles_single_order(sr,sc,ordpol,osf=1,silent=1,timit=timit)
-#     fibre_profiles_22 = {}
-#     fibre_profiles_22[ord] = colfits
-#     np.save('/Users/christoph/UNSW/fibre_profiles/sim/fibre_profiles_22_temp.npy', fibre_profiles_22)
-    
-    
-#     fibre_profiles_02 = fit_profiles(img02, P_id_02, stripes_02)
-#     np.save('/Users/christoph/UNSW/fibre_profiles/sim/fibre_profiles_02.npy', fibre_profiles_02) 
-#     fibre_profiles_03 = fit_profiles(img03, P_id_03, stripes_03)
-#     np.save('/Users/christoph/UNSW/fibre_profiles/sim/fibre_profiles_03.npy', fibre_profiles_03) 
-#     fibre_profiles_21 = fit_profiles(img21, P_id_21, stripes_21)
-#     np.save('/Users/christoph/UNSW/fibre_profiles/sim/fibre_profiles_21.npy', fibre_profiles_21) 
-#     fibre_profiles_22 = fit_profiles(img22, P_id_22, stripes_22)
-#     np.save('/Users/christoph/UNSW/fibre_profiles/sim/fibre_profiles_22.npy', fibre_profiles_22) 
-#     
-#     fibre_profiles_02 = np.load('/Users/christoph/UNSW/fibre_profiles/sim/fibre_profiles_02.npy').item()
-#     fibre_profiles_03 = np.load('/Users/christoph/UNSW/fibre_profiles/sim/fibre_profiles_03.npy').item()
-#     mu02 = np.array(fibre_profiles_02['order_10']['mu'])
-#     mu03 = np.array(fibre_profiles_03['order_10']['mu'])
-#     amp02 = np.array(fibre_profiles_02['order_10']['amp'])
-#     amp03 = np.array(fibre_profiles_03['order_10']['amp'])
-#     chi2red_02 = np.array(fibre_profiles_02['order_10']['chi2red'])
-#     chi2red_03 = np.array(fibre_profiles_03['order_10']['chi2red'])
-    
-#     flat01name = '/Users/christoph/UNSW/simulated_spectra/ES/veloce_flat_t70000_single_fib01.fit'
-#     flat02name = '/Users/christoph/UNSW/simulated_spectra/ES/veloce_flat_t70000_single_fib02.fit'
-#     flat03name = '/Users/christoph/UNSW/simulated_spectra/ES/veloce_flat_t70000_single_fib03.fit'
-#     flat04name = '/Users/christoph/UNSW/simulated_spectra/ES/veloce_flat_t70000_single_fib04.fit'
-#     flat05name = '/Users/christoph/UNSW/simulated_spectra/ES/veloce_flat_t70000_single_fib05.fit'
-#     flat06name = '/Users/christoph/UNSW/simulated_spectra/ES/veloce_flat_t70000_single_fib06.fit'
-#     flat07name = '/Users/christoph/UNSW/simulated_spectra/ES/veloce_flat_t70000_single_fib07.fit'
-#     flat08name = '/Users/christoph/UNSW/simulated_spectra/ES/veloce_flat_t70000_single_fib08.fit'
-#     flat09name = '/Users/christoph/UNSW/simulated_spectra/ES/veloce_flat_t70000_single_fib09.fit'
-#     flat01 = pyfits.getdata(flat01name)
-#     flat02 = pyfits.getdata(flat02name)
-#     flat03 = pyfits.getdata(flat03name)
-#     flat04 = pyfits.getdata(flat04name)
-#     flat05 = pyfits.getdata(flat05name)
-#     flat06 = pyfits.getdata(flat06name)
-#     flat07 = pyfits.getdata(flat07name)
-#     flat08 = pyfits.getdata(flat08name)
-#     flat09 = pyfits.getdata(flat09name)
-#     img01 = flat01 + 1.
-#     img02 = flat02 + 1.
-#     img03 = flat03 + 1.
-#     img04 = flat04 + 1.
-#     img05 = flat05 + 1.
-#     img06 = flat06 + 1.
-#     img07 = flat07 + 1.
-#     img08 = flat08 + 1.  
-#     img09 = flat09 + 1.  
-    
-    
-# for i in range(28):
-#     print(i)
-#     
-#     flatname = '/Users/christoph/UNSW/simulated_spectra/ES/veloce_flat_t70000_single_fib'+str(i+1).zfill(2)+'.fit'
-#     flat = pyfits.getdata(flatname)
-#     img = flat + 1.
-#       
-#     P,tempmask = find_stripes(flat, deg_polynomial=2)
-#     P_id = make_P_id(P)
-#     mask = make_mask_dict(tempmask)
-#     np.save('/Users/christoph/UNSW/fibre_profiles/masks/mask_'+str(i+1).zfill(2)+'.npy', mask)
-    
-#     stripes = extract_stripes(img, P_id, slit_height=10)
-#     fibre_profiles = fit_profiles(P_id, stripes)   
-#     np.save('/Users/christoph/UNSW/fibre_profiles/sim/fibre_profiles_'+str(i+1).zfill(2)+'.npy', fibre_profiles)
-     
-     
-     
-     
-     
-#     fibre_profiles_02 = fit_profiles(img02, P_id_02, stripes_02)
-#     np.save('/Users/christoph/UNSW/fibre_profiles/sim/fibre_profiles_02.npy', fibre_profiles_02) 
-#     fibre_profiles_03 = fit_profiles(img03, P_id_03, stripes_03)
-#     np.save('/Users/christoph/UNSW/fibre_profiles/sim/fibre_profiles_03.npy', fibre_profiles_03) 
-#     
-#     fibre_profiles_21 = fit_profiles(img21, P_id_21, stripes_21)
-#     np.save('/Users/christoph/UNSW/fibre_profiles/sim/fibre_profiles_21.npy', fibre_profiles_21) 
-#     fibre_profiles_22 = fit_profiles(img22, P_id_22, stripes_22)
-#     np.save('/Users/christoph/UNSW/fibre_profiles/sim/fibre_profiles_22.npy', fibre_profiles_22) 
-
-    
-#     # do Polynomial fit 
-#     xx = np.arange(4096)
-#     
-# #     p2 = np.poly1d(np.polyfit(xx, mu03, 2))
-# #     p3 = np.poly1d(np.polyfit(xx, mu03, 3))
-# #     p4 = np.poly1d(np.polyfit(xx, mu03, 4))
-# #     p5 = np.poly1d(np.polyfit(xx, mu03, 5))
-# #     res2 = mu03 - p2(xx)
-# #     res3 = mu03 - p3(xx)
-# #     res4 = mu03 - p4(xx)
-# #     res5 = mu03 - p5(xx)
-#     w = np.sqrt(amp)
-#     p = np.poly1d(np.polyfit(xx, mu03, 5, w=w))
-#     res = p(xx) - mu03
-#     rms = np.sqrt( np.sum(res*res)/len(res) )
-#     
-#     
-#     #mu02 = fibre_profiles_02['order_10']['mu']
-#     #mu03 = fibre_profiles_03['order_10']['mu']
-#     #mu21 = fibre_profiles_21['order_10']['mu']
-#     #mu22 = fibre_profiles_22['order_10']['mu']
-#     
-#     mu21 = mu03.copy() - (18*diff) + np.random.normal(0,rms,4096)
-#     mu22 = mu03.copy() - (19*diff) + np.random.normal(0,rms,4096)
-    return 1
-
-
-
-
-
 def find_tramlines_single_order(uu, ul, lu, ll, mask_uu, mask_ul, mask_lu, mask_ll):
     
     #make sure they're all the same length
@@ -773,6 +634,8 @@ def find_tramlines_single_order(uu, ul, lu, ll, mask_uu, mask_ul, mask_lu, mask_
 
 
 
+
+
 def find_tramlines(fp_uu, fp_ul, fp_lu, fp_ll, mask_uu, mask_ul, mask_lu, mask_ll, debug_level=0, timit=False):
     '''
     INPUT: 
@@ -813,6 +676,8 @@ def find_tramlines(fp_uu, fp_ul, fp_lu, fp_ll, mask_uu, mask_ul, mask_lu, mask_l
 
 
 
+
+
 def find_laser_tramlines_single_order(mu, mask):
         
     #fit 5th-order polynomial to each peak-array, with the weights of the fit being the RMS of the initial fit to the fibre profiles!?!?!?
@@ -847,6 +712,8 @@ def find_laser_tramlines_single_order(mu, mask):
 
 
 
+
+
 def find_laser_tramlines(fp, mask, debug_level=0, timit=False):
     
     if timit:
@@ -874,22 +741,4 @@ def find_laser_tramlines(fp, mask, debug_level=0, timit=False):
 
 
 
-def WIP():
-# parms = Parameters()
-# for i in range(76):
-#     parms.add('p'+str(i), value=guess[i])
-# 
-# def multi_fib_model_res(p,x,y):
-#     model = multi_fib_model(x,p)
-#     return model - data
 
-    
-
-
-
-
-
-
-
-
-    return 1

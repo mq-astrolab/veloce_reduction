@@ -53,16 +53,13 @@ def identify_obstypes(path):
 
 
 
-def short_filenames(file_list):
-    dum = [longname.split('/')[-1] for longname in file_list]
-    fnarr = ['.'.join(fn.split('.')[0:-1]) for fn in dum]
-    return fnarr
-
-
-
-
-
-
+def get_obs_coords_from_header(fn):
+    h = pyfits.getheader(fn)
+    lat = h['LAT_OBS']
+    long = h['LONG_OBS']
+    alt = h['ALT_OBS']
+    return lat,long,alt
+    
 
 
 

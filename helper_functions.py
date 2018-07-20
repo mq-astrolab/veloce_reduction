@@ -15,7 +15,18 @@ from astropy.modeling import models, fitting
 import collections
 #from scipy.special import erf
 #from scipy.special import gamma
-from scipy import special
+from scipy import special, signal
+from numpy.polynomial import polynomial
+
+
+
+
+
+def linfunc(p, x):
+    """linear function"""
+    c,m = p
+    return m*x + c
+
 
 
 def gauss2D(xytuple, amp, x0, y0, x_sig, y_sig, theta):
@@ -61,9 +72,9 @@ def fibmodel_fwhm(xarr, mu, fwhm, beta=2, alpha=0, norm=0):
             return phi * (1. + special.erf(alpha * xarr / np.sqrt(2.)))
 
 
-# model for the fibre profiles (gauss-like function)
+
 def fibmodel(xarr, mu, sigma, beta=2, alpha=0, norm=0):
-        
+    # model for the fibre profiles (gauss-like function)
     #define constant (FWHM vs sigma, because FWHM = sigma * 2*sqrt(2*log(2))
     #cons = 2*np.sqrt(np.log(2))
     
@@ -89,6 +100,7 @@ def fibmodel(xarr, mu, sigma, beta=2, alpha=0, norm=0):
 #             return norm2 * phi * (1. + erf(alpha * xarr / np.sqrt(2.)))
 #         else:
             return phi * (1. + special.erf(alpha * xarr / np.sqrt(2.)))
+
 
 
 def CMB_multi_gaussian(x, *p):
@@ -137,6 +149,176 @@ def gausslike_with_amp_and_offset_and_slope(x, mu, sigma, amp, beta, offset, slo
     return amp * fibmodel(x, mu, sigma, beta=beta, alpha=0, norm=0) + offset + slope*x
 
 
+
+
+def make_norm_profiles(x, o, col, fibparms, fibs='stellar', slope=False, offset=False):  
+    
+    #same number of fibres for every order, of course
+    if fibs == 'all':
+        #nfib = len(fibparms[o])  
+        nfib = 28
+        userange = np.arange(nfib) 
+    elif fibs == 'stellar':
+        nfib=19
+        userange = np.arange(5,24,1)
+    elif fibs == 'laser':
+        nfib=1
+        userange = np.arange(0,1,2)
+    elif fibs == 'thxe':
+        nfib=1
+        userange = np.arange(27,28,2)
+    elif fibs == 'sky3':
+        nfib=3
+        userange = np.arange(1,4,1)
+    elif fibs == 'sky2':
+        nfib=2
+        userange = np.arange(25,27,1)
+    else:
+        print('ERROR: fibre selection not recognised')
+        return
+    
+    #do we want to include extra "fibres" to take care of slope and/or offset? Default is NO for both (as this should be already taken care of globally)
+    if offset:
+        nfib += 1
+    if slope:
+        nfib += 1
+    
+    phi = np.zeros((len(x),28))
+    
+    for k,fib in enumerate(sorted(fibparms[o].keys())):
+        mu = fibparms[o][fib]['mu_fit'](col)
+        sigma = fibparms[o][fib]['sigma_fit'](col)
+        beta = fibparms[o][fib]['beta_fit'](col)
+        phi[:,k] = fibmodel(x, mu, sigma, beta=beta, alpha=0, norm=0)
+    
+    #deprecate phi-array to only use wanted fibres
+    phi = phi[:,userange]
+    
+    if offset:
+        phi[:,-2] = 1.
+    if slope:
+        phi[:,-1] = x - x[0]
+    
+    #return normalized profiles
+    phinorm =  phi/np.sum(phi,axis=0)
+
+    return phinorm
+
+def make_norm_profiles_2(x, col, fppo, fibs='stellar', slope=False, offset=False):  
+    """
+    clone of "make_norm_profiles", but takes as "fppo" (= fibparms per order) as input, rather
+    than "ord" and the entire "fibparms" dictionary
+    """
+    #same number of fibres for every order, of course
+    if fibs == 'all':
+        #nfib = len(fibparms[ord])  
+        nfib = 28
+        userange = np.arange(nfib) 
+    elif fibs == 'stellar':
+        nfib=19
+        userange = np.arange(5,24,1)
+    elif fibs == 'laser':
+        nfib=1
+        userange = np.arange(0,1,2)
+    elif fibs == 'thxe':
+        nfib=1
+        userange = np.arange(27,28,2)
+    elif fibs == 'sky3':
+        nfib=3
+        userange = np.arange(1,4,1)
+    elif fibs == 'sky2':
+        nfib=2
+        userange = np.arange(25,27,1)
+    else:
+        print('ERROR: fibre selection not recognised')
+        return
+    
+    #do we want to include extra "fibres" to take care of slope and/or offset? Default is NO for both (as this should be already taken care of globally)
+    if offset:
+        nfib += 1
+    if slope:
+        nfib += 1
+    
+    phi = np.zeros((len(x),28))
+    
+    for k,fib in enumerate(sorted(fppo.keys())):
+        mu = fppo[fib]['mu_fit'](col)
+        sigma = fppo[fib]['sigma_fit'](col)
+        beta = fppo[fib]['beta_fit'](col)
+        phi[:,k] = fibmodel(x, mu, sigma, beta=beta, alpha=0, norm=0)
+    
+    #deprecate phi-array to only use wanted fibres
+    phi = phi[:,userange]
+    
+    if offset:
+        phi[:,-2] = 1.
+    if slope:
+        phi[:,-1] = x - x[0]
+    
+    #return normalized profiles
+    phinorm =  phi/np.sum(phi,axis=0)
+
+    return phinorm
+
+def make_norm_profiles_temp(x, o, col, fibparms, slope=False, offset=False):  
+    
+    #xx = np.arange(4096)
+    
+    #same number of fibres for every order, of course
+    nfib = 19
+    if offset:
+        nfib += 1
+    if slope:
+        nfib += 1
+    
+    phi = np.zeros((len(x),nfib))
+    
+    
+    mu = fibparms[o]['fibre_03']['mu_fit'](col)
+    sigma = fibparms[o]['fibre_03']['sigma_fit'](col)
+    beta = fibparms[o]['fibre_03']['beta_fit'](col)
+    for k in range(nfib):
+        phi[:,k] = fibmodel(x, mu-k*1.98, sigma, beta=beta, alpha=0, norm=0)
+    
+    if offset:
+        phi[:,-2] = 1.
+    if slope:
+        phi[:,-1] = x - x[0]
+    
+    #return normalized_profiles
+    return phi/np.sum(phi,axis=0)
+
+def make_norm_single_profile_temp(x, o, col, fibparms, slope=False, offset=False):  
+
+    
+    #same number of fibres for every order, of course
+    nfib = 1
+    if offset:
+        nfib += 1
+    if slope:
+        nfib += 1
+    
+    phi = np.zeros((len(x),nfib))
+    
+    
+    mu = fibparms[o]['mu'][col]
+    sigma = fibparms[o]['sigma'][col]
+    beta = fibparms[o]['beta'][col]
+    for k in range(nfib):
+        phi[:,k] = fibmodel(x, mu, sigma, beta=beta, alpha=0, norm=0)
+    
+    if offset:
+        phi[:,-2] = 1.
+    if slope:
+        phi[:,-1] = x - x[0]
+    
+    #return normalized_profiles
+    return phi/np.sum(phi,axis=0)
+
+
+
+
+
 def blaze(x, alpha, amp, shift):
     return amp * (np.sin(np.pi * alpha * (x-shift))/(np.pi * alpha * (x-shift)))**2
 
@@ -154,15 +336,18 @@ def compose_matrix(sx,sy,shear,rot,tx,ty):
     return m
 
 
+
 def center(df, width, height):
     m = compose_matrix(df['scale_x'], df['scale_y'], df['shear'], df['rotation'], df['translation_x'], df['translation_y'])
     xy = m.dot([width, height, 1])
     return xy[0], xy[1]
 
 
+
 def polyfit2d(x, y, z, order=3, return_res=False):
-    '''The result (m) is an array of the polynomial coefficients in the model f  = sum_i sum_j a_ij x^i y^j, 
-       has the form m = [a00,a01,a02,a03,a10,a11,a12,a13,a20,.....,a33] for order=3'''
+    """The result (m) is an array of the polynomial coefficients in the model f  = sum_i sum_j a_ij x^i y^j, 
+       has the form m = [a00,a01,a02,a03,a10,a11,a12,a13,a20,.....,a33] for order=3
+    """
     ncols = (order + 1)**2
     G = np.zeros((x.size, ncols))
     ij = itertools.product(range(order+1), range(order+1))
@@ -175,9 +360,8 @@ def polyfit2d(x, y, z, order=3, return_res=False):
         return m
 
 
+
 def test_polyfit2d(x, y, f, deg=3):
-    from numpy.polynomial import polynomial
-    import numpy as np
     x = np.asarray(x)
     y = np.asarray(y)
     f = np.asarray(f)
@@ -189,7 +373,12 @@ def test_polyfit2d(x, y, f, deg=3):
     return c.reshape(deg+1)
 
 
+
 def polyval2d(x, y, m):
+    """
+    Returns a 2-dim array of values with the parameters m from 'polyfit2d'.
+    e.g.: m = [a00,a01,a02,a03,a10,a11,a12,a13,a20,.....,a33] for order=3
+    """
     order = int(np.sqrt(len(m))) - 1
     ij = itertools.product(range(order+1), range(order+1))
     z = np.zeros_like(x)
@@ -202,11 +391,13 @@ def polyval2d(x, y, m):
 def fit_poly_surface_2D(x_norm, y_norm, z, weights=None, polytype = 'chebyshev', poly_deg=5, timit=False, debug_level=0):
     """
     Calculate 2D polynomial fit to normalized x and y values.
-
+    
+    INPUT:
     x_norm: x-values (pixels) of all the lines, re-normalized to [-1,+1]
     m_norm: order numbers of all the lines, re-normalized to [-1,+1]
     orders: order numbers of all the lines
-
+    
+    OUTPUT:
     polytype: either 'polynomial' (default), 'legendre', or 'chebyshev' are accepted
     """
     
@@ -242,7 +433,6 @@ def fit_poly_surface_2D(x_norm, y_norm, z, weights=None, polytype = 'chebyshev',
 
 
 
-
 def find_blaze_peaks(flux,P_id):
     """ find the peaks of the blaze function for each order """
     
@@ -252,21 +442,33 @@ def find_blaze_peaks(flux,P_id):
     medfiltered = {}
     rough_peaks = {}
     peaks = {}
-    for ord in sorted(P_id.iterkeys()):
-        medfiltered[ord] = signal.medfilt(flux[ord],9)
-        rough_peaks[ord] = np.mean(xx[medfiltered[ord] == np.max(medfiltered[ord])])   # need mean if there is more than one index where flux is max
-        ix = rough_peaks[ord].astype(int)
+    for o in sorted(P_id.iterkeys()):
+        medfiltered[o] = signal.medfilt(flux[o],9)
+        rough_peaks[o] = np.mean(xx[medfiltered[o] == np.max(medfiltered[o])])   # need mean if there is more than one index where flux is max
+        ix = rough_peaks[o].astype(int)
         fitrange = xx[ix-500:ix+501]
         #fit 2nd order polynomial to fitrange
-        parms = np.poly1d(np.polyfit(fitrange, medfiltered[ord][fitrange], 2))
+        parms = np.poly1d(np.polyfit(fitrange, medfiltered[o][fitrange], 2))
         peakix = signal.argrelextrema(parms(fitrange), np.greater)[0]
-        peaks[ord] = fitrange[peakix]
+        peaks[o] = fitrange[peakix]
         
     return peaks    
 
 
 
 def find_nearest(arr,value,return_index=False):
+    """
+    This routine finds either the index or the value of the element of a 1-dim array that is closest to a given value.
+    
+    INPUT:
+    'arr'   : the array in which to look 
+    'value' : the value the closest thing to which you want to find
+    'return_index' : boolean - do you want to return the index or the value?
+    
+    OUTPUT:
+    'idx'      : the index of the closest thing to 'value' within 'arr' (if 'return_index' is set to TRUE)
+    'arr[idx]' : the value within 'arr' that is closest to 'value' (if 'return_index' is set to FALSE)
+    """
     idx = (np.abs(arr-value)).argmin()
     if return_index:
         return idx
@@ -276,6 +478,15 @@ def find_nearest(arr,value,return_index=False):
 
 
 def binary_indices(x):
+    """
+    Calculates and returns the non-zero indices in a binary representation of x, in order of increasing powers of 2.
+    
+    EXAMPLES:
+
+    x = 11 = '1011'        --->   returns [0, 1, 3]      --->   because 11 = 2^1 + 2^1 + 2^3
+    x = 153 = '10011001'   --->   returns [0, 3, 4, 7]   --->   because 153 = 2^0 + 2^3 + 2^4 + 2^7
+    x = 201 = '11001001'   --->   returns [0, 3, 6, 7]   --->   because 153 = 2^0 + 2^3 + 2^6 + 2^7
+    """
     binum = np.binary_repr(x)
     liste = list(reversed(binum))
     intlist = [int(i) for i in liste]
@@ -334,13 +545,13 @@ def offset_pseudo_gausslike(x, G_amplitude, L_amplitude, G_center, L_center, G_s
      
     
 def get_iterable(x):
+    """ make any python object an 'iterable' so that you can loop over it and your code does not crash, even if it's just a number """
     if isinstance(x, collections.Iterable):
         return x
     else:
         return (x,)    
     
     
-        
         
 def get_datestring():
     """ get the current date in a string of the format: 'YYYYMMDD' """
@@ -368,7 +579,6 @@ def get_mean_snr(flux, err=None, per_order=False):
     18/05/2018 - CMB create
     30/05/2018 - CMB added 'per_order' keyword
     """
-
     
     #calculate errors if not provided
     if err is None:
@@ -431,6 +641,12 @@ def central_parts_of_mask(mask):
 
     return cenmask
 
+
+
+def short_filenames(file_list):
+    dum = [longname.split('/')[-1] for longname in file_list]
+    fnarr = ['.'.join(fn.split('.')[0:-1]) for fn in dum]
+    return fnarr
 
 
 
@@ -758,6 +974,12 @@ def central_parts_of_mask(mask):
 #     return x, w, b, matrices
 
 
-def linfunc(p, x):
-    c,m = p
-    return m*x + c
+
+
+
+
+
+
+
+
+

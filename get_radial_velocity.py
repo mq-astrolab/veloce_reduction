@@ -272,13 +272,13 @@ def get_RV_from_xcorr(f, err, wl, f0, wl0, mask=None, smoothed_flat=None, osf=2,
         #popt, pcov = op.curve_fit(gaussian_with_offset_and_slope, xrange, xc[np.argmax(xc)-fitrangesize : np.argmax(xc)+fitrangesize+1]/np.max(xc[xrange]), p0=guess)
         #popt, pcov = op.curve_fit(gausslike_with_amp_and_offset_and_slope, xrange, xc[xrange]/np.max(xc[xrange]), p0=guess)
         popt, pcov = op.curve_fit(gausslike_with_amp_and_offset_and_slope, xrange, xc[xrange], p0=guess)
-        shift = popt[0]
+        mu = popt[0]
 #         print(ord, f[ord][3000:3003])
 #         print(ord, f[ord][::-1][3000:3003])
-        shift_err = pcov[0,0]
+        mu_err = pcov[0,0]
         #convert to RV in m/s
-        rv[ord] = c * (shift - (len(xc)//2)) * delta_log_wl
-        rverr[ord] = c * shift_err * delta_log_wl
+        rv[ord] = c * (mu - (len(xc)//2)) * delta_log_wl
+        rverr[ord] = c * mu_err * delta_log_wl
     
     if timit:
         delta_t = time.time() - start_time

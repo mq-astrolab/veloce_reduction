@@ -1149,6 +1149,10 @@ def get_wavelength_solution(thflux, thflux2, poly_deg=5, laser=False, polytype='
 
 
 def get_simu_dispsol(fibre=None, path='/Users/christoph/OneDrive - UNSW/dispsol/'):
+    """
+    Get wavelength solution from Veloce Zemax file for a given fibre (1...28)
+    WARNING: If no fibre is given, a mean wavelength solution across all orders is calculated!!!
+    """
     #read dispersion solution from file
     if fibre is None:
         dispsol = np.load(path + 'mean_dispsol_by_orders_from_zemax.npy').item()

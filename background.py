@@ -17,6 +17,7 @@ from veloce_reduction.helper_functions import *
 # x = np.repeat(np.arange(nx) - nx/2,nx)
 # y = np.tile(np.arange(ny) - ny/2,ny)
 # xx, yy = np.meshgrid(np.linspace(x.min(), x.max(), nx), np.linspace(y.min(), y.max(), ny))
+# #m =    [a00,a01,a02,  a03  ,a10,a11,a12,a13,  a20 ,a21,a22,a23, a30 ,a31,a32,a33] for order=3
 # parms = [90., 0., 0., 1.5e-9, 0., 0., 0., 0., -4e-9, 0., 0., 0., 1e-9, 0., 0., 0.]
 # #parms = np.array([1000., 0., -5.e-5, 0., 0., 0., 0., 0., -5.e-5, 0., 0., 0., 0., 0., 0., 0.])
 # zz_nf = polyval2d(xx, yy, parms)
@@ -39,7 +40,7 @@ def extract_background(img, P_id, slit_height=25, output_file=None, return_mask=
     'P_id'         : dictionary of the form of {order: np.poly1d} (as returned by make_P_id / identify_stripes)
     'slit_height'  : half the total slit height in pixels
     'output_file'  : path to file where result is saved
-    'return_mask': boolean - do you want to return the mask of the background locations as well?
+    'return_mask'  : boolean - do you want to return the mask of the background locations as well?
     'timit'        : for timing tests...
     'debug_level'  : debug level...
     
@@ -48,7 +49,7 @@ def extract_background(img, P_id, slit_height=25, output_file=None, return_mask=
     """
     
     if timit:
-        overall_start_time = time.time()
+        start_time = time.time()
     
     #logging.info('Extracting background...')
     print('Extracting background...')
@@ -77,12 +78,15 @@ def extract_background(img, P_id, slit_height=25, output_file=None, return_mask=
     mat = sparse.coo_matrix((img[bg_mask], (y_grid[bg_mask], x_grid[bg_mask])), shape=(ny, nx))
     # return mat.tocsr()
     
-    #print('Elapsed time: ',time.time() - start_time,' seconds')
+    if timit:
+        print('Elapsed time: ',time.time() - start_time,' seconds')
     
     if not return_mask:
         return mat.tocsc()
     else:
         return mat.tocsc(), bg_mask
+
+
 
 
 
@@ -133,6 +137,8 @@ def fit_background(bg, deg=3, timit=False, return_full=True):
         return coeffs, bkgd_img
     else:
         return coeffs
+ 
+ 
  
  
  

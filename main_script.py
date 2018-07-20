@@ -25,10 +25,10 @@ from matplotlib.colors import LogNorm
 from readcol import readcol
 #from mpl_toolkits.mplot3d import Axes3D
 
-from barycorrpy import get_BC_vel
+#from barycorrpy import get_BC_vel
 
 from veloce_reduction.helper_functions import *
-from veloce_reduction.get_info_from_headers import identify_obstypes, short_filenames
+from veloce_reduction.get_info_from_headers import identify_obstypes, get_obs_coords_from_header
 from veloce_reduction.bias_and_darks import bias_subtraction, dark_subtraction
 from veloce_reduction.create_master_frames import create_master_img
 from veloce_reduction.order_tracing import find_stripes, make_P_id, make_mask_dict, extract_stripes, find_tramlines
@@ -36,14 +36,12 @@ from veloce_reduction.cosmic_ray_removal import remove_cosmics
 from veloce_reduction.background import extract_background, fit_background
 from veloce_reduction.spatial_profiles import fit_profiles_from_indices, make_model_stripes_gausslike
 #from veloce_reduction.find_laser_peaks_2D import find_laser_peaks_2D
-from veloce_reduction.quick_extract import quick_extract, quick_extract_from_indices
-from veloce_reduction.collapse_extract import collapse_extract
-from veloce_reduction.optimal_extraction import optimal_extraction
+from veloce_reduction.extraction import quick_extract, quick_extract_from_indices, collapse_extract, collapse_extract_from_indices, optimal_extraction, optimal_extraction_from_indices 
 from veloce_reduction.wavelength_solution import get_wavelength_solution, get_simu_dispsol, fit_emission_lines_lmfit, find_suitable_peaks
 from veloce_reduction.flat_fielding import onedim_pixtopix_variations, deblaze_orders
-from veloce_reduction.relative_intensities import get_relints, get_relints_single_order
+from veloce_reduction.relative_intensities import get_relints
 #from veloce_reduction.pseudoslit_simulations import *
-from get_radial_velocity import get_RV_from_xcorr
+from veloce_reduction.get_radial_velocity import get_RV_from_xcorr, get_rvs_from_xcorr
 
 
 
@@ -159,7 +157,7 @@ P,tempmask = find_stripes(MW, deg_polynomial=2, min_peak=0.05, gauss_filter_sigm
 P_id = make_P_id(P)
 mask = make_mask_dict(tempmask)
 # extract stripes of user-defined width from the science image, centred on the polynomial fits defined in step (1)
-flat_stripes,fs_indices = extract_stripes(MW, P_id, return_indices=True, slit_height=10)
+flat_stripes,fs_indices = extract_stripes(MW, P_id, return_indices=True, slit_height=5)
 #####################################################################################################################################################
 
 
@@ -235,7 +233,7 @@ for obsname in obsnames:
 #extract Master White as well
 #flat_pix_quick, flat_flux_quick, flat_err_quick = quick_extract(flat_stripes, slit_height=25, RON=1., gain=1., verbose=False, timit=False)
 quick_extracted_raw['MW'] = {}
-quick_extracted_raw['MW']['pix'], quick_extracted_raw['MW']['flux'], quick_extracted_raw['MW']['err'] = quick_extract(flat_stripes, slit_height=10, RON=1., gain=1., verbose=False, timit=False)
+quick_extracted_raw['MW']['pix'], quick_extracted_raw['MW']['flux'], quick_extracted_raw['MW']['err'] = quick_extract(flat_stripes, slit_height=5, RON=1., gain=1., verbose=False, timit=False)
 #this works fine as well, but is a factor of ~2 slower:
 #pix_quick_fi, flux_quick_fi, err_quick_fi = quick_extract_from_indices(img, stripe_indices, slit_height=25, RON=10., gain=1., verbose=False, timit=False)
 #calculate mean SNR of observation
@@ -275,7 +273,7 @@ pix,flux,err = collapse_extract(stripes, tramlines, laser=False, RON=4., gain=1.
 
 
 # (c) Optimal Extraction
-pix2,flux2,err2 = optimal_extraction(img, P_id, stripes, stripe_indices, RON=4., gain=1., timit=True, individual_fibres=False)
+pix,flux,err = optimal_extraction(img, P_id, stripes, stripe_indices, RON=0., gain=1., slit_height=25, timit=True, simu=False, individual_fibres=True)
 
 
 
@@ -355,8 +353,10 @@ rv,rverr = get_rvs_from_xcorr(quick_extracted, obsnames, mask, smoothed_flat, de
 
 # (12) barycentric correction #######################################################################################################################
 # e.g.:
-bc = barycorrpy.get_BC_vel(JDUTC=JDUTC,hip_id=8102,lat=-31.2755,longi=149.0673,alt=1165.0,ephemeris='de430',zmeas=0.0)
-bc2  = get_BC_vel(JDUTC=JDUTC,hip_id=8102,obsname='AAO',ephemeris='de430')
+lat,long,alt = get_obs_coords_from_header(fn)
+bc = barycorrpy.get_BC_vel(JDUTC=JDUTC,hip_id=8102,lat=lat,longi=long,alt=float(alt),ephemeris='de430',zmeas=0.0)
+bc2 = barycorrpy.get_BC_vel(JDUTC=JDUTC,hip_id=8102,lat=-31.2755,longi=149.0673,alt=1165.0,ephemeris='de430',zmeas=0.0)
+bc3  = get_BC_vel(JDUTC=JDUTC,hip_id=8102,obsname='AAO',ephemeris='de430')
 #####################################################################################################################################################
 
 

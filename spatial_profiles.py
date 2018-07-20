@@ -9,6 +9,7 @@ from veloce_reduction.order_tracing import flatten_single_stripe, flatten_single
 from lmfit import Parameters, Model
 from lmfit.models import *
 from lmfit.minimizer import *
+import matplotlib.pyplot as plt
 
 
 
@@ -92,6 +93,7 @@ def determine_spatial_profiles_single_order(sc, sr, ordpol, ordmask=None, model=
                 #data = np.append(data,sc[:,j])
                 normdata = np.append(normdata, sc[:,j]/np.sum(sc[:,j]))
                 #errors = np.append(errors, np.sqrt(sc[:,j] + RON**2))
+                #using relative errors for weights in the fit
                 weights = np.append(weights, 1./((np.sqrt(sc[:,j] + RON**2)) / sc[:,j])**2)
                 if debug_level >= 2:
                     #plt.plot(sr[:,j] - ordpol(j),sc[:,j],'.')

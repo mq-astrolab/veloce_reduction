@@ -21,9 +21,9 @@ from veloce_reduction.helper_functions import binary_indices
 
 
 
-def create_master_img(imglist, imgtype='', RON=4., gain=1., clip=5., asint=False, savefile=False, norm=True, scalable=False, remove_outliers=True, diffimg=False, noneg=False, timit=False):
+def create_master_img(imglist, imgtype='', RON=0., gain=1., clip=5., asint=False, savefile=False, norm=True, scalable=False, remove_outliers=True, diffimg=False, noneg=False, timit=False):
     """
-    This routine co-adds spectra from a given input list. It can also remove cosmics etc. by removing outlier pixels that deviate by more than a certain
+    This routine co-adds spectra from a given input list. It can also remove cosmics etc. by replacing outlier pixels that deviate by more than a certain
     number of sigmas from the median across all images with the mean pixel value of the remaining pixels.
     
     INPUT:
@@ -151,7 +151,7 @@ def create_master_img(imglist, imgtype='', RON=4., gain=1., clip=5., asint=False
             hdiff = h.copy()
             dum = file.split('/') 
             path = file[:-len(dum[-1])]
-            hdiff['modhist'] = 'DIFFERENCE IMAGE - created '+time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())+' (GMT)'
+            hdiff['HISTORY'] = 'DIFFERENCE IMAGE - created '+time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())+' (GMT)'
             pyfits.writeto(path+'master_'+imgtype.lower()+normstring+intstring+'_diffimg.fits', diff, hdiff, clobber=True) 
             
         if savefile:
@@ -159,7 +159,7 @@ def create_master_img(imglist, imgtype='', RON=4., gain=1., clip=5., asint=False
             path = file[:-len(dum[-1])]
 #             while imgtype.lower() not in ['white','dark','bias']:
 #                 imgtype = raw_input("WARNING: Image type not specified! What kind of images are they ['white' / 'dark' / 'bias']: ")
-            h['modhist'] = 'MASTER '+imgtype.upper()+' - created '+time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())+' (GMT)'
+            h['HISTORY'] = 'MASTER '+imgtype.upper()+' - created '+time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())+' (GMT)'
             pyfits.writeto(path+'master_'+imgtype.lower()+normstring+outie_string+intstring+noneg_string+'.fits', master, h, clobber=True)                    
             
     else:
