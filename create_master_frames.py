@@ -21,20 +21,27 @@ from veloce_reduction.helper_functions import binary_indices
 
 
 
-def create_master_img(imglist, imgtype='', RON=0., gain=1., clip=5., asint=False, savefile=False, norm=True, scalable=False, remove_outliers=True, diffimg=False, noneg=False, timit=False):
+
+
+def create_master_img(imglist, imgtype='', RON=0., gain=1., clip=5., with_errors=True, asint=False, savefiles=True, scalable=False, remove_outliers=True, diffimg=False, noneg=False, timit=False):
     """
+    
+    NOT CURRENTLY IN USE, BUT SNIPPETS FROM IT ARE USED IN VARIOUS CALIBRATION ROUTINES!!!!!
+    
     This routine co-adds spectra from a given input list. It can also remove cosmics etc. by replacing outlier pixels that deviate by more than a certain
     number of sigmas from the median across all images with the mean pixel value of the remaining pixels.
+    NOTE: raw images are in units of ADU, but the processed master images are in units of electrons!!!
+    NOTE: if 'with_errors' is set to TRUE, then the error array is stored in the same FITS file as a second HDU
     
     INPUT:
     'imglist'           : list of filenames of images to co-add
     'imgtype'           : ['bias' / 'dark' / 'white' / 'stellar'] are valid options
-    'RON'               : read-out noise in electrons
-    'gain'              : camera gain in electrons per ADU
+    'RON'               : read-out noise in electrons per pixel
+    'gain'              : camera amplifier (inverse) gain in electrons per ADU
     'clip'              : threshold for outlier identification (in sigmas above/below median)
+    'with_errors'       : boolean - do you want to save/return the estimated error-array as well?
     'asint'             : boolean - do you want the master image to be rounded to the nearest integer?
-    'savefile'          : boolean - do you want to save the master image as a FITS file?
-    'norm'              : boolean - do you want to normalize the master image (ie divide by number of images)?
+    'savefiles'         : boolean - do you want to save the master image as a FITS file?
     'scalable'          : boolean - do you want to make the master image scalable (ie normalize to t_exp = 1s)
     'remove_outliers'   : boolean - do you want to remove outlier pixels (eg cosmics) with the median of the remaining images?
     'diffimg'           : boolean - do you want to save the difference image to a fits file? only works if 'remove_outliers' is also set to TRUE
@@ -50,25 +57,33 @@ def create_master_img(imglist, imgtype='', RON=0., gain=1., clip=5., asint=False
     
     print('Creating master image from: '+str(len(imglist))+' '+imgtype.upper()+' images')
     
-    if savefile or diffimg:
-        normstring = ''
+    if savefiles or diffimg:
         intstring = ''
         outie_string = ''
         noneg_string = ''
+        normstring = ''
     
     while imgtype.lower() not in ['white', 'w', 'dark', 'd', 'bias', 'b', 'stellar', 's']:
-                imgtype = raw_input("WARNING: Image type not specified! What kind of images are they ['(b)ias' / '(d)ark' / '(w)hite' / '(s)tellar']: ")
+                imgtype = raw_input("WARNING: Image type not specified! What kind of images are they? ['(b)ias' / '(d)ark' / '(w)hite' / '(s)tellar']")
+                
+    if imgtype.lower() in ['b', 'bias']:
+        RON = 0.
     
     #proceed if list is not empty
     if len(imglist) > 0:
         
+        if with_errors:
+            allerr = []
         if remove_outliers:
             allimg = []
             outie_string = '_outliers_removed'
         
         for n,file in enumerate(imglist):
-            #img = pyfits.getdata(file).T
-            img = pyfits.getdata(file)
+            #img = gain * pyfits.getdata(file).T
+            img = gain * pyfits.getdata(file)
+            if with_errors:
+                err_img = np.sqrt(gain*img.astype(float) + RON*RON)
+                allerr.append(err_img)
             if remove_outliers:
                 allimg.append(img)
             if n==0:
@@ -81,14 +96,22 @@ def create_master_img(imglist, imgtype='', RON=0., gain=1., clip=5., asint=False
                         diff = np.zeros((ny,nx),dtype='float')
             else:
                 master += img
-        #make sure we do not have any negative pixels
-        #master[master < 0] = 0.   #NO!!!!!
+                
         
+        #add individual-image errors in quadrature
+        if with_errors:
+            err_master = np.sqrt(np.sum((np.array(allerr)**2),axis=0))
+        
+                
         if remove_outliers:
-            medimg = np.median(np.array(allimg),axis=0)
+            medimg = np.median(np.array(allimg), axis=0)
             #for bias and dark frames just use the median image; for whites use something more sophisticated
             if imgtype[0] in ['b', 'd']:
+                #now set master image equal to median image
                 master = medimg
+                #estimate of the corresponding error array (estimate only!!!)
+                if with_errors:
+                    err_master = err_master / len(imglist)
             #do THIS for whites
             else:
                 #make sure we do not have any negative pixels for the sqrt
@@ -121,22 +144,23 @@ def create_master_img(imglist, imgtype='', RON=0., gain=1., clip=5., asint=False
                     #now replace value in master image by the sum of all pixel values in the unaffected pixels 
                     #plus the number of affected images times the mean of the pixel values in the unaffected images
                     master[i,j] = len(outnum) * np.mean( np.array([allimg[q][i,j] for q in useix]) ) + np.sum( np.array([allimg[q][i,j] for q in useix]) )    
-                    master = master / len(imglist)       
+                #once we have finished correcting the outliers, we want to "normalize" (ie divide by number of frames) the master image
+                master = master / len(imglist)      
+                if with_errors:
+                    err_master = err_master / len(imglist)  
                        
-        #if not remove outliers, at least divide by number of frames
+        #if not remove outliers, still need to "normalize" (ie divide by number of frames)
         else:
             master = master / len(imglist) 
+            if with_errors:
+                err_master = err_master / len(imglist) 
             
-#         if norm:
-#             master = master / len(imglist)
-#             normstring='_norm'
             
         if scalable:
-#             if not norm:
-#                 print('ERROR: "scalable" option has to be set together with "norm" option!!!')
-#                 return
             texp = pyfits.getval(imglist[0], 'exptime')
             master = master / texp
+            if with_errors:
+                err_master = err_master / texp
             normstring = normstring + '_scalable'
         
         if noneg:
@@ -145,22 +169,32 @@ def create_master_img(imglist, imgtype='', RON=0., gain=1., clip=5., asint=False
         
         if asint:
             master = np.round(master).astype(int)    
+            if with_errors:
+                err_master = np.round(err_master).astype(int)    
             intstring='_int'
         
         if diffimg:
             hdiff = h.copy()
             dum = file.split('/') 
             path = file[:-len(dum[-1])]
-            hdiff['HISTORY'] = 'DIFFERENCE IMAGE - created '+time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())+' (GMT)'
+            hdiff['HISTORY'] = '   DIFFERENCE IMAGE - created '+time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())+' (GMT)'
+            hdiff['COMMENT'] = 'Results are in units of ELECTRONS'
             pyfits.writeto(path+'master_'+imgtype.lower()+normstring+intstring+'_diffimg.fits', diff, hdiff, clobber=True) 
             
-        if savefile:
+        if savefiles:
             dum = file.split('/') 
             path = file[:-len(dum[-1])]
 #             while imgtype.lower() not in ['white','dark','bias']:
 #                 imgtype = raw_input("WARNING: Image type not specified! What kind of images are they ['white' / 'dark' / 'bias']: ")
-            h['HISTORY'] = 'MASTER '+imgtype.upper()+' - created '+time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())+' (GMT)'
-            pyfits.writeto(path+'master_'+imgtype.lower()+normstring+outie_string+intstring+noneg_string+'.fits', master, h, clobber=True)                    
+            h['HISTORY'] = '   MASTER '+imgtype.upper()+' - created '+time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())+' (GMT)'
+            hdiff['COMMENT'] = 'Results are in units of ELECTRONS'
+            pyfits.writeto(path+'master_'+imgtype.lower()+normstring+outie_string+intstring+noneg_string+'.fits', master, h, clobber=True)          
+            #save error array in second HDU
+            if with_errors:
+                h_err = h.copy()
+                h_err['LEGEND'] = 'estimated uncertainty in MASTER '+imgtype.upper()
+                pyfits.append(path+'master_'+imgtype.lower()+normstring+outie_string+intstring+noneg_string+'.fits', err_master, h_err, clobber=True)
+            
             
     else:
         print('WARNING: empty input list')    
@@ -171,7 +205,10 @@ def create_master_img(imglist, imgtype='', RON=0., gain=1., clip=5., asint=False
     if timit:
         print('Elapsed time: '+str(np.round(time.time() - start_time,2))+' seconds')
 
-    return master
+    if with_errors:
+        return master, err_master
+    else:
+        return master
 
 
 

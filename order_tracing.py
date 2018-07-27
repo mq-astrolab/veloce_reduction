@@ -281,7 +281,7 @@ def extract_stripes(img, P_id, slit_height=25, output_file=None, timit=False, re
     
     :param img: 2d echelle spectrum
     :type img: np.ndarray
-    :param P_id: dictionary of the form of {fiber_number:{order: np.poly1d, ...}, ...} (as returned by identify_stripes)
+    :param P_id: dictionary of the form of {order: np.poly1d, ...} (as returned by identify_stripes)
     or path to file
     :type P_id: dict or str
     :param slit_height: total slit height in px
@@ -290,7 +290,7 @@ def extract_stripes(img, P_id, slit_height=25, output_file=None, timit=False, re
     :type output_file: str
     :param debug_level: debug level
     :type debug_level: int
-    :return: dictionary of the form {fiber_number:{order: scipy.sparse_matrix}}
+    :return: dictionary of the form {order: scipy.sparse_matrix}
     :rtype: dict
     """
     
@@ -571,6 +571,9 @@ def flatten_stripes(stripes,slit_height=25):
         
 
 def find_maxima(data, gauss_filter_sigma=0., min_peak=0.1, return_values=0):
+    """
+    not currently used!!!
+    """
     # smooth image slightly for noise reduction
     smooth_data = ndimage.gaussian_filter(data, gauss_filter_sigma)
     # find all local maxima

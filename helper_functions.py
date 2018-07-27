@@ -650,6 +650,23 @@ def short_filenames(file_list):
 
 
 
+def make_quadrant_masks(nx,ny):
+    
+    #define four quadrants via masks
+    q1 = np.zeros((ny,nx),dtype='bool')
+    q1[:(ny/2), :(nx/2)] = True
+    q2 = np.zeros((ny,nx),dtype='bool')
+    q2[:(ny/2), (nx/2):] = True
+    q3 = np.zeros((ny,nx),dtype='bool')
+    q3[(ny/2):, (nx/2):] = True
+    q4 = np.zeros((ny,nx),dtype='bool')
+    q4[(ny/2):, :(nx/2)] = True
+    
+    return q1,q2,q3,q4
+    
+    
+    
+    
 # def make_lenslets(input_arm, fluxes=[], mode='', seeing=0.8, llet_offset=0):
 #     """Make an image of the lenslets with sub-pixel sampling.
 #
@@ -972,6 +989,19 @@ def short_filenames(file_list):
 #             ## onto the slit.
 #             matrices[i, j, :, :] = np.linalg.inv(amat)
 #     return x, w, b, matrices
+
+
+
+def correct_orientation(img,orient=1):
+    """
+    (1) = same orientation as the simulated spectra, ie wavelength decreases from left to right and bottom to top
+    """
+    if orient == 1:
+        img = np.fliplr(img.T)
+    else:
+        print('ERROR: selected orientation not defined!!!')
+    
+    return img
 
 
 

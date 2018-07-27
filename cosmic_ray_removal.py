@@ -7,10 +7,9 @@ Created on 4 Oct. 2017
 from scipy import ndimage
 import numpy as np
 import time
-# import matplotlib.colors as colors
-# from matplotlib.colors import LogNorm
 from click._compat import raw_input
 import scipy.interpolate as ipol
+import astropy.io.fits as pyfits
 
 # imgname = '/Users/christoph/UNSW/cosmics/image.fit'
 # img = pyfits.getdata(imgname)
@@ -19,53 +18,116 @@ import scipy.interpolate as ipol
 # xcen = pyfits.getdata(xcenname)
 
 
-def remove_cosmics(img, gain=1.0, RON=3.0, Flim=3.0, siglim=5.0, verbose=False, timit=False):
+def remove_cosmics(img, ronmask, obsname, path, Flim=3.0, siglim=5.0, maxiter=20, savemask=True, savefile=False, save_err=False, verbose=False, timit=False):
+    """
+    Top-level wrapper function for the cosmic-ray cleaning of an image. 
     
+    INPUT:
+    'img'      : input image (2-dim numpy array)
+    'ronmask'  : read-out noise mask (or ron-image really...) from "make_master_bias_and_ronmask"
+    'obsname'  : the obsname in "obsname.fits"
+    'path'     : the directory of the files
+    'Flim'     : lower threshold for the identification of a pixel as a cosmic ray when using L+/F (ie Laplacian image divided by fine-structure image) (= lbarplus/F2 in the implementation below)
+    'siglim'   : sigma threshold for identification as cosmic in S_prime
+    'maxiter'  : maximum number of iterations
+    'savemask' : boolean - do you want to save the cosmic-ray mask?
+    'savefile' : boolean - do you want to save the cosmic-ray corrected image?
+    'save_err' : boolean - do you want to save the corresponding error array as well? (remains unchanged though)
+    'verbose'  : boolean - for user information / debugging...
+    'timit'    : boolean - do you want to measure execution run time?
+    
+    OUTPUT:
+    'cleaned'  : the cosmic-ray corrected image
+    """
+    
+    if timit:
+        start_time = time.time()
+        
+    if verbose:
+        print('Cleaning cosmic rays...')
+    
+    #some preparations    
     global_mask = np.cast['bool'](np.zeros(img.shape))
     n_cosmics = 0
     niter = 0
     n_new = 0
     cleaned = img.copy()
     
-    while ((niter == 0) or n_new > 0) and (niter <= 100):
+    #remove cosmics iteratively
+    while ((niter == 0) or n_new > 0) and (niter < maxiter):
         print('Now running iteration '+str(niter+1)+'...')
         #go and identify cosmics
-        mask = identify_cosmics(cleaned,verbose=verbose)
+        mask = identify_cosmics(cleaned, ronmask, Flim=Flim, siglim=siglim, verbose=verbose, timit=timit)
         n_new = np.sum(mask)
         #add to global mask
         global_mask = np.logical_or(global_mask, mask)
         n_cosmics += n_new
-        n_global = np.sum(global_mask)     #should be equal to n_cosmics!!!!! if they're not, this means that some of the "cleaned" cosmics from a previous round are identified as cosmics again!!! well, they're not...
+        #n_global = np.sum(global_mask)     #should be equal to n_cosmics!!!!! if they're not, this means that some of the "cleaned" cosmics from a previous round are identified as cosmics again!!! well, they're not...
         #now go and clean these newly found cosmics
-        cleaned = clean_cosmics(cleaned,mask,verbose=verbose)
+        cleaned = clean_cosmics(cleaned, mask, verbose=verbose, timit=timit)
         niter += 1
     
-    print('Haehaehae...')    
-    return 1
+    #save cosmic-ray mask
+    if savemask:
+        outfn = path+obsname+'_CR_mask.fits'
+        #get header from the BIAS- & DARK-subtracted image if it exits; otherwise from the original image FITS file
+        try:
+            h = pyfits.getheader(path+obsname+'_BD.fits')
+        except:
+            h = pyfits.getheader(path+obsname+'.fits')
+        h['HISTORY'] = '   COSMIC-RAY MASK- created '+time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())+' (GMT)'
+        pyfits.writeto(outfn, global_mask.astype(int), h, clobber=True)
+    
+    #save cosmic-ray corrected image    
+    if savefile:
+        outfn = path+obsname+'_BD_CR.fits'
+        #get header from the BIAS- & DARK-subtracted images if they exit; otherwise from the original image FITS file
+        try:
+            h = pyfits.getheader(path+obsname+'_BD.fits')
+        except:
+            h = pyfits.getheader(path+obsname+'.fits')
+        h['HISTORY'] = '   COSMIC-RAY corrected image - created '+time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())+' (GMT)'
+        pyfits.writeto(outfn, cleaned, h, clobber=True)
+        #also save the error array if desired
+        if save_err:
+            try:
+                err = pyfits.getdata(path+obsname+'_BD.fits', 1)
+                h_err = h.copy()
+                h_err['HISTORY'] = 'estimated uncertainty in COSMIC-RAY corrected image - created '+time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())+' (GMT)'
+                pyfits.append(outfn, err, h_err, clobber=True)
+            except:
+                print('WARNING: error array not found - cannot save error array')
+            
+    
+    if verbose:
+        print('Done!')
+    
+    if timit:
+        print('Total time elapsed: '+str(np.round(time.time() - start_time,1))+' seconds')
+        
+    return cleaned
 
 
 
 
 
-def identify_cosmics(img, gain=1.0, RON=3.0, Flim=3.0, siglim=5.0, verbose=False, timit=False):
-    '''
+def identify_cosmics(img, ronmask, Flim=3.0, siglim=5.0, verbose=False, timit=False):
+    """
     This routine identifies cosmic rays via Laplacian edge detection based on the method (ie LACosmic) described by van Dokkum et al., 2001, PASP, 113:1420 
     Should be slightly faster than the python translation of LACosmics by Malte Tewes, as it uses "ndimage" rather than "signal" package for convolution.
     
     INPUT:
     "img"       - a 2-dim image
-    "gain"      - gain in electrons per ADU 
-    "RON"       - read-out noise in electrons
+    "ronmask"   - read-out noise in ADUs
     "Flim"      - lower threshold for the identification of a pixel as a cosmic ray when using L+/F (ie Laplacian image divided by fine-structure image) (= lbarplus/F2 in the implementation below)
     "siglim"    - sigma threshold for identification as cosmic in S_prime
     
     OUTPUT:
     "final_mask"   - a boolean mask, where True identifies pixels affected by cosmic rays. This mask has the same dimensions as the input image "img"
     
-    To Do List:
-    This basically only identifies the cosmics. If I ever have time, I will try to implement a method similar to Bai et al., 2017, PASP, 129:024004
-    
-    '''
+    TODO:
+    This basically only identifies the cosmics. If I ever have time, I will try to implement a method similar to Bai et al., 2017, PASP, 129:024004.
+    """
     
     #timing
     if timit:
@@ -101,8 +163,13 @@ def identify_cosmics(img, gain=1.0, RON=3.0, Flim=3.0, siglim=5.0, verbose=False
     im5 = ndimage.filters.median_filter(img, size=5, mode='mirror')   #again, IDK if that is the right mode
     if np.min(im5) < 0.00001:
         im5 = im5.clip(min=0.00001) # As we will take the sqrt
+        
     #construct noise model (ie eq. 10 in van Dokkum, or eq. 6 in Bai et al)
-    noise = (1.0/gain) * np.sqrt(gain*im5 + RON*RON)
+    #CMB comment: this is a noise model in units of ADU; use this in the "normal" case, where you have a given value for gain (ine e-/ADU) and RON (in e-)
+    #noise = (1.0/gain) * np.sqrt(gain*im5 + RON*RON)    
+    #BUT in the Veloce pipeline we have the 2-dim images still in units of ADUs, and our read-noise is a 2-dim array, so simply do this:
+    noise = np.sqrt(im5 + ronmask*ronmask)    
+    
     
     #calculate S (eq. 11 in van Dokkum or eq. 7 in Bai et al)
     S = 0.5 * lbarplus / noise
@@ -172,9 +239,17 @@ def clean_cosmics(img, mask, badpixmask=None, method='median', boxsize=5, verbos
                     - 'spline' : a cubic spline interpolation is performed through the surrounding non-cosmic-affected pixels and the flux of the cosmic-affected
                                  pixels is replaced with the interpolated value at their respective locations
         "boxsize"   - the size of the surrounding pixels to be considered. default value is 5, ie a box of 5x5 pixels centred on the affected pixel
+        "verbose"   - for debugging...
+        "timit"     - boolean - do you want to measure execution run time?
 
         This routine borrows heavily from the python translation of LACosmic by Malte Tewes!
+        
+        TODO:
+        implement surface fit method
         """
+        
+        if timit:
+            start_time = time.time()
         
         #check that img and mask really do have the same size
         if img.shape != mask.shape:
@@ -234,10 +309,10 @@ def clean_cosmics(img, mask, badpixmask=None, method='median', boxsize=5, verbos
         for cosmicpos in cosmicindices:
             x = cosmicpos[0]
             y = cosmicpos[1]
-            if verbose:
-                print('[x,y] = ['+str(x)+','+str(y)+']')
+#             if verbose:
+#                 print('[x,y] = ['+str(x)+','+str(y)+']')
             cutout = padarray[x:x+boxsize, y:y+boxsize].ravel() # remember the shift due to the padding !
-            # Now we have our cutout pixels, some of them are np.Inf, which will be ignored for calculating medien or interpolating
+            # Now we have our cutout pixels, some of them are np.Inf, which will be ignored for calculating median or interpolating
             goodcutout = cutout[cutout != np.Inf]
             
             if np.alen(goodcutout) >= boxsize*boxsize :
@@ -272,6 +347,9 @@ def clean_cosmics(img, mask, badpixmask=None, method='median', boxsize=5, verbos
         if verbose:
             #print "Cleaning done!"
             print("Cleaning done!")
+            
+        if timit:
+            print('Time elapsed: '+str(np.round(time.time() - start_time,1))+' seconds')    
             
         #return the cleaned image
         return cleaned    

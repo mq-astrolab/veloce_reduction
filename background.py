@@ -5,11 +5,12 @@ Created on 5 Feb. 2018
 '''
 
 import numpy as np
-from astropy.modeling import models, fitting
-import warnings
+import time
 import scipy.sparse as sparse
+from scipy.ndimage import label
+import astropy.io.fits as pyfits
 
-from veloce_reduction.helper_functions import *
+from veloce_reduction.helper_functions import polyfit2d, polyval2d, fit_poly_surface_2D
 
 
 # #make simulated background
@@ -30,29 +31,118 @@ from veloce_reduction.helper_functions import *
 
 
 
-def extract_background(img, P_id, slit_height=25, output_file=None, return_mask=False, timit=False, debug_level=0):
+def remove_background(img, P_id, obsname, path, degpol=5, slit_height=25, save_bg=True, savefile=True, save_err=False, exclude_top_and_bottom=False, verbose=True, timit=False):
+    """
+    Top-level wrapper function to identify, extract, fit, and subtract the background for a given image.
+    
+    INPUT:
+    'img'                     : input image (2-dim numpy array)
+    'P_id'                    : dictionary of the form of {order: np.poly1d, ...} (as returned by identify_stripes)
+    'obsname'                 : the obsname in "obsname.fits"
+    'path'                    : the directory of the files
+    'degpol'                  : degree (in each direction) of the 2-dim polynomial surface fit
+    'slit_height'             : height of the extraction slit (ie the pixel columns are 2*slit_height pixels long)
+    'save_bg'                 : boolean - do you want to save the background image?
+    'savefile'                : boolean - do you want to save the background-corrected science image?
+    'save_err'                : boolean - do you want to save the corresponding error array as well? (remains unchanged though)
+    'exclude_top_and_bottom'  : boolean - do you want to exclude the areas at top and bottom of chip, ie outside the useful orders but still containing some incomplete orders?
+    'verbose'                 : for user information / debugging...
+    'timit'                   : boolean - do you want to measure execution run time?
+    
+    OUTPUT:
+    'corrected_image'         : the background-corrected science image
+    """
+    
+    if timit:
+        start_time = time.time()
+    
+    #(1) identify and extract background
+    bg = extract_background(img, P_id, slit_height=slit_height, exclude_top_and_bottom=exclude_top_and_bottom, verbose=verbose, timit=timit)
+    #(2) fit background
+    bg_coeffs,bg_img = fit_background(bg, deg=degpol, return_full=True, timit=timit)
+    #(3) subtract background
+    corrected_image = img - bg_img
+    #what about errors??????
+    
+    #save background image
+    if save_bg:
+        outfn = path+obsname+'_BG_img.fits'
+        #get header from the BIAS- & DARK-subtracted & cosmic-ray corrected image if it exists
+        try:
+            h = pyfits.getheader(path+obsname+'_BD_CR.fits')
+        except:
+            #otherwise try to get header from the BIAS- & DARK-subtracted image; otherwise from the original image FITS file
+            try: 
+                h = pyfits.getheader(path+obsname+'_BD.fits')
+            except:
+                h = pyfits.getheader(path+obsname+'.fits')
+        h['HISTORY'] = '   BACKGROUND image - created '+time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())+' (GMT)'
+        pyfits.writeto(outfn, bg_img, h, clobber=True)
+        
+    #save background-corrected image
+    if savefile:
+        outfn = path+obsname+'_BD_CR_BG_img.fits'
+        #get header from the BIAS- & DARK-subtracted & cosmic-ray corrected image if it exists
+        try:
+            h = pyfits.getheader(path+obsname+'_BD_CR.fits')
+        except:
+            #otherwise try to get header from the BIAS- & DARK-subtracted image; otherwise from the original image FITS file
+            try: 
+                h = pyfits.getheader(path+obsname+'_BD.fits')
+            except:
+                h = pyfits.getheader(path+obsname+'.fits')
+        h['HISTORY'] = '   BACKGROUND-corrected image - created '+time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())+' (GMT)'
+        pyfits.writeto(outfn, corrected_image, h, clobber=True)
+        #also save the error array if desired
+        if save_err:
+            try:
+                err = pyfits.getdata(path+obsname+'_BD_CR.fits', 1)
+                h_err = h.copy()
+                h_err['HISTORY'] = 'estimated uncertainty in BACKGROUND-corrected image - created '+time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())+' (GMT)'
+                pyfits.append(outfn, err, h_err, clobber=True)
+            except:
+                try:
+                    err = pyfits.getdata(path+obsname+'_BD.fits', 1)
+                    h_err = h.copy()
+                    h_err['HISTORY'] = 'estimated uncertainty in BACKGROUND-corrected image - created '+time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())+' (GMT)'
+                    pyfits.append(outfn, err, h_err, clobber=True)
+                except:
+                    print('WARNING: error array not found - cannot save error array')
+    
+    
+    if timit:
+        print('Total time elapsed: '+str(np.round(time.time() - start_time,1))+' seconds')
+    
+    return corrected_image
+
+
+
+
+def extract_background(img, P_id, slit_height=25, return_mask=False, exclude_top_and_bottom=False, verbose=True, timit=False):
     """
     This function marks all relevant pixels for extraction. Extracts the background (ie the inter-order regions = everything outside the order stripes)
     from the original 2D spectrum to a sparse matrix containing only relevant pixels.
     
     INPUT:
-    'img'          : 2D echelle spectrum [np.array]
-    'P_id'         : dictionary of the form of {order: np.poly1d} (as returned by make_P_id / identify_stripes)
-    'slit_height'  : half the total slit height in pixels
-    'output_file'  : path to file where result is saved
-    'return_mask'  : boolean - do you want to return the mask of the background locations as well?
-    'timit'        : for timing tests...
-    'debug_level'  : debug level...
+    'img'                     : 2D echelle spectrum [np.array]
+    'P_id'                    : dictionary of the form of {order: np.poly1d} (as returned by make_P_id / identify_stripes)
+    'slit_height'             : half the total slit height in pixels
+    'return_mask'             : boolean - do you want to return the mask of the background locations as well?
+    'exclude_top_and_bottom'  : boolean - do you want to exclude the top and bottom bits (where there are usually incomplete orders)
+    'verbose'                 : for user info / debugging...
+    'timit'                   : for timing tests...
     
     OUTPUT:
     'mat.tocsc()'  : scipy.sparse_matrix containing the locations and values of the inter-order regions    
+    'bg_mask'      : boolean array containing the location of what is considered background (ie the inter-order space)
     """
     
     if timit:
         start_time = time.time()
     
     #logging.info('Extracting background...')
-    print('Extracting background...')
+    if verbose:
+        print('Extracting background...')
 
     ny, nx = img.shape
     xx = np.arange(nx, dtype='f8')
@@ -60,22 +150,28 @@ def extract_background(img, P_id, slit_height=25, output_file=None, return_mask=
     x_grid, y_grid = np.meshgrid(xx, yy, copy=False)
     bg_mask = np.ones((ny, nx), dtype=bool)
 
-    for o, p in P_id.items():
-        #xx = np.arange(nx, dtype=img.dtype)
-        xx = np.arange(nx, dtype='f8')
-        #yy = np.arange(ny, dtype=img.dtype)
-        yy = np.arange(ny, dtype='f8')
-    
+    for o, p in sorted(P_id.items()):
+        
+        #order trace
         y = np.poly1d(p)(xx)
-        x_grid, y_grid = np.meshgrid(xx, yy, copy=False)
-    
+        
+        #distance from order trace
         distance = y_grid - y.repeat(ny).reshape((nx, ny)).T
         indices = abs(distance) > slit_height
         
+        #include in global mask
         bg_mask *= indices
         
-
-    mat = sparse.coo_matrix((img[bg_mask], (y_grid[bg_mask], x_grid[bg_mask])), shape=(ny, nx))
+    
+    final_bg_mask = bg_mask.copy()
+    #in case we want to exclude the top and bottom parts where incomplete orders are located
+    if exclude_top_and_bottom:
+        labelled_mask,nobj = label(bg_mask)
+        final_bg_mask[labelled_mask == 1] = False
+        final_bg_mask[labelled_mask == nobj] = False
+    
+    
+    mat = sparse.coo_matrix((img[final_bg_mask], (y_grid[final_bg_mask], x_grid[final_bg_mask])), shape=(ny, nx))
     # return mat.tocsr()
     
     if timit:
@@ -84,13 +180,29 @@ def extract_background(img, P_id, slit_height=25, output_file=None, return_mask=
     if not return_mask:
         return mat.tocsc()
     else:
-        return mat.tocsc(), bg_mask
+        return mat.tocsc(), final_bg_mask
 
 
 
 
 
-def fit_background(bg, deg=3, timit=False, return_full=True):
+def fit_background(bg, deg=5, return_full=True, timit=False):
+    """ 
+    WARNING: While this works just fine, it is MUCH MUCH slower than 'fit_background' above. The astropy fitting/modelling must be to blame...
+    
+    INPUT:
+    'bg'                      : sparse matrix containing the inter-order regions of the 2D image
+    'deg'                     : the order of the polynomials to use in the fit (for both dimensions)
+    'return_full'             : boolean - if TRUE, then the full image of the background model is returned; otherwise just the set of coefficients that describe it
+    'timit'                   : time it...
+    
+    OUTPUT:
+    'coeffs'    : polynomial coefficients that describe the background model
+    'bkgd_img'  : full background image constructed from best-fit model (only if 'return_full' is set to TRUE)
+    
+    TODO:
+    figure out how to properly use weights here
+    """
     
     if timit:
         start_time = time.time()
@@ -142,14 +254,14 @@ def fit_background(bg, deg=3, timit=False, return_full=True):
  
  
  
-def fit_background_astropy(bg, poly_deg=5, polytype='chebyshev', return_full=True, timit=False, debug_level=0):
+def fit_background_astropy(bg, poly_deg=5, polytype='chebyshev', return_full=True, timit=False):
     """ 
     WARNING: While this works just fine, it is MUCH MUCH slower than 'fit_background' above. The astropy fitting/modelling must be to blame...
     
     INPUT:
     'bg'               : sparse matrix containing the inter-order regions of the 2D image
     'poly_deg'         : the order of the polynomials to use in the fit (for both dimensions)
-    'polype'           : either 'polynomial' (default), 'legendre', or 'chebyshev' are accepted
+    'polytype'         : either 'polynomial' (default), 'legendre', or 'chebyshev' are accepted
     'return_full'      : boolean - if TRUE, then the background model for each pixel for each order is returned; otherwise just the set of coefficients that describe it
     'timit'            : time it...
     'debug_level'      : for debugging only
