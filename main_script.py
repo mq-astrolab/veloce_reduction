@@ -9,7 +9,8 @@ import astropy.io.fits as pyfits
 import numpy as np
 
 from veloce_reduction.helper_functions import short_filenames, correct_orientation
-from veloce_reduction.calibration import get_offset_and_readnoise_from_bias_frames, make_master_bias_and_ronmask, make_master_dark, process_whites
+from veloce_reduction.calibration import get_offset_and_readnoise_from_bias_frames, \
+    make_master_bias_and_ronmask, make_master_dark, process_whites, crop_overscan_region
 from veloce_reduction.order_tracing import find_stripes, make_P_id, make_mask_dict, extract_stripes #, find_tramlines
 
 
@@ -96,7 +97,8 @@ np.save(path+'bad_pixel_mask_'+datestring+'.npy', bad_pixel_mask)
 #####################################################################################################################################################
 
 
-
+# TODO:
+# b/c of gain, I should really do this in electrons right from the start (Poisson noise only in units of e-, not ADUs)
 # (2) CALIBRATION ###################################################################################################################################
 # (i) BIAS 
 # get offsets and read-out noise
