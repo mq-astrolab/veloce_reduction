@@ -180,7 +180,7 @@ def measure_gain_from_slope(signal, variance, debug_level=0):
     'debug_level'  : for debugging...
 
     OUTPUT:
-    'gain' : the gain in e-/ADU
+    'gain'  : the gain in e-/ADU
     """
 
     # unweighted linear fit
