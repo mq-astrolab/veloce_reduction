@@ -29,7 +29,7 @@ from readcol import readcol
 
 from veloce_reduction.helper_functions import *
 from veloce_reduction.get_info_from_headers import identify_obstypes, get_obs_coords_from_header
-from veloce_reduction.calibration import get_offset_and_readnoise_from_bias_frames, make_master_bias_and_ronmask, make_master_dark, process_whites
+from veloce_reduction.calibration import get_offmask_and_readnoise_from_bias_frames, make_master_bias_and_ronmask, make_master_dark, process_whites
 from veloce_reduction.create_master_frames import create_master_img
 from veloce_reduction.order_tracing import find_stripes, make_P_id, make_mask_dict, extract_stripes, find_tramlines
 from veloce_reduction.cosmic_ray_removal import remove_cosmics

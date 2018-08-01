@@ -76,6 +76,7 @@ def remove_background(img, P_id, obsname, path, degpol=5, slit_height=25, save_b
                 h = pyfits.getheader(path+obsname+'_BD.fits')
             except:
                 h = pyfits.getheader(path+obsname+'.fits')
+                h['UNITS'] = 'ADU'
         h['HISTORY'] = '   BACKGROUND image - created '+time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())+' (GMT)'
         pyfits.writeto(outfn, bg_img, h, clobber=True)
         
@@ -91,6 +92,7 @@ def remove_background(img, P_id, obsname, path, degpol=5, slit_height=25, save_b
                 h = pyfits.getheader(path+obsname+'_BD.fits')
             except:
                 h = pyfits.getheader(path+obsname+'.fits')
+                h['UNITS'] = 'ADU'
         h['HISTORY'] = '   BACKGROUND-corrected image - created '+time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())+' (GMT)'
         pyfits.writeto(outfn, corrected_image, h, clobber=True)
         #also save the error array if desired
@@ -166,9 +168,16 @@ def extract_background(img, P_id, slit_height=25, return_mask=False, exclude_top
     final_bg_mask = bg_mask.copy()
     #in case we want to exclude the top and bottom parts where incomplete orders are located
     if exclude_top_and_bottom:
+        print('WARNING: this fix works for the current Veloce CCD layout only!!!')
         labelled_mask,nobj = label(bg_mask)
-        final_bg_mask[labelled_mask == 1] = False
-        final_bg_mask[labelled_mask == nobj] = False
+        #WARNING: this fix works for the current Veloce CCD layout only!!!
+        topleftnumber = labelled_mask[ny-1,0]
+        toprightnumber = labelled_mask[ny-1,nx-1]
+        #bottomleftnumber = labelled_mask[0,0]
+        bottomrightnumber = labelled_mask[0,nx-1]
+        final_bg_mask[labelled_mask == topleftnumber] = False
+        final_bg_mask[labelled_mask == toprightnumber] = False
+        final_bg_mask[labelled_mask == bottomrightnumber] = False
     
     
     mat = sparse.coo_matrix((img[final_bg_mask], (y_grid[final_bg_mask], x_grid[final_bg_mask])), shape=(ny, nx))
@@ -188,7 +197,6 @@ def extract_background(img, P_id, slit_height=25, return_mask=False, exclude_top
 
 def fit_background(bg, deg=5, return_full=True, timit=False):
     """ 
-    WARNING: While this works just fine, it is MUCH MUCH slower than 'fit_background' above. The astropy fitting/modelling must be to blame...
     
     INPUT:
     'bg'                      : sparse matrix containing the inter-order regions of the 2D image
@@ -239,7 +247,7 @@ def fit_background(bg, deg=5, return_full=True, timit=False):
         yyn = (yy / ((ny-1)/2.)) - 1.
         X,Y = np.meshgrid(xxn,yyn)
         #bkgd_img = polyval2d(X,Y,coeffs)
-        bkgd_img = polyval2d(Y,X,coeffs)    #IDKY, but the indices are the wrong way around if I do it like in the line above!!!!!
+        bkgd_img = polyval2d(Y,X,coeffs)    #IDKY, but the indices are the wrong way around if I do it like in the line above!!!!! 
     
     if timit:
         print('Time taken for constructing full background image: '+np.round(time.time() - start_time_2,2).astype(str)+' seconds...')

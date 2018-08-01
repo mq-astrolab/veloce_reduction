@@ -75,7 +75,7 @@ def remove_cosmics(img, ronmask, obsname, path, Flim=3.0, siglim=5.0, maxiter=20
             h = pyfits.getheader(path+obsname+'_BD.fits')
         except:
             h = pyfits.getheader(path+obsname+'.fits')
-        h['HISTORY'] = '   COSMIC-RAY MASK- created '+time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())+' (GMT)'
+        h['HISTORY'] = '   (boolean) COSMIC-RAY MASK- created '+time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())+' (GMT)'
         pyfits.writeto(outfn, global_mask.astype(int), h, clobber=True)
     
     #save cosmic-ray corrected image    
@@ -86,6 +86,7 @@ def remove_cosmics(img, ronmask, obsname, path, Flim=3.0, siglim=5.0, maxiter=20
             h = pyfits.getheader(path+obsname+'_BD.fits')
         except:
             h = pyfits.getheader(path+obsname+'.fits')
+            h['UNITS'] = 'ADU'
         h['HISTORY'] = '   COSMIC-RAY corrected image - created '+time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())+' (GMT)'
         pyfits.writeto(outfn, cleaned, h, clobber=True)
         #also save the error array if desired
@@ -165,9 +166,9 @@ def identify_cosmics(img, ronmask, Flim=3.0, siglim=5.0, verbose=False, timit=Fa
         im5 = im5.clip(min=0.00001) # As we will take the sqrt
         
     #construct noise model (ie eq. 10 in van Dokkum, or eq. 6 in Bai et al)
-    #CMB comment: this is a noise model in units of ADU; use this in the "normal" case, where you have a given value for gain (ine e-/ADU) and RON (in e-)
+    #CMB comment: this is a noise model in units of ADU; use this in the "normal" case, where you have a given value for gain (in e-/ADU) and RON (in e-)
     #noise = (1.0/gain) * np.sqrt(gain*im5 + RON*RON)    
-    #BUT in the Veloce pipeline we have the 2-dim images still in units of ADUs, and our read-noise is a 2-dim array, so simply do this:
+    #BUT in the Veloce pipeline we have the 2-dim images still in units of ADUs, and our read-noise is a 2-dim array in ADU, so simply do this:
     noise = np.sqrt(im5 + ronmask*ronmask)    
     
     

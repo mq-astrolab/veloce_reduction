@@ -9,8 +9,7 @@ import astropy.io.fits as pyfits
 import numpy as np
 
 from veloce_reduction.helper_functions import short_filenames, correct_orientation
-from veloce_reduction.calibration import get_offset_and_readnoise_from_bias_frames, \
-    make_master_bias_and_ronmask, make_master_dark, process_whites, crop_overscan_region
+from veloce_reduction.calibration import crop_overscan_region, get_bias_and_readnoise_from_bias_frames, make_offmask_and_ronmask, make_master_bias_from_coeffs, make_master_dark, process_whites
 from veloce_reduction.order_tracing import find_stripes, make_P_id, make_mask_dict, extract_stripes #, find_tramlines
 
 
@@ -97,26 +96,33 @@ np.save(path+'bad_pixel_mask_'+datestring+'.npy', bad_pixel_mask)
 #####################################################################################################################################################
 
 
-# TODO:
-# b/c of gain, I should really do this in electrons right from the start (Poisson noise only in units of e-, not ADUs)
+
 # (2) CALIBRATION ###################################################################################################################################
+gain = [1.,1.,1.,1.]
 # (i) BIAS 
 # get offsets and read-out noise
-#either from bias frames
-offsets,rons = get_offset_and_readnoise_from_bias_frames(bias_list, debug_level=0, timit=False)
+#either from bias frames (units = ADUs)
+medbias,coeffs,offsets,rons = get_bias_and_readnoise_from_bias_frames(bias_list, degpol=5, clip=5., gain=gain, debug_level=0, timit=True)
 #or from the overscan regions
 
-# create MASTER BIAS frame and read-out noise mask (units = ADUs)
-MB,ronmask = make_master_bias_and_ronmask(offsets, rons, nx, ny, savefiles=True, path=path)
-#XXXsave read-noise and offsets for all headers to write later
+# create MASTER BIAS frame and read-out noise mask (units = electrons)
+offmask,ronmask = make_offmask_and_ronmask(offsets, rons, nx, ny, gain=gain, savefiles=True, path=path, timit=True)
+MB = make_master_bias_from_coeffs(coeffs, nx, ny, savefile=True, path=path, timit=True)
+# or
+# MB = offmask.copy()
+# #or
+# MB = medbias.copy()
+#XXXalso save read-noise and offsets for all headers to write later!?!?!?
+
 
 # (ii) DARKS
 # create (bias-subtracted) MASTER DARK frame (units = ADUs)
-MD = make_master_dark(dark_list, MB, scalable=False, savefile=True, path=path, timit=False)
+MD = make_master_dark(dark_list, MB, gain=gain, scalable=False, savefile=True, path=path, timit=True)
+MDS = make_master_dark(dark_list, MB, gain=gain, scalable=True, savefile=True, path=path, timit=True)
 
 # (iii) WHITES 
 #create (bias- & dark-subtracted) MASTER WHITE frame and corresponding error array (units = ADUs)
-MW,err_MW = process_whites(white_list, MB=MB, ronmask=ronmask, MD=MD, scalable=False, fancy=False, clip=5., savefile=True, saveall=False, diffimg=False, path=None, timit=False)
+MW,err_MW = process_whites(white_list, MB=MB, ronmask=ronmask, MD=MD, gain=gain, scalable=False, fancy=False, clip=5., savefile=True, saveall=True, diffimg=False, path=None, timit=False)
 #####################################################################################################################################################
 
 
