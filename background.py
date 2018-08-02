@@ -76,13 +76,13 @@ def remove_background(img, P_id, obsname, path, degpol=5, slit_height=25, save_b
                 h = pyfits.getheader(path+obsname+'_BD.fits')
             except:
                 h = pyfits.getheader(path+obsname+'.fits')
-                h['UNITS'] = 'ADU'
+                h['UNITS'] = 'ELECTRONS'
         h['HISTORY'] = '   BACKGROUND image - created '+time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())+' (GMT)'
         pyfits.writeto(outfn, bg_img, h, clobber=True)
         
     #save background-corrected image
     if savefile:
-        outfn = path+obsname+'_BD_CR_BG_img.fits'
+        outfn = path+obsname+'_BD_CR_BG.fits'
         #get header from the BIAS- & DARK-subtracted & cosmic-ray corrected image if it exists
         try:
             h = pyfits.getheader(path+obsname+'_BD_CR.fits')
@@ -92,7 +92,7 @@ def remove_background(img, P_id, obsname, path, degpol=5, slit_height=25, save_b
                 h = pyfits.getheader(path+obsname+'_BD.fits')
             except:
                 h = pyfits.getheader(path+obsname+'.fits')
-                h['UNITS'] = 'ADU'
+                h['UNITS'] = 'ELECTRONS'
         h['HISTORY'] = '   BACKGROUND-corrected image - created '+time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())+' (GMT)'
         pyfits.writeto(outfn, corrected_image, h, clobber=True)
         #also save the error array if desired
@@ -116,6 +116,7 @@ def remove_background(img, P_id, obsname, path, degpol=5, slit_height=25, save_b
         print('Total time elapsed: '+str(np.round(time.time() - start_time,1))+' seconds')
     
     return corrected_image
+
 
 
 

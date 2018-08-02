@@ -10,7 +10,8 @@ from itertools import combinations
 import time
 import matplotlib.pyplot as plt
 
-from veloce_reduction.helper_functions import make_quadrant_masks, binary_indices, correct_orientation, sigma_clip, make_median_image, polyfit2d, polyval2d
+from veloce_reduction.helper_functions import make_quadrant_masks, correct_orientation, sigma_clip, make_median_image, polyfit2d, polyval2d
+from . import *
 
 
 
@@ -745,7 +746,7 @@ def make_master_dark(dark_list, MB, gain=None, scalable=False, savefile=True, pa
         h['UNITS'] = 'ELECTRONS'
         if scalable:
             h['COMMENT'] = 're-normalized to texp=1s to make it scalable'
-            h['EXPTIME'] = (1., 'exposure time [s]; re-normalized to 1s; originally '+str(np.round(texp,2))+'s')
+            h['EXPTIME'] = (1., 'exposure time [s]; originally '+str(np.round(texp,2))+'s')
         pyfits.writeto(outfn, MD, h, clobber=True)
 #         if return_errors:
 #             h_err = h.copy()
@@ -900,160 +901,11 @@ def correct_for_bias_and_dark_from_filename(imgname, MB, MD, gain=None, scalable
 
 
 
-
-def process_whites(white_list, MB=None, ronmask=None, MD=None, gain=None, scalable=False, fancy=False, clip=5., savefile=True, saveall=False, diffimg=False, path=None, debug_level=0, timit=False):
-    """
-    This routine processes all whites from a given list of file. It corrects the orientation of the image and crops the overscan regions,
-    and subtracts both the MASTER BIAS frame [in ADU], and the MASTER DARK frame [in e-] from every image before combining them to create a MASTER WHITE frame.
-    NOTE: the input image has units of ADU, but the output image has units of electrons!!!
-    
-    INPUT:
-    'white_list'  : list of filenames of raw white images (incl. directories)
-    'MB'          : the master bias frame [ADU]
-    'ronmask'     : the read-noise mask (or frame) [e-]
-    'MD'          : the master dark frame [e-]
-    'gain'        : the gains for each quadrant [e-/ADU]
-    'scalable'    : boolean - do you want to normalize the dark current to an exposure time of 1s? (ie do you want to make it "scalable"?)
-    'fancy'       : boolean - do you want to use the 'fancy' method for creating the master white frame? (otherwise a simple median image will be used)
-    'clip'        : number of 'expected-noise sigmas' a pixel has to deviate from the median pixel value across all images to be considered an outlier when using the 'fancy' method
-    'savefile'    : boolean - do you want to save the master white frame as a FITS file?
-    'saveall'     : boolean - do you want to save all individual bias- & dark-corrected images as well?
-    'diffimg'     : boolean - do you want to save the difference image (ie containing the outliers)? only used if 'fancy' is set to TRUE
-    'path'        : path to the output file directory (only needed if savefile is set to TRUE)
-    'debug_level' : for debugging...
-    'timit'       : boolean - do you want to measure execution run time?
-    
-    OUTPUT:
-    'master'      : the master white image [e-] (also has been brought to 'correct' orientation and overscan regions cropped) 
-    'err_master'  : the corresponding uncertainty array [e-]    
-    """
-    
-    if timit:
-        start_time = time.time()
-
-    #if the darks have a different exposure time than the whites, then we need to re-scale the master dark
-    texp = pyfits.getval(white_list[0], 'exptime')
-
-    #if INPUT arrays are not given, read them from default files
-    if path is None:
-        print('WARNING: output file directory not provided!!!')
-        print('Using same directory as input file...')
-        dum = white_list[0].split('/')
-        path = white_list[0][0:-len(dum[-1])]
-    if MB is None:
-        #no need to fix orientation, this is already a processed file [ADU]
-        MB = pyfits.getdata(path+'master_bias.fits')
-    if ronmask is None:
-        #no need to fix orientation, this is already a processed file [e-]
-        ronmask = pyfits.getdata(path+'read_noise_mask.fits')
-    if MD is None:
-        if scalable:
-            #no need to fix orientation, this is already a processed file [e-]
-            MD = pyfits.getdata(path+'master_dark_scalable.fits', 0)
-#             err_MD = pyfits.getdata(path+'master_dark_scalable.fits', 1)
-        else:
-            #no need to fix orientation, this is already a processed file [e-]
-            MD = pyfits.getdata(path+'master_dark_t'+str(int(np.round(texp,0)))+'.fits', 0)
-#             err_MD = pyfits.getdata(path+'master_dark_t'+str(int(np.round(texp,0)))+'.fits', 1)
+########################################3
 
 
-    #prepare arrays
-    allimg = []
-    allerr = []
-
-    #loop over all files in "white_list"; correct for bias and darks on the fly
-    for n,fn in enumerate(white_list):
-        if debug_level >=1:
-            print('Now processing file: '+str(fn))
-        #call routine that does all the bias and dark correction stuff and converts from ADU to e-
-        img = correct_for_bias_and_dark_from_filename(fn, MB, MD, gain=gain, scalable=scalable, savefile=saveall, path=path, timit=timit)     #these are now bias- & dark-corrected images; units are e-
-        if debug_level >=1:
-            print('min(img) = '+str(np.min(img)))
-        allimg.append(img)
-#         allerr.append(err)
-#         allerr.append( np.sqrt(img + ronmask*ronmask) )   # [e-]
-        #dumb fix for negative pixel values that can occur, if we haven't masked out bad pixels yet
-        allerr.append( np.sqrt(np.abs(img) + ronmask*ronmask) )   # [e-]
 
 
-    #########################################################################
-    ### now we do essentially what "CREATE_MASTER_IMG" does for whites... ###
-    #########################################################################
-    #add individual-image errors in quadrature (need it either way, not only for fancy method)
-    err_summed = np.sqrt(np.sum((np.array(allerr)**2),axis=0))
-    #get median image
-    medimg = np.median(np.array(allimg), axis=0)
-
-    if fancy:
-        #need to create a co-added frame if we want to do outlier rejection the fancy way
-        summed = np.sum((np.array(allimg)),axis=0)
-        if diffimg:
-            diff = np.zeros(summed.shape)
-
-        master_outie_mask = np.zeros(summed.shape, dtype='int')
-
-        #make sure we do not have any negative pixels for the sqrt
-        medimgpos = medimg.copy()
-        medimgpos[medimgpos < 0] = 0.
-        med_sig_arr = np.sqrt(medimgpos + ronmask*ronmask)       #expected STDEV for the median image (from LB Eq 2.1); still in ADUs
-        for n,img in enumerate(allimg):
-            #outie_mask = np.abs(img - medimg) > clip*med_sig_arr
-            outie_mask = (img - medimg) > clip*med_sig_arr      #do we only want HIGH outliers, ie cosmics?
-            #save info about which image contributes the outlier pixel using unique binary numbers technique
-            master_outie_mask += (outie_mask * 2**n).astype(int)
-        #see which image(s) produced the outlier(s) and replace outies by mean of pixel value from remaining images
-        n_outie = np.sum(master_outie_mask > 0)
-        print('Correcting '+str(n_outie)+' outliers...')
-        #loop over all outliers
-        for i,j in zip(np.nonzero(master_outie_mask)[0],np.nonzero(master_outie_mask)[1]):
-            #access binary numbers and retrieve component(s)
-            outnum = binary_indices(master_outie_mask[i,j])   #these are the indices (within allimg) of the images that contain outliers
-            dumix = np.arange(len(white_list))
-            #remove the images containing the outliers in order to compute mean from the remaining images
-            useix = np.delete(dumix,outnum)
-            if diffimg:
-                diff[i,j] = summed[i,j] - ( len(outnum) * np.mean( np.array([allimg[q][i,j] for q in useix]) ) + np.sum( np.array([allimg[q][i,j] for q in useix]) ) )
-            #now replace value in master image by the sum of all pixel values in the unaffected pixels
-            #plus the number of affected images times the mean of the pixel values in the unaffected images
-            summed[i,j] = len(outnum) * np.mean( np.array([allimg[q][i,j] for q in useix]) ) + np.sum( np.array([allimg[q][i,j] for q in useix]) )
-        #once we have finished correcting the outliers, we want to "normalize" (ie divide by number of frames) the master image and the corresponding error array
-        master = summed / len(white_list)
-        err_master = err_summed / len(white_list)
-    else:
-        #ie not fancy, just take the median image to remove outliers
-        medimg = np.median(np.array(allimg), axis=0)
-        #now set master image equal to median image
-        master = medimg.copy()
-        #estimate of the corresponding error array (estimate only!!!)
-        err_master = err_summed / len(white_list)
-
-
-    #now save master white to file
-    if savefile:
-        outfn = path+'master_white.fits'
-        pyfits.writeto(outfn, master, clobber=True)
-        pyfits.setval(outfn, 'HISTORY', value='   MASTER WHITE frame - created '+time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())+' (GMT)')
-        pyfits.setval(outfn, 'EXPTIME', value=texp, comment='exposure time [s]')
-        pyfits.setval(outfn, 'UNITS', value='ELECTRONS')
-        if fancy:
-            pyfits.setval(outfn, 'METHOD', value='fancy', comment='method to create master white and remove outliers')
-        else:
-            pyfits.setval(outfn, 'METHOD', value='median', comment='method to create master white and remove outliers')
-        h = pyfits.getheader(outfn)
-        h_err = h.copy()
-        h_err['HISTORY'] = 'estimated uncertainty in MASTER WHITE frame - created '+time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())+' (GMT)'
-        pyfits.append(outfn, err_master, h_err, clobber=True)
-
-    #also save the difference image if desired
-    if diffimg:
-        hdiff = h.copy()
-        hdiff['HISTORY'] = '   MASTER WHITE DIFFERENCE IMAGE - created '+time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())+' (GMT)'
-        pyfits.writeto(path+'master_white_diffimg.fits', diff, hdiff, clobber=True)
-
-    if timit:
-        print('Total time elapsed: '+str(np.round(time.time() - start_time,1))+' seconds')
-
-    return master, err_master
 
 
 

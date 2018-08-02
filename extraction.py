@@ -10,8 +10,7 @@ import astropy.io.fits as pyfits
 import os
 
 
-from veloce_reduction.helper_functions import fibmodel_with_amp, make_norm_profiles_2, short_filenames,\
-    get_datestring
+from veloce_reduction.helper_functions import fibmodel_with_amp, make_norm_profiles_2, short_filenames
 from veloce_reduction.spatial_profiles import fit_single_fibre_profile
 from veloce_reduction.order_tracing import flatten_single_stripe, flatten_single_stripe_from_indices, extract_stripes
 from veloce_reduction.relative_intensities import get_relints
@@ -20,7 +19,7 @@ from veloce_reduction.relative_intensities import get_relints
 
 
 
-def quick_extract(stripes, slit_height=25, RON=0., gain=1., verbose=False, timit=False):
+def quick_extract(stripes, err_stripes, slit_height=25, verbose=False, timit=False):
     """
     This routine performs a quick-look reduction of an echelle spectrum, by simply adding up the flux in a pixel column
     perpendicular to the dispersion direction. Similar to the tramline extraction in "collapse_extract", but even sloppier
@@ -28,9 +27,8 @@ def quick_extract(stripes, slit_height=25, RON=0., gain=1., verbose=False, timit
     
     INPUT:
     'stripes'     : dictionary (keys = orders) containing the 2-dim stripes (ie the to-be-extracted regions centred on the orders) of the spectrum
+    'err_stripes' : dictionary (keys = orders) containing the errors in the 2-dim stripes (ie the to-be-extracted regions centred on the orders) of the spectrum    
     'slit_height' : height of the extraction slit (ie the pixel columns are 2*slit_height pixels long)
-    'RON'         : read-out noise per pixel
-    'gain'        : gain
     'verbose'     : boolean - for debugging...
     'timit'       : boolean - do you want to measure execution run time?
     
@@ -58,13 +56,15 @@ def quick_extract(stripes, slit_height=25, RON=0., gain=1., verbose=False, timit
         
         # define stripe
         stripe = stripes[ord]
+        err_stripe = err_stripes[ord]
         # find and fill the "order-box"
         sc,sr = flatten_single_stripe(stripe,slit_height=slit_height,timit=False)
+        err_sc,err_sr = flatten_single_stripe(err_stripe,slit_height=slit_height,timit=False)
         # get dimensions of the box
         ny,nx = sc.shape
         
         flux[ord] = np.sum(sc,axis=0)
-        err[ord] = np.sqrt(flux[ord] + ny*RON*RON)
+        err[ord] = np.sqrt(np.sum(err_sc*err_sc,axis=0))
         pixnum[ord] = np.arange(nx) + 1
     
         if timit:
@@ -83,18 +83,17 @@ def quick_extract(stripes, slit_height=25, RON=0., gain=1., verbose=False, timit
 
 
 
-def quick_extract_from_indices(img, stripe_indices, slit_height=25, RON=0., gain=1., verbose=False, timit=False):
+def quick_extract_from_indices(img, err_img, stripe_indices, slit_height=25, verbose=False, timit=False):
     """
     This routine performs a quick-look reduction of an echelle spectrum, by simply adding up the flux in a pixel column
     perpendicular to the dispersion direction. Similar to the tramline extraction in "collapse_extract", but even sloppier
     as edge effects (ie fractional pixels) are not taken into account.
     
     INPUT:
-    'img'            : 2-dim input image
+    'img'            : 2-dim input array
+    'err_img'        : 2-dim array of the corresponding errors
     'stripe_indices' : dictionary (keys = orders) containing the indices of the pixels that are identified as the "stripes" (ie the to-be-extracted regions centred on the orders)
     'slit_height'    : height of the extraction slit (ie the pixel columns are 2*slit_height pixels long)
-    'RON'            : read-out noise per pixel
-    'gain'           : gain
     'verbose'        : boolean - for debugging...
     'timit'          : boolean - do youi want to measure execution run time?
     
@@ -126,11 +125,12 @@ def quick_extract_from_indices(img, stripe_indices, slit_height=25, RON=0., gain
         indices = stripe_indices[ord]
         # find and fill the "order-box"
         sc,sr = flatten_single_stripe_from_indices(img,indices,slit_height=slit_height,timit=False)
+        err_sc,err_sr = flatten_single_stripe_from_indices(err_img,indices,slit_height=slit_height,timit=False)
         # get dimensions of the box
         ny,nx = sc.shape
         
         flux[ord] = np.sum(sc,axis=0)
-        err[ord] = np.sqrt(flux[ord] + ny*RON*RON)
+        err[ord] = np.sqrt(np.sum(err_sc*err_sc,axis=0))
         pixnum[ord] = np.arange(nx) + 1
     
         if timit:
@@ -149,16 +149,16 @@ def quick_extract_from_indices(img, stripe_indices, slit_height=25, RON=0., gain
 
 
 
-def collapse_extract_single_cutout(cutout, top, bottom, RON=0., gain=1.):
+def collapse_extract_single_cutout(cutout, err_cutout, top, bottom):
     
     x = np.arange(len(cutout))
     inner_range = np.logical_and(x >= np.ceil(bottom), x <= np.floor(top))
     top_frac = top - np.floor(top)
     bottom_frac = np.ceil(bottom) - bottom
-    flux = gain * ( np.sum(cutout[inner_range]) + top_frac * cutout[int(np.ceil(top))] + bottom_frac * cutout[int(np.floor(bottom))] )
-    n = np.sum(inner_range)     # as in my thesis; sum is fine because inner_range is boolean
-    w = n + 2                   # as in my thesis
-    err = np.sqrt(flux + w*RON*RON)
+    flux = np.sum(cutout[inner_range]) + top_frac * cutout[int(np.ceil(top))] + bottom_frac * cutout[int(np.floor(bottom))] 
+    err = np.sqrt(np.sum(err_cutout*err_cutout))
+#     n = np.sum(inner_range)     # as in my thesis; sum is fine because inner_range is boolean
+#     w = n + 2                   # as in my thesis
     
     return flux, err
 
@@ -166,7 +166,7 @@ def collapse_extract_single_cutout(cutout, top, bottom, RON=0., gain=1.):
 
 
 
-def collapse_extract_order(ordnum, data, row_ix, upper_boundary, lower_boundary, RON=0., gain=1.):
+def collapse_extract_order(ordnum, data, err_data, row_ix, upper_boundary, lower_boundary):
     
     flux,err = (np.zeros(len(upper_boundary)),np.zeros(len(upper_boundary)))
     pixnum = []
@@ -174,12 +174,13 @@ def collapse_extract_order(ordnum, data, row_ix, upper_boundary, lower_boundary,
     for i in range(data.shape[1]):
         pixnum.append(ordnum+str(i+1).zfill(4))
         cutout = data[:,i]
+        err_cutout = err_data[:,i]
         top = upper_boundary[i] - row_ix[0,i]
         bottom = lower_boundary[i] - row_ix[0,i]
         if top>=0 and bottom>=0:
             if top<=data.shape[0] and bottom <=data.shape[0] and top>bottom:
                 # this is the normal case, where the entire cutout lies on the chip
-                f,e = collapse_extract_single_cutout(cutout, top, bottom, RON=RON, gain=gain)
+                f,e = collapse_extract_single_cutout(cutout, err_cutout, top, bottom)
             else:
                 print('ERROR: Tramlines are not properly defined!!!')
                 quit()
@@ -195,7 +196,7 @@ def collapse_extract_order(ordnum, data, row_ix, upper_boundary, lower_boundary,
 
 
 
-def collapse_extract(stripes, tramlines, RON=0., gain=1., slit_height=25, verbose=False, timit=False):
+def collapse_extract(stripes, err_stripes, tramlines, slit_height=25, verbose=False, timit=False):
     
     if verbose:
         print('Collapsing and extracting orders...')
@@ -219,14 +220,16 @@ def collapse_extract(stripes, tramlines, RON=0., gain=1., slit_height=25, verbos
         
         # define stripe
         stripe = stripes[ord]
+        err_stripe = err_stripes[ord]
         # find the "order-box"
         sc,sr = flatten_single_stripe(stripe, slit_height=slit_height, timit=False)
+        err_sc,err_sr = flatten_single_stripe(err_stripe, slit_height=slit_height, timit=False)
         
         # define upper and lower extraction boundaries
         upper_boundary = tramlines[ord]['upper_boundary']
         lower_boundary = tramlines[ord]['lower_boundary']
-        # call extraction routine for this order (NOTE the sc-1 is becasue we added 1 artificially at the beginning in order for extract_stripes tow work properly)
-        pix,f,e = collapse_extract_order(ordnum, sc-1, sr, upper_boundary, lower_boundary, RON=RON, gain=gain)
+        # call extraction routine for this order 
+        pix,f,e = collapse_extract_order(ordnum, sc, err_sc, sr, upper_boundary, lower_boundary)
         
         flux[ord] = f
         err[ord] = e
@@ -248,7 +251,7 @@ def collapse_extract(stripes, tramlines, RON=0., gain=1., slit_height=25, verbos
 
 
 
-def collapse_extract_from_indices(img, stripe_indices, tramlines, RON=0., gain=1., slit_height=25, verbose=False, timit=False):
+def collapse_extract_from_indices(img, err_img, stripe_indices, tramlines, slit_height=25, verbose=False, timit=False):
     
     if verbose:
         print('Collapsing and extracting orders...')
@@ -276,12 +279,13 @@ def collapse_extract_from_indices(img, stripe_indices, tramlines, RON=0., gain=1
         # find the "order-box"
         #sc,sr = flatten_single_stripe(stripe,slit_height=slit_height,timit=False)
         sc,sr = flatten_single_stripe_from_indices(img, indices, slit_height=slit_height, timit=False)
+        err_sc,err_sr = flatten_single_stripe_from_indices(err_img, indices, slit_height=slit_height, timit=False)
         
         # define upper and lower extraction boundaries
         upper_boundary = tramlines[ord]['upper_boundary']
         lower_boundary = tramlines[ord]['lower_boundary']
-        # call extraction routine for this order (NOTE the sc-1 is becasue we added 1 artificially at the beginning in order for extract_stripes tow work properly)
-        pix,f,e = collapse_extract_order(ordnum, sc-1, sr, upper_boundary, lower_boundary, RON=RON, gain=gain)
+        # call extraction routine for this order 
+        pix,f,e = collapse_extract_order(ordnum, sc, err_sc, sr, upper_boundary, lower_boundary, RON=RON, gain=gain)
         
         flux[ord] = f
         err[ord] = e
@@ -303,10 +307,10 @@ def collapse_extract_from_indices(img, stripe_indices, tramlines, RON=0., gain=1
 
 
 
-def optimal_extraction(stripes, err_stripes=None, nfib=28, RON=0., gain=1., slit_height=25, phi_onthefly=False, timit=False, simu=False, 
+def optimal_extraction(stripes, err_stripes=None, ron_stripes=None, nfib=28, RON=0., slit_height=25, phi_onthefly=False, timit=False, simu=False, 
                        individual_fibres=False, combined_profiles=False, relints=None, collapse=False, debug_level=0):
     
-    # if error array is not provided, then RON and gain must be provided (but this is bad because that way we don't know about large errors for cosmic-correctdd pixels etc)
+    # if error array is not provided, then RON and gain must be provided (but this is bad because that way we don't know about large errors for cosmic-corrected pixels etc)
     
     if timit:
         start_time = time.time()
@@ -342,9 +346,11 @@ def optimal_extraction(stripes, err_stripes=None, nfib=28, RON=0., gain=1., slit
         
         # define stripe
         stripe = stripes[ord]
+        ron_stripe = ron_stripes[ord]
         #indices = stripe_indices[ord]
         # find the "order-box"
         sc,sr = flatten_single_stripe(stripe,slit_height=slit_height,timit=False)
+        ron_sc, ron_sr = flatten_single_stripe(ron_stripe,slit_height=slit_height,timit=False)
         #sc,sr = flatten_single_stripe_from_indices(img, indices, slit_height=slit_height, timit=False)
         if err_stripes is not None:
             err_stripe = err_stripes[ord]
@@ -390,12 +396,14 @@ def optimal_extraction(stripes, err_stripes=None, nfib=28, RON=0., gain=1., slit
                 print('pixel '+str(i+1)+'/'+str(npix))
             pix[ord].append(ordnum+str(i+1).zfill(4))
             z = sc[:,i].copy()
-#             if simu:
-#                 z -= 1.     #note the minus 1 is because we added 1 artificially at the beginning in order for "extract_stripes" to work properly
+            if simu:
+                z -= 1.     #note the minus 1 is because we added 1 artificially at the beginning in order for "extract_stripes" to work properly
+            roncol = ron_sc[:,i].copy()
+
             
             #if error is not provided, estimate it (NOT RECOMMENDED!!!)
             if err_stripes is None:
-                pixerr = np.sqrt( RON*RON + np.abs(z) )
+                pixerr = np.sqrt( ron_sc[:,i]**2 + np.abs(z) )
             else:
                 pixerr = err_sc[:,i].copy()
             
@@ -443,14 +451,16 @@ def optimal_extraction(stripes, err_stripes=None, nfib=28, RON=0., gain=1., slit
             #do the optimal extraction
             if not collapse:
                 if np.sum(phi)==0:
-                    f,v = (0.,np.sqrt(len(phi)*RON*RON))
+#                     f,v = (0.,np.sqrt(len(phi)*RON*RON))
+                    f,v = (0., np.sqrt(np.sum(pixerr*pixerr)))
                 else:
-                    #THIS IS THE NORMAL CASE!!!
-                    f,v = linalg_extract_column(z, pix_w, phi, RON=RON)
-                    
+                    #THIS IS THE NORMAL CASE!!! 
+                    #NOTE: take the read-out noise as the average of the individual-pixel read-out noise values over the cutout, as it can change if we cross a quadrant boundary!
+                    f,v = linalg_extract_column(z, pix_w, phi, RON=np.mean(roncol))
             else:
                 #f,v = (np.sum(z-np.median(z)), np.sum(z-np.median(z)) + len(phi)*RON*RON)   ### background should already be taken care of here...
-                f,v = (np.sum(z), np.sum(z) + len(phi)*RON*RON)
+                #f,v = (np.sum(z), np.sum(z) + len(phi)*RON*RON)
+                f,v = (np.sum(z), np.sqrt(np.sum(pixerr*pixerr)))
             
             #e = np.sqrt(v)
             #model = np.sum(f*phi,axis=1)
@@ -461,8 +471,10 @@ def optimal_extraction(stripes, err_stripes=None, nfib=28, RON=0., gain=1., slit
                 #there should not be negative values!!!
                 f[f<0] = 0.
                 #not sure if this is the proper way to do this, but we can't have negative variance
-                v[np.logical_or(v<=0,f<=0)] = RON*RON
-                v[v<RON*RON] = np.maximum(RON*RON,1.)
+#                 v[np.logical_or(v<=0,f<=0)] = RON*RON
+#                 v[v<RON*RON] = np.maximum(RON*RON,1.)   #just a stupid fix so that variance is never below 1
+                v[np.logical_or(v<=0,f<=0)] = np.mean(roncol)**2
+                v[v<RON*RON] = np.maximum(np.mean(roncol)**2,1.)   #just a stupid fix so that variance is never below 1
                     
                 if individual_fibres:   
                     #fill flux- and error- output arrays for individual fibres
@@ -505,7 +517,8 @@ def optimal_extraction(stripes, err_stripes=None, nfib=28, RON=0., gain=1., slit
             else:
                 flux[ord].append(np.max([f,0.]))
                 if f <= 0 or v <= 0:
-                    err[ord].append(np.sqrt(len(phi)*RON*RON))
+                    #err[ord].append(np.sqrt(len(phi)*RON*RON))
+                    err[ord].append(np.sqrt(np.sum(pixerr*pixerr)))
                 else:
                     err[ord].append(np.sqrt(v))
          
@@ -523,7 +536,7 @@ def optimal_extraction(stripes, err_stripes=None, nfib=28, RON=0., gain=1., slit
 
 
 
-def optimal_extraction_from_indices(img, stripe_indices, err_img=None, nfib=28, RON=0., gain=1., slit_height=25, phi_onthefly=False, timit=False, simu=False, 
+def optimal_extraction_from_indices(img, stripe_indices, err_img=None, nfib=28, RON=0., slit_height=25, phi_onthefly=False, timit=False, simu=False, 
                        individual_fibres=False, combined_profiles=False, relints=None, collapse=False, debug_level=0):
     
     # if error array is not provided, then RON and gain must be provided (but this is bad because that way we don't know about large errors for cosmic-correctdd pixels etc)
@@ -566,6 +579,7 @@ def optimal_extraction_from_indices(img, stripe_indices, err_img=None, nfib=28, 
         # find the "order-box"
         #sc,sr = flatten_single_stripe(stripe,slit_height=slit_height,timit=False)
         sc,sr = flatten_single_stripe_from_indices(img, indices, slit_height=slit_height, timit=False)
+        ron_sc,ron_sr = flatten_single_stripe_from_indices(RON, indices, slit_height=slit_height, timit=False)
         if err_img is not None:
             err_sc,err_sr = flatten_single_stripe_from_indices(err_img, indices, slit_height=slit_height, timit=False)
         
@@ -609,12 +623,14 @@ def optimal_extraction_from_indices(img, stripe_indices, err_img=None, nfib=28, 
                 print('pixel '+str(i+1)+'/'+str(npix))
             pix[ord].append(ordnum+str(i+1).zfill(4))
             z = sc[:,i].copy()
-#             if simu:
-#                 z -= 1.     #note the minus 1 is because we added 1 artificially at the beginning in order for "extract_stripes" to work properly
+            if simu:
+                z -= 1.     #note the minus 1 is because we added 1 artificially at the beginning in order for "extract_stripes" to work properly
+            roncol = ron_sc[:,i].copy()
+
             
             #if error is not provided, estimate it (NOT RECOMMENDED!!!)
             if err_img is None:
-                pixerr = np.sqrt( RON*RON + np.abs(z) )
+                pixerr = np.sqrt( ron_sc[:,i]**2 + np.abs(z) )
             else:
                 pixerr = err_sc[:,i].copy()
             
@@ -662,13 +678,16 @@ def optimal_extraction_from_indices(img, stripe_indices, err_img=None, nfib=28, 
             #do the optimal extraction
             if not collapse:
                 if np.sum(phi)==0:
-                    f,v = (0.,np.sqrt(len(phi)*RON*RON))
+#                     f,v = (0.,np.sqrt(len(phi)*RON*RON))
+                    f,v = (0., np.sqrt(np.sum(pixerr*pixerr)))
                 else:
-                    #THIS IS THE NORMAL CASE!!!
-                    f,v = linalg_extract_column(z, pix_w, phi, RON=RON)
+                    #THIS IS THE NORMAL CASE!!! 
+                    #NOTE: take the read-out noise as the average of the individual-pixel read-out noise values over the cutout, as it can change if we cross a quadrant boundary!
+                    f,v = linalg_extract_column(z, pix_w, phi, RON=np.mean(roncol))
             else:
                 #f,v = (np.sum(z-np.median(z)), np.sum(z-np.median(z)) + len(phi)*RON*RON)   ### background should already be taken care of here...
-                f,v = (np.sum(z), np.sum(z) + len(phi)*RON*RON)
+                #f,v = (np.sum(z), np.sum(z) + len(phi)*RON*RON)
+                f,v = (np.sum(z), np.sqrt(np.sum(pixerr*pixerr)))
             
             #e = np.sqrt(v)
             #model = np.sum(f*phi,axis=1)
@@ -679,8 +698,10 @@ def optimal_extraction_from_indices(img, stripe_indices, err_img=None, nfib=28, 
                 #there should not be negative values!!!
                 f[f<0] = 0.
                 #not sure if this is the proper way to do this, but we can't have negative variance
-                v[np.logical_or(v<=0,f<=0)] = RON*RON
-                v[v<RON*RON] = np.maximum(RON*RON,1.)
+#                 v[np.logical_or(v<=0,f<=0)] = RON*RON
+#                 v[v<RON*RON] = np.maximum(RON*RON,1.)   #just a stupid fix so that variance is never below 1
+                v[np.logical_or(v<=0,f<=0)] = np.mean(roncol)**2
+                v[v<RON*RON] = np.maximum(np.mean(roncol)**2,1.)   #just a stupid fix so that variance is never below 1
                     
                 if individual_fibres:   
                     #fill flux- and error- output arrays for individual fibres
@@ -723,7 +744,8 @@ def optimal_extraction_from_indices(img, stripe_indices, err_img=None, nfib=28, 
             else:
                 flux[ord].append(np.max([f,0.]))
                 if f <= 0 or v <= 0:
-                    err[ord].append(np.sqrt(len(phi)*RON*RON))
+                    #err[ord].append(np.sqrt(len(phi)*RON*RON))
+                    err[ord].append(np.sqrt(np.sum(pixerr*pixerr)))
                 else:
                     err[ord].append(np.sqrt(v))
          
@@ -741,7 +763,7 @@ def optimal_extraction_from_indices(img, stripe_indices, err_img=None, nfib=28, 
 
 
 
-def linalg_extract_column(z, w, phi, RON=0., naive_variance=False, altvar=True):
+def linalg_extract_column(z, w, phi, RON=3.3, naive_variance=False, altvar=True):
     
     #create diagonal matrix for weights
     ### XXX maybe use sparse matrix here instead to save memory / speed things up
@@ -830,7 +852,8 @@ def mikes_linalg_extraction(col_data, col_inv_var, phi, no=19):
 
 
 
-def extract_spectrum(stripes, method='optimal', individual_fibres=False, combined_profiles=False, slit_height=25, RON=0., gain=1., simu=False, verbose=False, timit=False, debug_level=0):
+def extract_spectrum(stripes, err_stripes, ron_stripes, method='optimal', individual_fibres=False, combined_profiles=False, slit_height=25, RON=0., 
+                     savefile=False, filetype='fits', obsname=None, path=None, simu=False, verbose=False, timit=False, debug_level=0):
     """
     This routine is simply a wrapper code for the different extraction methods. There are a total FIVE (1,2,3a,3b,3c) different extraction methods implemented, 
     which can be selected by a combination of the 'method', individual_fibres', and 'combined_profile' keyword arguments.
@@ -856,7 +879,9 @@ def extract_spectrum(stripes, method='optimal', individual_fibres=False, combine
              
     
     INPUT:
-    'stripes' : dictionary (keys = orders) containing the order-stripes (from "extract_stripes")
+    'stripes'      : dictionary (keys = orders) containing the order-stripes (from "extract_stripes")
+    'err_stripes'  : dictionary (keys = orders) containing the errors in the order-stripes (from "extract_stripes")
+    'ron_stripes'  : dictionary (keys = orders) containing the read-out noise stripes (from "extract_stripes")
     
     OPTIONAL INPUT / KEYWORDS:
     'method'            : method for extraction - valid options are ["quick" / "tramline" / "optimal"]
@@ -865,6 +890,10 @@ def extract_spectrum(stripes, method='optimal', individual_fibres=False, combine
     'slit_height'       : height of the extraction slit is 2*slit_height pixels
     'RON'               : read-out noise per pixel
     'gain'              : gain
+    'savefile'          : boolean - do you want to save the extracted spectrum to a file? 
+    'filetype'          : if 'savefile' is set to TRUE: do you want to save it as a 'fits' file, or as a 'dict' (python disctionary), or 'both'
+    'obsname'           : (short) name of observation file
+    'path'              : directory to the destination of the output file
     'simu'              : boolean - are you using ES-simulated spectra???
     'verbose'           : boolean - for debugging...
     'timit'             : boolean - do you want to measure execution run time?
@@ -879,25 +908,91 @@ def extract_spectrum(stripes, method='optimal', individual_fibres=False, combine
     
     MODHIST:
     13/07/18 - CMB create
+    02/08/18 - added 'savefile', 'path', and 'obsname' keywords - save output as FITS file
     """
     
     while method not in ["quick", "tramline", "optimal"]:
         print('ERROR: extraction method not recognized!')
         method = raw_input('Which method do you want to use (valid options are ["quick" / "tramline" / "optimal"] )?')
         
-    if method.lower == 'quick':
-        pix, flux, err = quick_extract(stripes, slit_height=slit_height, RON=RON, gain=gain, verbose=verbose, timit=timit, debug_level=debug_level)
-    elif method.lower == 'tramline':
+    if method.lower() == 'quick':
+        pix, flux, err = quick_extract(stripes, err_stripes, slit_height=slit_height, verbose=verbose, timit=timit)
+    elif method.lower() == 'tramline':
         print('WARNING: need to update tramline finding routine first for new IFU layout - use method="quick" in the meantime')
         return
         #tramlines = find_tramlines(fibre_profiles_02, fibre_profiles_03, fibre_profiles_21, fibre_profiles_22, mask_02, mask_03, mask_21, mask_22)
-        #pix,flux,err = collapse_extract(stripes, tramlines, slit_height=slit_height, RON=RON, gain=gain, verbose=verbose, timit=timit, debug_level=debug_level)
-    elif method.lower == 'optimal':
-        pix,flux,err = optimal_extraction(stripes, imgerr=None, nfib=28, RON=RON, gain=gain, slit_height=25, individual_fibres=individual_fibres, 
+        #pix,flux,err = collapse_extract(stripes, err_stripes, tramlines, slit_height=slit_height, verbose=verbose, timit=timit, debug_level=debug_level)
+    elif method.lower() == 'optimal':
+        pix,flux,err = optimal_extraction(stripes, err_stripes=err_stripes, ron_stripes=ron_stripes, nfib=28, RON=RON, slit_height=25, individual_fibres=individual_fibres, 
                                           combined_profiles=combined_profiles, simu=simu, timit=timit, debug_level=debug_level) 
     else:
         print('ERROR: Nightmare! That should never happen  --  must be an error in the Matrix...')
         return    
+    
+    #now save to FITS file or PYTHON DICTIONARY if desired
+    if savefile:
+        if path is None:
+            print('ERROR: path to output directory not provided!!!')
+            return
+        elif obsname is None:
+            print('ERROR: "obsname" not provided!!!')
+            return
+        else:
+            while filetype not in ["fits", "dict", "both"]:
+                print('ERROR: file type for output file not recognized!')
+                filetype = raw_input('Which method do you want to use (valid options are ["fits" / "dict" / "both"] )?') 
+            if filetype in ['fits', 'both']:
+                #OK, save as FITS file
+                outfn = path+obsname+'_extracted.fits'
+                fluxarr = np.zeros((len(pix), len(pix['order_01'])))
+                errarr = np.zeros((len(pix), len(pix['order_01'])))
+                for i,o in enumerate(sorted(pix.keys())):
+                    fluxarr[i,:] = flux[o]
+                    errarr[i,:] = err[o]
+                #try and get header from previously saved files
+                if os.path.exists(path+obsname+'_BD_CR_BG_FF.fits'):
+                    h = pyfits.getheader(path+obsname+'_BD_CR_BG_FF.fits')
+                elif os.path.exists(path+obsname+'_BD_CR_BG.fits'):
+                    h = pyfits.getheader(path+obsname+'_BD_CR_BG.fits')
+                elif os.path.exists(path+obsname+'_BD_CR.fits'):
+                    h = pyfits.getheader(path+obsname+'_BD_CR.fits')
+                elif os.path.exists(path+obsname+'_BD.fits'):
+                    h = pyfits.getheader(path+obsname+'_BD.fits')
+                else:
+                    h = pyfits.getheader(path+obsname+'.fits')
+                #update the header and write to file
+                h['HISTORY'] = '   EXTRACTED SPECTRUM - created '+time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())+' (GMT)'
+                h['METHOD'] = (method, 'extraction method used')
+                topord = sorted(pix.keys())[0]
+                topordnum = int(topord[-2:])
+                botord = sorted(pix.keys())[-1]
+                botordnum = int(botord[-2:])
+                h['FIRSTORD'] = (topordnum, 'order number of first (top) order')
+                h['LASTORD'] = (botordnum, 'order number of last (bottom) order')
+                if method.lower() == 'optimal':
+                    if individual_fibres:
+                        submethod = '3a'
+                    else:
+                        if combined_profiles:
+                            submethod = '3c'
+                        else:
+                            submethod = '3b'
+                    h['METHOD2'] = (submethod, 'exact optimal extraction method used')
+                #write to FITS file    
+                pyfits.writeto(outfn, fluxarr, h, clobber=True)    
+                #now append the corresponding error array
+                h_err = h.copy()
+                h_err['HISTORY'] = 'estimated uncertainty in EXTRACTED SPECTRUM - created '+time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())+' (GMT)'
+                pyfits.append(outfn, errarr, h_err, clobber=True)
+                
+            if filetype in ['dict', 'both']:
+                #OK, save as a python dictionary
+                #create combined dictionary
+                extracted = {}
+                extracted['pix'] = pix
+                extracted['flux'] = flux
+                extracted['err'] = err
+                np.save(path + obsname + '_extracted.npy', extracted)
         
     return pix,flux,err
 
@@ -905,7 +1000,8 @@ def extract_spectrum(stripes, method='optimal', individual_fibres=False, combine
 
 
 
-def extract_spectrum_from_indices(img, stripe_indices, method='optimal', individual_fibres=False, combined_profiles=False, slit_height=25, RON=0., gain=1., simu=False, verbose=False, timit=False, debug_level=0):
+def extract_spectrum_from_indices(img, err_img, stripe_indices, method='optimal', individual_fibres=False, combined_profiles=False, slit_height=25, RON=0., 
+                                  savefile=False, filetype='fits', obsname=None, path=None, simu=False, verbose=False, timit=False, debug_level=0):
     """
     CLONE OF 'extract_spectrum'!
     This routine is simply a wrapper code for the different extraction methods. There are a total FIVE (1,2,3a,3b,3c) different extraction methods implemented, 
@@ -932,7 +1028,8 @@ def extract_spectrum_from_indices(img, stripe_indices, method='optimal', individ
              
     
     INPUT:
-    'img'            : 2-dim input image
+    'img'            : 2-dim input array
+    'err_img'        : 2-dim array of the corresponding errors
     'stripe_indices' : dictionary (keys = orders) containing the indices of the pixels that are identified as the "stripes" (ie the to-be-extracted regions centred on the orders)
     
     OPTIONAL INPUT / KEYWORDS:
@@ -942,6 +1039,10 @@ def extract_spectrum_from_indices(img, stripe_indices, method='optimal', individ
     'slit_height'       : height of the extraction slit is 2*slit_height pixels
     'RON'               : read-out noise per pixel
     'gain'              : gain
+    'savefile'          : boolean - do you want to save the extracted spectrum to a file? 
+    'filetype'          : if 'savefile' is set to TRUE: do you want to save it as a 'fits' file, or as a 'dict' (python disctionary)
+    'obsname'           : (short) name of observation file
+    'path'              : directory to the destination of the output file
     'simu'              : boolean - are you using ES-simulated spectra???
     'verbose'           : boolean - for debugging...
     'timit'             : boolean - do you want to measure execution run time?
@@ -962,19 +1063,84 @@ def extract_spectrum_from_indices(img, stripe_indices, method='optimal', individ
         print('ERROR: extraction method not recognized!')
         method = raw_input('Which method do you want to use (valid options are ["quick" / "tramline" / "optimal"] )?')
         
-    if method.lower == 'quick':
-        pix, flux, err = quick_extract_from_indices(img, stripe_indices, slit_height=slit_height, RON=RON, gain=gain, verbose=verbose, timit=timit, debug_level=debug_level)
-    elif method.lower == 'tramline':
+    if method.lower() == 'quick':
+        pix, flux, err = quick_extract_from_indices(img, err_img, stripe_indices, slit_height=slit_height, verbose=verbose, timit=timit)
+    elif method.lower() == 'tramline':
         print('WARNING: need to update tramline finding routine first for new IFU layout - use method="quick" in the meantime')
         return
         #tramlines = find_tramlines(fibre_profiles_02, fibre_profiles_03, fibre_profiles_21, fibre_profiles_22, mask_02, mask_03, mask_21, mask_22)
-        #pix,flux,err = collapse_extract_from_indices(img, stripe_indices, tramlines, slit_height=slit_height, RON=RON, gain=gain, verbose=verbose, timit=timit, debug_level=debug_level)
-    elif method.lower == 'optimal':
-        pix,flux,err = optimal_extraction(img, stripe_indices, imgerr=None, nfib=28, RON=RON, gain=gain, slit_height=25, individual_fibres=individual_fibres, 
-                                          combined_profiles=combined_profiles, simu=simu, timit=timit, debug_level=debug_level) 
+        #pix,flux,err = collapse_extract_from_indices(img, err_img, stripe_indices, tramlines, slit_height=slit_height, verbose=verbose, timit=timit, debug_level=debug_level)
+    elif method.lower() == 'optimal':
+        pix,flux,err = optimal_extraction_from_indices(img, stripe_indices, err_img=err_img, nfib=28, RON=RON, slit_height=25, individual_fibres=individual_fibres, 
+                                                       combined_profiles=combined_profiles, simu=simu, timit=timit, debug_level=debug_level) 
     else:
         print('ERROR: Nightmare! That should never happen  --  must be an error in the Matrix...')
         return    
+        
+        #now save to FITS file or PYTHON DICTIONARY if desired
+    if savefile:
+        if path is None:
+            print('ERROR: path to output directory not provided!!!')
+            return
+        elif obsname is None:
+            print('ERROR: "obsname" not provided!!!')
+            return
+        else:
+            while filetype not in ["fits", "dict", "both"]:
+                print('ERROR: file type for output file not recognized!')
+                filetype = raw_input('Which method do you want to use (valid options are ["fits" / "dict" / "both"] )?') 
+            if filetype in ['fits', 'both']:
+                #OK, save as FITS file
+                outfn = path+obsname+'_extracted.fits'
+                fluxarr = np.zeros((len(pix), len(pix['order_01'])))
+                errarr = np.zeros((len(pix), len(pix['order_01'])))
+                for i,o in enumerate(sorted(pix.keys())):
+                    fluxarr[i,:] = flux[o]
+                    errarr[i,:] = err[o]
+                #try and get header from previously saved files
+                if os.path.exists(path+obsname+'_BD_CR_BG_FF.fits'):
+                    h = pyfits.getheader(path+obsname+'_BD_CR_BG_FF.fits')
+                elif os.path.exists(path+obsname+'_BD_CR_BG.fits'):
+                    h = pyfits.getheader(path+obsname+'_BD_CR_BG.fits')
+                elif os.path.exists(path+obsname+'_BD_CR.fits'):
+                    h = pyfits.getheader(path+obsname+'_BD_CR.fits')
+                elif os.path.exists(path+obsname+'_BD.fits'):
+                    h = pyfits.getheader(path+obsname+'_BD.fits')
+                else:
+                    h = pyfits.getheader(path+obsname+'.fits')
+                #update the header and write to file
+                h['HISTORY'] = '   EXTRACTED SPECTRUM - created '+time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())+' (GMT)'
+                h['METHOD'] = (method, 'extraction method used')
+                topord = sorted(pix.keys())[0]
+                topordnum = int(topord[-2:])
+                botord = sorted(pix.keys())[-1]
+                botordnum = int(botord[-2:])
+                h['FIRSTORD'] = (topordnum, 'order number of first (top) order')
+                h['LASTORD'] = (botordnum, 'order number of last (bottom) order')
+                if method.lower() == 'optimal':
+                    if individual_fibres:
+                        submethod = '3a'
+                    else:
+                        if combined_profiles:
+                            submethod = '3c'
+                        else:
+                            submethod = '3b'
+                    h['METHOD2'] = (submethod, 'exact optimal extraction method used')
+                #write to FITS file    
+                pyfits.writeto(outfn, fluxarr, h, clobber=True)    
+                #now append the corresponding error array
+                h_err = h.copy()
+                h_err['HISTORY'] = 'estimated uncertainty in EXTRACTED SPECTRUM - created '+time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())+' (GMT)'
+                pyfits.append(outfn, errarr, h_err, clobber=True)
+                
+            if filetype in ['dict', 'both']:
+                #OK, save as a python dictionary
+                #create combined dictionary
+                extracted = {}
+                extracted['pix'] = pix
+                extracted['flux'] = flux
+                extracted['err'] = err
+                np.save(path + obsname + '_extracted.npy', extracted)    
         
     return pix,flux,err
 
@@ -982,7 +1148,11 @@ def extract_spectrum_from_indices(img, stripe_indices, method='optimal', individ
 
 
 
-def extract_spectra(filelist, P_id, mask, method='optimal', save_files=True, outpath=None, verbose=False, debug_level=0):
+def extract_spectra(filelist, P_id, mask, method='optimal', save_files=True, outpath=None, verbose=False):
+    """
+    DUMMY ROUTINE: not currently in use
+    """
+    
     
     #get short filenames for files in 'filelist'
     obsnames = short_filenames(filelist)    

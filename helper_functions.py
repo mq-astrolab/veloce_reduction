@@ -20,7 +20,7 @@ from scipy import special, signal
 from numpy.polynomial import polynomial
 
 
-from veloce_reduction.calibration import crop_overscan_region
+#from veloce_reduction.calibration import crop_overscan_region
 
 
 
@@ -718,6 +718,8 @@ def make_median_image(imglist, MB=None, raw=False):
     medimg = np.median(np.array(allimg), axis=0)
     
     return medimg
+
+
 
 
 

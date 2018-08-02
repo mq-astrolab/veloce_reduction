@@ -8,9 +8,10 @@ import glob
 import astropy.io.fits as pyfits
 import numpy as np
 
-from veloce_reduction.helper_functions import short_filenames, correct_orientation
-from veloce_reduction.calibration import crop_overscan_region, get_bias_and_readnoise_from_bias_frames, make_offmask_and_ronmask, make_master_bias_from_coeffs, make_master_dark, process_whites
+from veloce_reduction.helper_functions import short_filenames
+from veloce_reduction.calibration import get_bias_and_readnoise_from_bias_frames, make_offmask_and_ronmask, make_master_bias_from_coeffs, make_master_dark, correct_orientation, crop_overscan_region
 from veloce_reduction.order_tracing import find_stripes, make_P_id, make_mask_dict, extract_stripes #, find_tramlines
+from veloce_reduction.process_scripts import process_whites, process_science_images
 
 
 

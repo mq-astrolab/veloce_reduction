@@ -229,7 +229,7 @@ def extract_single_stripe(img, p, slit_height=25, return_indices=False, indonly=
     :type img: np.ndarray
     :param P: polynomial coefficients
     :type P: np.ndarray
-    :param slit_height: total slit height in pixel to be extracted
+    :param slit_height: height of the extraction slit (ie the pixel columns are 2*slit_height pixels long)
     :type slit_height: double
     :param debug_level: debug level
     :type debug_level: int
@@ -272,26 +272,27 @@ def extract_single_stripe(img, p, slit_height=25, return_indices=False, indonly=
 
 
 
-def extract_stripes(img, P_id, slit_height=25, output_file=None, timit=False, return_indices=True, debug_level=0):
+def extract_stripes(img, P_id, slit_height=25, return_indices=True, savefiles=False, obsname=None, path=None, debug_level=0, timit=False):
     """
     Extracts the stripes from the original 2D spectrum to a sparse array, containing only relevant pixels.
     
     This function marks all relevant pixels for extraction. Using the provided dictionary P_id it iterates over all
     stripes in the image and saves a sparse matrix for each stripe.
     
-    :param img: 2d echelle spectrum
-    :type img: np.ndarray
-    :param P_id: dictionary of the form of {order: np.poly1d, ...} (as returned by identify_stripes)
-    or path to file
-    :type P_id: dict or str
-    :param slit_height: total slit height in px
-    :type slit_height: float
-    :param output_file: path to file where result is saved
-    :type output_file: str
-    :param debug_level: debug level
-    :type debug_level: int
-    :return: dictionary of the form {order: scipy.sparse_matrix}
-    :rtype: dict
+    INPUT:
+    'img'             : 2-dim image
+    'P_id'            : dictionary of the form of {order: np.poly1d, ...} (as returned by "identify_stripes")
+    'slit_height'     : height of the extraction slit (ie the pixel columns are 2*slit_height pixels long)
+    'return_indices'  : boolean - do you also want to return the indices (ie x-&y-coordinates) of the pixels in the stripes? 
+    'savefiles'       : boolean - do you want to save the extracted stripes and stripe-indices to files? [as a dictionary stored in a numpy file]
+    'obsname'         : (short) name of observation file
+    'path'            : directory to the destination of the output file
+    'debug_level'     : for debugging...
+    'timit'           : boolean - do you want to measure execution run time?
+    
+    OUTPUT:
+    'stripes'         : dictionary containing the extracted stripes (keys = orders)
+    'stripe_indices'  : dictionary containing the indices (ie x-&y-coordinates) of the pixels in the extracted stripes (keys = orders)
     """
     
     if timit:
@@ -317,11 +318,22 @@ def extract_stripes(img, P_id, slit_height=25, output_file=None, timit=False, re
             
 #         if o in stripes:
         stripes.update({o: stripe})
-        stripe_indices.update({o: indices})
+        if return_indices:
+            stripe_indices.update({o: indices})
 #         else:
 #              stripes = {o: stripe}
 
-#     if output_file is not None:
+    if savefiles:
+        if path is None:
+            print('ERROR: path to output directory not provided!!!')
+            return
+        elif obsname is None:
+            print('ERROR: "obsname" not provided!!!')
+            return
+        else:
+            np.save(path + obsname + '_stripes.npy', stripes)
+            if return_indices:
+                np.save(path + obsname + '_stripe_indices.npy', stripe_indices)
 #         for f in stripes.keys():
 #             for o in stripes[f].keys():
 #                 utils.store_sparse_mat(stripes[f][o], 'extracted_stripes/%s/%s' % (f, o), output_file)
