@@ -4,21 +4,28 @@ Created on 5 Apr. 2018
 @author: christoph
 '''
 
-from veloce_reduction.helper_functions import *
-from veloce_reduction.order_tracing import flatten_single_stripe, flatten_single_stripe_from_indices
 from lmfit import Parameters, Model
 from lmfit.models import *
 from lmfit.minimizer import *
+from scipy import ndimage
 import matplotlib.pyplot as plt
+import time
+
+from veloce_reduction.helper_functions import find_maxima, fibmodel, fibmodel_with_amp, offset_pseudo_gausslike, fibmodel_with_amp_and_offset, norm_fibmodel_with_amp, norm_fibmodel_with_amp_and_offset
+from veloce_reduction.order_tracing import flatten_single_stripe, flatten_single_stripe_from_indices
 
 
 
 
-def determine_spatial_profiles_single_order(sc, sr, ordpol, ordmask=None, model='gausslike', sampling_size=50, RON=10., return_stats=False, debug_level=0, timit=False):
+
+def determine_spatial_profiles_single_order(sc, sr, err_sc, ordpol, ordmask=None, model='gausslike', sampling_size=50, return_stats=False, debug_level=0, timit=False):
     """
+    Calculate the spatial-direction profiles of the fibres for a single order.
+    
     INPUT:
     'sc'             : the flux in the extracted, flattened stripe
     'sr'             : row-indices (ie in spatial direction) of the cutouts in 'sc'
+    'err_sc'         : the error in the extracted, flattened stripe
     'ordpol'         : set of polynomial coefficients from P_id for that order (ie p = P_id[ord])
     'ordmask'        : gives user the option to provide a mask (eg from "find_stripes")
     'model'          : which model do you want to use for the fitting? 
@@ -26,8 +33,9 @@ def determine_spatial_profiles_single_order(sc, sr, ordpol, ordmask=None, model=
     'sampling_size'  : how many pixels (in dispersion direction) either side of current i-th pixel do you want to consider? 
                        (ie stack profiles for a total of 2*sampling_size+1 pixels...)
     'RON'            : read-out noise per pixel
-    'return_stats'   : boolean - do you want to return goodness of fit statistics (ie AIC, BIC, CHISQ and REDCHISQ)?
+    'return_stats'   : boolean - do you want to return goodness-of-fit statistics (ie AIC, BIC, CHISQ and REDCHISQ)?
     'debug_level'    : for debugging...
+    'timit'          : boolean - do you want to measure execution run time?
     
     OUTPUT:
     'colfits'        : instance of "best_values" from "lmfit" fitting of order profiles
@@ -94,11 +102,19 @@ def determine_spatial_profiles_single_order(sc, sr, ordpol, ordmask=None, model=
                 normdata = np.append(normdata, sc[:,j]/np.sum(sc[:,j]))
                 #errors = np.append(errors, np.sqrt(sc[:,j] + RON**2))
                 #using relative errors for weights in the fit
-                weights = np.append(weights, 1./((np.sqrt(sc[:,j] + RON**2)) / sc[:,j])**2)
+                normerr = err_sc[:,j] / np.sum(sc[:,j])
+                pix_w = 1./(normerr*normerr)  
+                pix_w[np.isinf(pix_w)] = 0.
+                weights = np.append(weights, pix_w)
+                ### initially I thought this was clearly rubbish as it down-weights the central parts
+                ### and that we really want to use the relative errors, ie w_i = 1/(relerr_i)**2
+                ### HOWEVER: this is not true, and the optimal extraction linalg routine requires absolute errors!!!    
+                #weights = np.append(weights, 1./((np.sqrt(sc[:,j] + RON**2)) / sc[:,j])**2)
                 if debug_level >= 2:
                     #plt.plot(sr[:,j] - ordpol(j),sc[:,j],'.')
                     plt.plot(sr[:,j] - ordpol(j),sc[:,j]/np.sum(sc[:,j]),'.')
-                    plt.xlim(-5,5)
+                    #plt.xlim(-5,5)
+                    plt.xlim(-sc.shape[0]/2,sc.shape[0]/2)
                 
             #data = data[grid.argsort()]
             normdata = normdata[grid.argsort()]
@@ -226,6 +242,8 @@ def determine_spatial_profiles_single_order(sc, sr, ordpol, ordmask=None, model=
 
 def fit_stacked_single_fibre_profile(grid, data, weights=None, pos=None, model='gausslike', method='leastsq', fix_posns=False, offset=False, norm=False, nofit=False, timit=False, debug_level=0):
     """
+    Fit a single fibre profile in spatial direction. Sub-pixel sampling is achieved by stacking the (input) data for multiple pixel columns.
+    
     INPUT:
     'grid'           : the grid for fitting
     'data'           : the data points for fitting
@@ -423,33 +441,338 @@ def fit_stacked_single_fibre_profile(grid, data, weights=None, pos=None, model='
 
 
 
-def make_model_stripes_gausslike(fibre_profiles, flat, stripe_indices, P_id, mask, slit_height=10, RON=10., debug_level=0):
-    #initialise the dictionaries
+def fit_single_fibre_profile(grid, data, pos=None, osf=1, fix_posns=False, method='leastsq', offset=False, debug_level=0, timit=False):
+    
+    #print('OK, pos: ',pos)
+    if timit:
+        start_time = time.time()
+    
+    if pos == None:
+        #initial guess for the locations of the individual fibre profiles from location of maxima
+        #maxix,maxval = find_maxima(data, return_values=1)
+        maxix = np.where(data == np.max(data))[0]
+        maxval = data[maxix]
+    else:
+        maxval = data[np.int(np.rint(pos-grid[0]))]
+    
+    # go to oversampled grid (the number of grid points should be: n_os = ((n_orig-1)*osf)+1
+    if osf != 1:
+        os_grid = np.linspace(grid[0],grid[-1],osf * (len(grid)-1) + 1)
+        os_data = np.interp(os_grid, grid, data)
+        grid = os_grid
+        data = os_data
+    
+    #initial guesses in the right format for function "fibmodel_with_amp"
+    if pos == None:
+        guess = np.array([maxix[0]+grid[0], .7, maxval[0], 2.]).flatten()
+    else:
+        guess = np.array([pos, .7, maxval, 2.]).flatten()
+    if offset:
+        guess = np.append(guess,np.median(data))
+       
+    #create model function for fitting with LMFIT
+    #model = Model(nineteen_fib_model_explicit)
+    if not offset:
+        model = Model(fibmodel_with_amp)
+        guessmodel = fibmodel_with_amp(grid,*guess)
+    else:
+        model = Model(fibmodel_with_amp_and_offset)
+        guessmodel = fibmodel_with_amp_and_offset(grid,*guess)
+    
+    #create instance of Parameters-class needed for fitting with LMFIT
+    parms = Parameters()
+    if fix_posns:
+        parms.add('mu', guess[0], vary=False)
+    else:
+        parms.add('mu', guess[0], min=guess[0]-3*osf, max=guess[0]+3*osf)
+    parms.add('sigma', guess[1], min=0.5, max=1.)
+    parms.add('amp', guess[2], min=0.)
+    parms.add('beta', guess[3], min=1., max=4.)
+    if offset:
+        parms.add('offset',guess[4], min=0., max=65535.)
+    #parms.add('offset', guess[4], min=0.)
+    #parms.add('slope', guess[5], min=-0.5, max=0.5)
+    
+    #perform fit
+    result = model.fit(data,parms,xarr=grid,method=method)
+    
+    if debug_level >= 1:
+        plot_osf = 10
+        plot_os_grid = np.linspace(grid[0],grid[-1],plot_osf * (len(grid)-1) + 1)
+        #plot_os_data = np.interp(plot_os_grid, grid, data)
+        guessmodel = fibmodel_with_amp(plot_os_grid,*guess)
+        bestparms = np.array([result.best_values['mu'], result.best_values['sigma'], result.best_values['amp'], result.best_values['beta']])
+        bestmodel = fibmodel_with_amp(plot_os_grid,*bestparms)
+        plt.plot(grid, data, 'bx')
+        plt.plot(plot_os_grid, guessmodel, 'r--')
+        plt.plot(plot_os_grid, bestmodel, 'g-')     
+    
+    if timit:
+        print(time.time() - start_time, ' seconds')
+    
+    return result
+
+
+
+
+
+def fit_profiles_single_order(stripe_rows, stripe_columns, ordpol, osf=1, method='leastsq', offset=False, timit=False, silent=False):
+    
+    if not silent:
+        choice = None
+        while choice is None:
+            choice = raw_input("WARNING: Fitting the fibre profiles for an entire order currently takes more than 2 hours. Do you want to continue? [y/n]: ")
+            if choice not in ('y','n'):
+                print('Invalid input! Please try again...')
+                choice = None
+    else:
+        choice = 'y'
+            
+    if choice == 'n':
+        print('OK, stopping script...')
+        quit()
+    else:         
+        
+        if timit:
+            start_time = time.time()
+        print('Fitting fibre profiles for one order...') 
+        #loop over all columns for one order and do the profile fitting
+        #'colfits' is a dictionary, that has 4096 keys. Each key is an instance of the 'ModelResult'-class from the 'lmfit' package
+        colfits = {}
+        npix = stripe_columns.shape[1]
+        fiblocs = np.poly1d(ordpol)(np.arange(npix))
+        #starting_values = None
+        for i in range(npix):
+            #fit_result = fitfib_single_cutout(stripe_rows[:,i], stripe_columns[:,i], osf=osf, method=method)
+            if not silent:
+                print('i = ',str(i))
+            fu = 0
+            #check if that particular cutout falls fully onto CCD
+            checkprod = np.product(stripe_rows[1:,i].astype(float))    #exclude the first row number, as that can legitimately be zero
+            if checkprod == 0:
+                fu = 1
+                checksum = np.sum(stripe_rows[:,i])
+                if checksum == 0:
+                    print('WARNING: the entire cutout lies outside the chip!!!')
+                    #fit_result = fit_single_fibre_profile(np.arange(len(stripe_rows[:,i])),stripe_columns[:,i],guess=None)
+                    best_values = {'amp':-1., 'beta':-1., 'mu':-1., 'sigma':-1.}
+                else:
+                    print('WARNING: parts of the cutout lie outside the chip!!!')
+                    #fit_result = fit_single_fibre_profile(np.arange(len(stripe_rows[:,i])),stripe_columns[:,i],guess=None)
+                    best_values = {'amp':-1., 'beta':-1., 'mu':-1., 'sigma':-1.}
+            else:    
+                #fit_result = fit_single_fibre_profile(stripe_rows[:,i],stripe_columns[:,i],guess=None,timit=1)
+                fit_result = fit_single_fibre_profile(stripe_rows[:,i],stripe_columns[:,i]-1.,pos=fiblocs[i],offset=offset,timit=0)     #the minus 1 is necessary because we added an offset to start with, due to stripes needing that
+            #starting_values = fit_result.best_values
+            #colfits['col_'+str(i)] = fit_result
+            if fu == 1:
+                for keyname in best_values.keys():
+                    try:
+                        colfits[keyname].append(best_values[keyname])
+                    except KeyError:
+                        colfits[keyname] = [best_values[keyname]]
+            else:
+                for keyname in fit_result.best_values.keys():
+                    try:
+                        colfits[keyname].append(fit_result.best_values[keyname])
+                    except KeyError:
+                        colfits[keyname] = [fit_result.best_values[keyname]]
+    
+    if timit:
+        print('Elapsed time for fitting profiles to a single order: '+str(time.time() - start_time)+' seconds...')
+    
+    return colfits
+
+
+
+
+
+def fit_profiles(P_id, stripes, err_stripes, mask=None, stacking=True, slit_height=25, model='gausslike', return_stats=False, timit=False):
+    """
+    This routine determines the profiles of the fibres in spatial direction. This is an extremely crucial step, as the pre-defined profiles are then used during
+    the optimal extraction, as well as during the determination of the relative fibre intensities!!!
+    
+    INPUT:
+    'P_id'          : dictionary of the form of {order: np.poly1d, ...} (as returned by "identify_stripes")
+    'stripes'       : dictionary containing the flux in the extracted stripes (keys = orders)
+    'err_stripes'   : dictionary containing the errors in the extracted stripes (keys = orders)
+    'mask'          : dictionary of boolean masks (keys = orders) from "find_stripes" (masking out regions of very low signal)
+    'stacking'      : boolean - do you want to stack the profiles from multiple pixel-columns (in order to achieve sub-pixel sampling)?
+    'slit_height'   : height of the extraction slit (ie the pixel columns are 2*slit_height pixels long)
+    'model'         : the name of the mathematical model used to describe the profile of an individual fibre profile
+    'return_stats'  : boolean - do you want to include some goodness-of-fit statistics in the output (ie AIC, BIC, CHISQ and REDCHISQ)?
+    'timit'         : boolean - do you want to measure execution run time?
+    
+    OUTPUT:
+    'fibre_profiles'  : dictionary (keys=orders) containing the calculated spatial-direction fibre profiles
+    """
+    
+    print('Fitting fibre profiles...')
+    
+    if timit:
+        start_time = time.time()
+    
+    #create "global" parameter dictionary for entire chip
+    fibre_profiles = {}
+    #loop over all orders
+    for ord in sorted(P_id.iterkeys()):
+        print('OK, now processing '+str(ord))
+        
+        ordpol = P_id[ord]
+        
+        # define stripe
+        stripe = stripes[ord]
+        err_stripe = err_stripes[ord]
+        # find the "order-box"
+        sc,sr = flatten_single_stripe(stripe, slit_height=slit_height, timit=False)
+        err_sc,err_sr = flatten_single_stripe(err_stripe, slit_height=slit_height, timit=False)
+        
+        npix = sc.shape[1]
+        if mask is None:
+            mask = {}
+            mask[ord] = np.ones(npix, dtype='bool')
+        
+        # fit profile for single order and save result in "global" parameter dictionary for entire chip
+        if stacking:
+            colfits = determine_spatial_profiles_single_order(sc, sr, err_sc, ordpol, ordmask=mask[ord], model=model, return_stats=return_stats, timit=timit)
+        else:
+            colfits = fit_profiles_single_order(sr,sc,ordpol,osf=1,silent=True,timit=timit)
+        fibre_profiles[ord] = colfits
+    
+    if timit:
+        print('Time elapsed: '+str(int(time.time() - start_time))+' seconds...')  
+          
+    return fibre_profiles
+
+
+
+
+
+def fit_profiles_from_indices(P_id, img, err_img, stripe_indices, mask=None, stacking=True, slit_height=25, model='gausslike', return_stats=False, timit=False):
+    """
+    This routine determines the profiles of the fibres in spatial direction. This is an extremely crucial step, as the pre-defined profiles are then used during
+    the optimal extraction, as well as during the determination of the relative fibre intensities!!!
+    
+    CLONE OF "fit_profiles", but using stripe-indices, rather than stripes...
+    
+    INPUT:
+    'P_id'          : dictionary of the form of {order: np.poly1d, ...} (as returned by "identify_stripes")
+    'img'           : 2-dim input array/image
+    'err_img'       : estimated uncertainties in the 2-dim input array/image
+    'mask'          : dictionary of boolean masks (keys = orders) from "find_stripes" (masking out regions of very low signal)
+    'stacking'      : boolean - do you want to stack the profiles from multiple pixel-columns (in order to achieve sub-pixel sampling)?
+    'slit_height'   : height of the extraction slit (ie the pixel columns are 2*slit_height pixels long)
+    'model'         : the name of the mathematical model used to describe the profile of an individual fibre profile
+    'return_stats'  : boolean - do you want to include some goodness-of-fit statistics in the output (ie AIC, BIC, CHISQ and REDCHISQ)?
+    'timit'         : boolean - do you want to measure execution run time?
+    
+    OUTPUT:
+    'fibre_profiles'  : dictionary (keys=orders) containing the calculated spatial-direction fibre profiles
+    """
+    
+    
+    print('Fitting fibre profiles...')
+    
+    if timit:
+        start_time = time.time()
+        
+    #create "global" parameter dictionary for entire chip
+    fibre_profiles = {}
+    #loop over all orders
+    for ord in sorted(P_id.iterkeys()):
+        print('OK, now processing '+str(ord))
+        
+        ordpol = P_id[ord]
+        
+        # define stripe
+        indices = stripe_indices[ord]
+        # find the "order-box"
+        sc,sr = flatten_single_stripe_from_indices(img, indices, slit_height=slit_height, timit=False)
+        err_sc,err_sr = flatten_single_stripe_from_indices(err_img, indices, slit_height=slit_height, timit=False)
+        
+        npix = sc.shape[1]
+        if mask is None:
+            mask = {}
+            mask[ord] = np.ones(npix, dtype='bool')
+        
+        # fit profile for single order and save result in "global" parameter dictionary for entire chip
+        if stacking:
+            colfits = determine_spatial_profiles_single_order(sc, sr, err_sc, ordpol, ordmask=mask[ord], model=model, return_stats=return_stats, timit=timit)
+        else:
+            colfits = fit_profiles_single_order(sr,sc,ordpol,osf=1,silent=True,timit=timit)
+        fibre_profiles[ord] = colfits
+    
+    if timit:
+        print('Time elapsed: '+str(int(time.time() - start_time))+' seconds...')  
+          
+    return fibre_profiles
+
+
+
+
+
+def make_model_stripes_gausslike(fibre_profiles, flat, err_img, stripe_indices, mask, degpol=5, slit_height=10, debug_level=0):
+    """
+    Using the fibre_profiles dictionary from "fit_profiles(_from_indices)", we enforce that the parameters describing the spatial fibre profiles
+    are only smoothly varying as a function of pixel number in dispersion direction by fitting a low-level polynomial tot the fitted values of the parameters.
+    
+    We construct two sets of stripes as output:
+    (1) 'fitted_stripes' - by using the fibre_profiles from each pixel column for each order
+    (2) 'model_stripes'  - by using the "smoothly-varying-enforced" parameters
+    
+    INPUT:
+    'fibre_profiles'  : dictionary (keys=orders) containing the calculated spatial-direction fibre profiles
+    'flat'            : the 2-dim master white / flat-field image
+    'err_img'         : the 2-dim array of the corresponding uncertainties
+    'stripe_indices'  : dictionary (keys = orders) containing the indices of the pixels that are identified as the "stripes" (ie the to-be-extracted regions centred on the orders)
+    'mask'            : dictionary of boolean masks (keys = orders) from "find_stripes" (masking out regions of very low signal)
+    'slit_height'     : height of the extraction slit (ie the pixel columns are 2*slit_height pixels long)
+    'debug_level'     : for debugging...
+    
+    OUTPUT:
+    'fitted_stripes'  : dictionary (keys=orders) containing the reconstructed model using the best-fit solutions to the individual-pixel-column profile fits
+    'model_stripes'   : dictionary (keys=orders) containing the reconstructed model using the "smoothly-varying-enforced" parameters
+    
+    TODO:
+    make this more generic to include different analytical models for the profile shapes
+    """
+    
+    #initialize the dictionaries
     fitted_stripes = {}
     model_stripes = {}
+    
     #loop over all orders
     for ord in sorted(fibre_profiles.iterkeys()):
         if debug_level >= 1:
             print('Creating model for ',ord)
-        # initialise the dictionaries for each order
+            
+        # initialize the dictionaries for each order
         fitted_stripes[ord] = {}
         model_stripes[ord] = {}
+        
         # fill "fitted_stripes" dictionary
         parms = np.array([fibre_profiles[ord]['mu'],fibre_profiles[ord]['sigma'],fibre_profiles[ord]['amp'],fibre_profiles[ord]['beta']])
         indices = stripe_indices[ord]
-        sc,sr = flatten_single_stripe_from_indices(flat,indices,slit_height=slit_height,timit=False)
+        sc,sr = flatten_single_stripe_from_indices(flat, indices, slit_height=slit_height, timit=False)
+        err_sc,err_sr = flatten_single_stripe_from_indices(err_img, indices, slit_height=slit_height, timit=False)
         NY,NX = sc.shape
         xx = np.arange(NX)
         fitted_stripes[ord] = fibmodel_with_amp(sr,*parms)
-        # get weights for fitting of smooth function to parameters across order
+        
+        ### NOW ENFORCE SMOOTHLY VARYING PROFILES!!!
+        # get weights for fitting of smooth function to parameters across order 
         collapsed_signal = np.sum(sc,axis=0)     #BTW this is a quick-and-dirty style extracted spectrum 
-        collapsed_error = np.sqrt(collapsed_signal + NY*RON**2)
-        w = 1./(collapsed_error / collapsed_signal)**2
-        #perform the fits (MASKS for fitting comes from "find_stripes()")
-        p_mu = np.poly1d(np.polyfit(xx[mask[ord]], np.array(fibre_profiles[ord]['mu'])[mask[ord]], 5, w=w[mask[ord]]))
-        p_sigma = np.poly1d(np.polyfit(xx[mask[ord]], np.array(fibre_profiles[ord]['sigma'])[mask[ord]], 5, w=w[mask[ord]]))
-        p_amp = np.poly1d(np.polyfit(xx[mask[ord]], np.array(fibre_profiles[ord]['amp'])[mask[ord]], 5, w=w[mask[ord]]))
-        p_beta = np.poly1d(np.polyfit(xx[mask[ord]], np.array(fibre_profiles[ord]['beta'])[mask[ord]], 5, w=w[mask[ord]]))
+        #collapsed_error = np.sqrt(collapsed_signal + NY*RON**2)
+        collapsed_error = np.sqrt(np.sum(err_sc**2,axis=0))
+        #use relative errors here, otherwise the order centres will get down-weighted
+        w = 1./((collapsed_error / collapsed_signal)**2)   
+        
+        #perform the polynomial fits to the parameters across the dispersion direction (MASKS for fitting comes from "find_stripes()")
+        p_mu = np.poly1d(np.polyfit(xx[mask[ord]], np.array(fibre_profiles[ord]['mu'])[mask[ord]], degpol, w=w[mask[ord]]))
+        p_sigma = np.poly1d(np.polyfit(xx[mask[ord]], np.array(fibre_profiles[ord]['sigma'])[mask[ord]], degpol, w=w[mask[ord]]))
+        p_amp = np.poly1d(np.polyfit(xx[mask[ord]], np.array(fibre_profiles[ord]['amp'])[mask[ord]], degpol, w=w[mask[ord]]))
+        p_beta = np.poly1d(np.polyfit(xx[mask[ord]], np.array(fibre_profiles[ord]['beta'])[mask[ord]], degpol, w=w[mask[ord]]))
+        
         # fill "model_stripes" dictionary
         smooth_parms = np.array([p_mu(xx),p_sigma(xx),p_amp(xx),p_beta(xx)])
         model_stripes[ord] = fibmodel_with_amp(sr,*smooth_parms)
@@ -462,6 +785,11 @@ def make_model_stripes_gausslike(fibre_profiles, flat, stripe_indices, P_id, mas
 
 def fit_stacked_single_fibre_profile_v1(grid, data, pos=None, model='gausslike', fix_posns=False, method='leastsq', offset=False, norm=False, timit=False, debug_level=0):
     """
+    
+    OLDER VERSION:
+    NOT CURRENTLY USED !!!!!
+    
+    
     INPUT:
     'grid'           : the grid for fitting
     'data'           : the data points for fitting
@@ -625,86 +953,10 @@ def fit_stacked_single_fibre_profile_v1(grid, data, pos=None, model='gausslike',
     
     return result
 
-
-
-
-
-def fit_single_fibre_profile(grid, data, pos=None, osf=1, fix_posns=False, method='leastsq', offset=False, debug_level=0, timit=False):
-    #print('OK, pos: ',pos)
-    if timit:
-        start_time = time.time()
-    
-    if pos == None:
-        #initial guess for the locations of the individual fibre profiles from location of maxima
-        #maxix,maxval = find_maxima(data, return_values=1)
-        maxix = np.where(data == np.max(data))[0]
-        maxval = data[maxix]
-    else:
-        maxval = data[np.int(np.rint(pos-grid[0]))]
-    
-    # go to oversampled grid (the number of grid points should be: n_os = ((n_orig-1)*osf)+1
-    if osf != 1:
-        os_grid = np.linspace(grid[0],grid[-1],osf * (len(grid)-1) + 1)
-        os_data = np.interp(os_grid, grid, data)
-        grid = os_grid
-        data = os_data
-    
-    #initial guesses in the right format for function "fibmodel_with_amp"
-    if pos == None:
-        guess = np.array([maxix[0]+grid[0], .7, maxval[0], 2.]).flatten()
-    else:
-        guess = np.array([pos, .7, maxval, 2.]).flatten()
-    if offset:
-        guess = np.append(guess,np.median(data))
-       
-    #create model function for fitting with LMFIT
-    #model = Model(nineteen_fib_model_explicit)
-    if not offset:
-        model = Model(fibmodel_with_amp)
-        guessmodel = fibmodel_with_amp(grid,*guess)
-    else:
-        model = Model(fibmodel_with_amp_and_offset)
-        guessmodel = fibmodel_with_amp_and_offset(grid,*guess)
-    
-    #create instance of Parameters-class needed for fitting with LMFIT
-    parms = Parameters()
-    if fix_posns:
-        parms.add('mu', guess[0], vary=False)
-    else:
-        parms.add('mu', guess[0], min=guess[0]-3*osf, max=guess[0]+3*osf)
-    parms.add('sigma', guess[1], min=0.5, max=1.)
-    parms.add('amp', guess[2], min=0.)
-    parms.add('beta', guess[3], min=1., max=4.)
-    if offset:
-        parms.add('offset',guess[4], min=0., max=65535.)
-    #parms.add('offset', guess[4], min=0.)
-    #parms.add('slope', guess[5], min=-0.5, max=0.5)
-    
-    #perform fit
-    result = model.fit(data,parms,xarr=grid,method=method)
-    
-    if debug_level >= 1:
-        plot_osf = 10
-        plot_os_grid = np.linspace(grid[0],grid[-1],plot_osf * (len(grid)-1) + 1)
-        #plot_os_data = np.interp(plot_os_grid, grid, data)
-        guessmodel = fibmodel_with_amp(plot_os_grid,*guess)
-        bestparms = np.array([result.best_values['mu'], result.best_values['sigma'], result.best_values['amp'], result.best_values['beta']])
-        bestmodel = fibmodel_with_amp(plot_os_grid,*bestparms)
-        plt.plot(grid, data, 'bx')
-        plt.plot(plot_os_grid, guessmodel, 'r--')
-        plt.plot(plot_os_grid, bestmodel, 'g-')     
-    
-    if timit:
-        print(time.time() - start_time, ' seconds')
-    
-    return result
-
-
-
-
-
 def fitfib_single_cutout(grid,data,osf=1,method='leastsq',debug_level=0):
-    
+    """
+    NOT CURRENTLY USED
+    """  
     #timing test
     start_time = time.time()
     
@@ -794,11 +1046,10 @@ def fitfib_single_cutout(grid,data,osf=1,method='leastsq',debug_level=0):
 
     return result
 
-
-
-
-
 def multi_fib_model_star(x,*p):
+    """
+    NOT CURRENTLY USED
+    """    
     #determine number of fibres
     #nfib = len(p)/4
     nfib = 1
@@ -826,6 +1077,9 @@ def multi_fib_model_star(x,*p):
     return model
     
 def multi_fib_model(x,p):
+    """
+    NOT CURRENTLY USED
+    """  
     #determine number of fibres
     nfib = len(p)/4
     #nfib = 19
@@ -880,6 +1134,9 @@ def nineteen_fib_model_explicit(x, mu1, mu2, mu3, mu4, mu5, mu6, mu7, mu8, mu9, 
                                 sigma1, sigma2, sigma3, sigma4, sigma5, sigma6, sigma7, sigma8, sigma9, sigma10, sigma11, sigma12, sigma13, sigma14, sigma15, sigma16, sigma17, sigma18, sigma19,
                                 amp1, amp2, amp3, amp4, amp5, amp6, amp7, amp8, amp9, amp10, amp11, amp12, amp13, amp14, amp15, amp16, amp17, amp18, amp19,
                                 beta1, beta2, beta3, beta4, beta5, beta6, beta7, beta8, beta9, beta10, beta11, beta12, beta13, beta14, beta15, beta16, beta17, beta18, beta19):
+    """
+    NOT CURRENTLY USED
+    """  
     
     nfib=19
     
@@ -897,6 +1154,9 @@ def nineteen_fib_model_explicit(x, mu1, mu2, mu3, mu4, mu5, mu6, mu7, mu8, mu9, 
    
 def nineteen_fib_model_explicit_onesig_onebeta(x, mu1, mu2, mu3, mu4, mu5, mu6, mu7, mu8, mu9, mu10, mu11, mu12, mu13, mu14, mu15, mu16, mu17, mu18, mu19,
                                                amp1, amp2, amp3, amp4, amp5, amp6, amp7, amp8, amp9, amp10, amp11, amp12, amp13, amp14, amp15, amp16, amp17, amp18, amp19, sigma, beta):
+    """
+    NOT CURRENTLY USED
+    """  
     
     nfib=19
     
@@ -913,152 +1173,3 @@ def nineteen_fib_model_explicit_onesig_onebeta(x, mu1, mu2, mu3, mu4, mu5, mu6, 
     return model
 
 
-
-
-
-def fit_profiles_single_order(stripe_rows, stripe_columns, ordpol, osf=1, method='leastsq', offset=False, timit=False, silent=False):
-    
-    if not silent:
-        choice = None
-        while choice is None:
-            choice = raw_input("WARNING: Fitting the fibre profiles for an entire order currently takes more than 2 hours. Do you want to continue? [y/n]: ")
-            if choice not in ('y','n'):
-                print('Invalid input! Please try again...')
-                choice = None
-    else:
-        choice = 'y'
-            
-    if choice == 'n':
-        print('OK, stopping script...')
-        quit()
-    else:         
-        
-        if timit:
-            start_time = time.time()
-        print('Fitting fibre profiles for one order...') 
-        #loop over all columns for one order and do the profile fitting
-        #'colfits' is a dictionary, that has 4096 keys. Each key is an instance of the 'ModelResult'-class from the 'lmfit' package
-        colfits = {}
-        npix = stripe_columns.shape[1]
-        fiblocs = np.poly1d(ordpol)(np.arange(npix))
-        #starting_values = None
-        for i in range(npix):
-            #fit_result = fitfib_single_cutout(stripe_rows[:,i], stripe_columns[:,i], osf=osf, method=method)
-            if not silent:
-                print('i = ',str(i))
-            fu = 0
-            #check if that particular cutout falls fully onto CCD
-            checkprod = np.product(stripe_rows[1:,i].astype(float))    #exclude the first row number, as that can legitimately be zero
-            if checkprod == 0:
-                fu = 1
-                checksum = np.sum(stripe_rows[:,i])
-                if checksum == 0:
-                    print('WARNING: the entire cutout lies outside the chip!!!')
-                    #fit_result = fit_single_fibre_profile(np.arange(len(stripe_rows[:,i])),stripe_columns[:,i],guess=None)
-                    best_values = {'amp':-1., 'beta':-1., 'mu':-1., 'sigma':-1.}
-                else:
-                    print('WARNING: parts of the cutout lie outside the chip!!!')
-                    #fit_result = fit_single_fibre_profile(np.arange(len(stripe_rows[:,i])),stripe_columns[:,i],guess=None)
-                    best_values = {'amp':-1., 'beta':-1., 'mu':-1., 'sigma':-1.}
-            else:    
-                #fit_result = fit_single_fibre_profile(stripe_rows[:,i],stripe_columns[:,i],guess=None,timit=1)
-                fit_result = fit_single_fibre_profile(stripe_rows[:,i],stripe_columns[:,i]-1.,pos=fiblocs[i],offset=offset,timit=0)     #the minus 1 is necessary because we added an offset to start with, due to stripes needing that
-            #starting_values = fit_result.best_values
-            #colfits['col_'+str(i)] = fit_result
-            if fu == 1:
-                for keyname in best_values.keys():
-                    try:
-                        colfits[keyname].append(best_values[keyname])
-                    except KeyError:
-                        colfits[keyname] = [best_values[keyname]]
-            else:
-                for keyname in fit_result.best_values.keys():
-                    try:
-                        colfits[keyname].append(fit_result.best_values[keyname])
-                    except KeyError:
-                        colfits[keyname] = [fit_result.best_values[keyname]]
-    
-    if timit:
-        print('Elapsed time for fitting profiles to a single order: '+str(time.time() - start_time)+' seconds...')
-    
-    return colfits
-
-
-
-
-
-def fit_profiles(P_id, stripes, mask=None, stacking=True, slit_height=25, model='gausslike', return_stats=False, timit=False):
-    
-    print('Fitting fibre profiles...')
-    
-    if timit:
-        start_time = time.time()
-    
-    #create "global" parameter dictionary for entire chip
-    fibre_profiles = {}
-    #loop over all orders
-    for ord in sorted(P_id.iterkeys()):
-        print('OK, now processing '+str(ord))
-        
-        if mask is None:
-            mask = {}
-            mask[ord] = np.ones(npix, dtype='bool')
-        
-        ordpol = P_id[ord]
-        
-        # define stripe
-        stripe = stripes[ord]
-        # find the "order-box"
-        sc,sr = flatten_single_stripe(stripe,slit_height=slit_height,timit=False)
-        #sc,sr = flatten_single_stripe_from_indices(img,indices,slit_height=25,timit=False)
-        # fit profile for single order and save result in "global" parameter dictionary for entire chip
-        if stacking:
-            colfits = determine_spatial_profiles_single_order(sc, sr, ordpol, ordmask=mask[ord], model=model, return_stats=return_stats, timit=timit)
-        else:
-            colfits = fit_profiles_single_order(sr,sc,ordpol,osf=1,silent=True,timit=timit)
-        fibre_profiles[ord] = colfits
-    
-    if timit:
-        print('Time elapsed: '+str(int(time.time() - start_time))+' seconds...')  
-          
-    return fibre_profiles
-
-
-
-
-
-def fit_profiles_from_indices(P_id, img, stripe_indices, mask=None, stacking=True, slit_height=25, model='gausslike', return_stats=False, timit=False):
-    
-    print('Fitting fibre profiles...')
-    
-    if timit:
-        start_time = time.time()
-        
-    #create "global" parameter dictionary for entire chip
-    fibre_profiles = {}
-    #loop over all orders
-    for ord in sorted(P_id.iterkeys()):
-        print('OK, now processing '+str(ord))
-        
-        if mask is None:
-            mask = {}
-            mask[ord] = np.ones(npix, dtype='bool')
-        
-        ordpol = P_id[ord]
-        
-        # define stripe
-        indices = stripe_indices[ord]
-        # find the "order-box"
-        #sc,sr = flatten_single_stripe(stripe,slit_height=10,timit=False)
-        sc,sr = flatten_single_stripe_from_indices(img,indices,slit_height=slit_height,timit=False)
-        # fit profile for single order and save result in "global" parameter dictionary for entire chip
-        if stacking:
-            colfits = determine_spatial_profiles_single_order(sc, sr, ordpol, ordmask=mask[ord], model=model, return_stats=return_stats, timit=timit)
-        else:
-            colfits = fit_profiles_single_order(sr,sc,ordpol,osf=1,silent=True,timit=timit)
-        fibre_profiles[ord] = colfits
-    
-    if timit:
-        print('Time elapsed: '+str(int(time.time() - start_time))+' seconds...')  
-          
-    return fibre_profiles

@@ -16,7 +16,7 @@ import time
 #from scipy import special
 #from lmfit import minimize, Minimizer, Parameters, Parameter, report_fit, Model
 #from astropy.io import ascii
-from matplotlib.colors import LogNorm
+#from matplotlib.colors import LogNorm
 from veloce_reduction.helper_functions import sigma_clip #CMB_pure_gaussian, gaussian_with_offset, fibmodel_with_amp_and_offset, fibmodel_with_amp_and_offset_and_slope, fibmodel_with_amp
 
 
@@ -556,7 +556,7 @@ def flatten_single_stripe_from_indices(img, indices, slit_height=25, timit=False
      
     
 
-def flatten_stripes(stripes,slit_height=25):
+def flatten_stripes(stripes, slit_height=25):
     """
     CMB 27/09/2017
     
@@ -580,26 +580,6 @@ def flatten_stripes(stripes,slit_height=25):
     
     return order_boxes
         
-        
-
-def find_maxima(data, gauss_filter_sigma=0., min_peak=0.1, return_values=0):
-    """
-    not currently used!!!
-    """
-    # smooth image slightly for noise reduction
-    smooth_data = ndimage.gaussian_filter(data, gauss_filter_sigma)
-    # find all local maxima
-    peaks = np.r_[True, smooth_data[1:] > smooth_data[:-1]] & np.r_[smooth_data[:-1] > smooth_data[1:], True]
-    # only use peaks higher than a certain threshold
-    idx = np.logical_and(peaks, smooth_data > min_peak * np.max(smooth_data))
-    maxix = np.arange(len(data))[idx]
-    maxima = data[maxix]
-    
-    if return_values != 0:
-        return maxix,maxima
-    else:
-        return maxix
-
 
 
 
@@ -679,7 +659,7 @@ def find_tramlines(fp_uu, fp_ul, fp_lu, fp_ll, mask_uu, mask_ul, mask_lu, mask_l
     if debug_level >= 1:
         xx = np.arange(4096)
         plt.figure()
-        plt.imshow(img, origin='lower', norm=LogNorm())
+        #plt.imshow(img, origin='lower', norm=LogNorm())
         for ord in tramlines.keys():
             plt.plot(xx, tramlines[ord]['upper_boundary'],'y-')
             plt.plot(xx, tramlines[ord]['lower_boundary'],'r-')
@@ -744,7 +724,7 @@ def find_laser_tramlines(fp, mask, debug_level=0, timit=False):
     if debug_level >= 1:
         xx = np.arange(4096)
         plt.figure()
-        plt.imshow(img, origin='lower', norm=LogNorm())
+        #plt.imshow(img, origin='lower', norm=LogNorm())
         for ord in tramlines.keys():
             plt.plot(xx, tramlines[ord]['upper_boundary'],'y-')
             plt.plot(xx, tramlines[ord]['lower_boundary'],'r-')

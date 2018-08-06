@@ -4,10 +4,12 @@ Created on 21 Nov. 2017
 @author: christoph
 '''
 
-import glob, os
+import glob
+import numpy as np
 import astropy.io.fits as pyfits
-from veloce_reduction.helper_functions import *
-from veloce_reduction.order_tracing import *
+
+from veloce_reduction.order_tracing import find_stripes, make_P_id, extract_stripes, flatten_single_stripe
+
 
 
 def make_fibparms_by_fib(savefile=True):

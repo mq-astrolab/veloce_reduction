@@ -16,6 +16,7 @@ from astropy.modeling import models, fitting
 import collections
 #from scipy.special import erf
 #from scipy.special import gamma
+from scipy import ndimage
 from scipy import special, signal
 from numpy.polynomial import polynomial
 
@@ -622,6 +623,8 @@ def central_parts_of_mask(mask):
     
     MODHIST:
     01/06/2018 - CMB create    
+    03/08/2018 - fixed bug if mask is asymmetric - now requires closest upstep location to be to the left of the order centre and nearest downstep location to 
+                 be to the right of the order centre
     """
     
     cenmask = {}
@@ -629,14 +632,14 @@ def central_parts_of_mask(mask):
     for o in sorted(mask.keys()):
         ordmask = mask[o]
         if ordmask[len(ordmask)//2]:
-            upstep_locations = np.argwhere(np.diff(ordmask.astype(int))==1)
-            downstep_locations = np.argwhere(np.diff(ordmask.astype(int))==-1)
+            upstep_locations = np.argwhere(np.diff(ordmask.astype(int)) == 1)
+            downstep_locations = np.argwhere(np.diff(ordmask.astype(int)) == -1)
             cenmask[o] = ordmask.copy()
             if len(upstep_locations) >= 1:
-                up = np.squeeze(find_nearest(upstep_locations,len(ordmask)//2,return_index=False))
+                up = np.squeeze(find_nearest(upstep_locations[upstep_locations < len(ordmask)//2],len(ordmask)//2,return_index=False))
                 cenmask[o][:up+1] = False
             if len(downstep_locations) >= 1:
-                down = np.squeeze(find_nearest(downstep_locations,len(ordmask)//2,return_index=False))
+                down = np.squeeze(find_nearest(downstep_locations[downstep_locations > len(ordmask)//2],len(ordmask)//2,return_index=False))
                 cenmask[o][down+1:] = False           
         else:
             print('ERROR: order centre is masked out!!!')
@@ -721,6 +724,25 @@ def make_median_image(imglist, MB=None, raw=False):
 
 
 
+
+
+def find_maxima(data, gauss_filter_sigma=0., min_peak=0.1, return_values=0):
+    """
+    not currently used!!!
+    """
+    # smooth image slightly for noise reduction
+    smooth_data = ndimage.gaussian_filter(data, gauss_filter_sigma)
+    # find all local maxima
+    peaks = np.r_[True, smooth_data[1:] > smooth_data[:-1]] & np.r_[smooth_data[:-1] > smooth_data[1:], True]
+    # only use peaks higher than a certain threshold
+    idx = np.logical_and(peaks, smooth_data > min_peak * np.max(smooth_data))
+    maxix = np.arange(len(data))[idx]
+    maxima = data[maxix]
+    
+    if return_values != 0:
+        return maxix,maxima
+    else:
+        return maxix
 
 
 

@@ -15,6 +15,20 @@ import matplotlib.pyplot as plt
             
 
 
+# xdisp_boxsize = 1
+# disp_boxsize = 15
+# medfiltered_flat = medfilt(MW,[xdisp_boxsize,disp_boxsize])
+# OR
+# dum, filtered_flat = make_model_stripes(...) --> see spatial_profiles.py
+#
+# pix_sens_image = MW / medfiltered_flat   #should be roughly flat & scattering around 1
+# 
+# smoothed_MW = MW / pix_sens_image    #ie for the flat fields that means that smoothed_MW = filtered flat...
+# smoothed_img = img / pix_sens_image
+
+
+
+
 
 def onedim_pixtopix_variations(f_flat, filt='gaussian', filter_width=25):
     """
@@ -93,21 +107,3 @@ def deblaze_orders(f, wl, smoothed_flat, mask, err=None, degpol=1, gauss_filter_
 
 
 
-    
-# def blaze_function(x,a):
-#     return np.sinc(a*x)*np.sinc(a*x)
-# 
-# 
-# 
-# 
-# 
-# 
-# 
-# xdisp_boxsize = 1
-# disp_boxsize = 15
-# medfiltered_flat = medfilt(MW,[xdisp_boxsize,disp_boxsize])
-# 
-# pix_sens_image = MW / medfiltered_flat
-# 
-# smoothed_MW = MW / pix_sens_image    #ie for the flat fields that means that smoothed_MW = Running_Meanfilt...
-# smoothed_img = img / pix_sens_image

@@ -139,6 +139,14 @@ flat_stripes,fs_indices = extract_stripes(MW, P_id, return_indices=True, slit_he
 #####################################################################################################################################################
 
 
+###
+#if we want to determine spatial profiles, then we should remove cosmics and background from MW before doing the following
+fp = fit_profiles(P_id, stripes, err_stripes, mask=mask, stacking=True, slit_height=10, model='gausslike', return_stats=True, timit=True)
+#OR
+fp2 = fit_profiles_from_indices(P_id, img, err_img, stripe_indices, mask=mask, stacking=True, slit_height=10, model='gausslike', return_stats=True, timit=True)
+###
+
+
 
 # (4) cosmic ray removal ############################################################################################################################
 

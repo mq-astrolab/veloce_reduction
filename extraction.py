@@ -6,12 +6,14 @@ Created on 12 Jul. 2018
 
 import numpy as np
 import time
+import datetime
 import astropy.io.fits as pyfits
 import os
 
 
 from veloce_reduction.helper_functions import fibmodel_with_amp, make_norm_profiles_2, short_filenames
 from veloce_reduction.spatial_profiles import fit_single_fibre_profile
+from veloce_reduction.linalg import linalg_extract_column
 from veloce_reduction.order_tracing import flatten_single_stripe, flatten_single_stripe_from_indices, extract_stripes
 from veloce_reduction.relative_intensities import get_relints
 
@@ -309,6 +311,7 @@ def collapse_extract_from_indices(img, err_img, stripe_indices, tramlines, slit_
 
 def optimal_extraction(stripes, err_stripes=None, ron_stripes=None, nfib=28, RON=0., slit_height=25, phi_onthefly=False, timit=False, simu=False, 
                        individual_fibres=False, combined_profiles=False, relints=None, collapse=False, debug_level=0):
+    
     
     # if error array is not provided, then RON and gain must be provided (but this is bad because that way we don't know about large errors for cosmic-corrected pixels etc)
     
@@ -763,95 +766,6 @@ def optimal_extraction_from_indices(img, stripe_indices, err_img=None, nfib=28, 
 
 
 
-def linalg_extract_column(z, w, phi, RON=3.3, naive_variance=False, altvar=True):
-    
-    #create diagonal matrix for weights
-    ### XXX maybe use sparse matrix here instead to save memory / speed things up
-    w_mat = np.diag(w)
-
-    #create the cross-talk matrix
-    #C = np.transpose(phi) @ w_mat @ phi
-    C = np.matmul( np.matmul(np.transpose(phi),w_mat), phi )
-    
-
-    #compute b
-    btemp = phi * np.transpose(np.array([z]))     
-    #this reshaping is necessary so that z has shape (4096,1) instead of (4096,), which is needed
-    # for the broadcasting (ie singelton expansion) functionality
-    b = sum( btemp * np.transpose(np.array([w])) )
-    #alternatively: b = sum( btemp / (np.transpose(np.array([err**2]))) )
-    
-
-    #compute eta (ie the array of the fibre-intensities (or amplitudes)
-    ### XXX check if that can be made more efficient
-    C_inv = np.linalg.inv(C)
-    #eta =  C_inv @ b
-    eta = np.matmul(C_inv,b)
-    #the following line does the same thing, but contrary to EVERY piece of literature I find it is NOT faster
-    #np.linalg.solve(C, b)
-    #OR
-    #np.linalg.solve(C, b)
-    
-    #retrieved = eta * phi
-    
-    if not naive_variance:
-        if altvar:
-            #THIS CORRESPONDS TO SHARP & BIRCHALL paragraph 5.2.2
-            C_prime = np.matmul(np.transpose(phi),phi)
-            C_prime_inv = np.linalg.inv(C_prime)
-    #        b_prime = sum( phi * np.transpose(np.array([z-RON*RON])) )     #that z here should be the variance actually, but input weights should be from error array that leaves error bars high when cosmics are removed
-            b_prime = sum( phi * np.transpose(np.array([(1./w)-RON*RON])) )
-            var = np.matmul(C_prime_inv,b_prime)
-        else:
-            #THIS CORRESPONDS TO SHARP & BIRCHALL paragraph 5.2.1
-            T = np.maximum(np.sum(eta * phi, axis=1), 1e-6)
-            T = T[:, np.newaxis]    #add extra axis b/c Python...
-            fracs = (eta * phi) / T
-            var = np.sum(fracs**2 * (1./w)[:, np.newaxis], axis=0)
-            #var = np.dot(fracs.T**2 , (1./w)[:,np.newaxis])   # same as line above, but a bit faster
-            
-    else:
-        #these are the "naive errorbars"
-        #convert error from variance to proper error
-        eta_err = np.sqrt(abs(eta))
-        var = eta_err ** 2
-        
-    #return np.array([eta, eta_err, retrieved])   
-    return np.array([eta, var])   
-
-
-
-
-
-def mikes_linalg_extraction(col_data, col_inv_var, phi, no=19):
-    """
-    col_data = z
-    col_inv_var = w
-    """
-    
-    #Fill in the "c" matrix and "b" vector from Sharp and Birchall equation 9
-    #Simplify things by writing the sum in the computation of "b" as a matrix
-    #multiplication. We can do this because we're content to invert the 
-    #(small) matrix "c" here. Equation 17 from Sharp and Birchall 
-    #doesn't make a lot of sense... so lets just calculate the variance in the
-    #simple explicit way.
-    col_inv_var_mat = np.reshape(col_inv_var.repeat(no), (len(col_data),no) )     #why do the weights have to be the same for every "object"?
-    b_mat = phi * col_inv_var_mat
-    c_mat = np.dot(phi.T,phi*col_inv_var_mat)
-    pixel_weights = np.dot(b_mat,np.linalg.inv(c_mat))   #pixel weights are the z_ki in M.I.'s description
-    f = np.dot(col_data,pixel_weights)   #these are the etas
-    var = np.dot(1.0/np.maximum(col_inv_var,1e-12),pixel_weights**2)    # CMB: I don't quite understand this, and I think this is wrong actually...;similar to section 5.2.1 in Sharp & Birchall, just not weighted per pixel
-    #if ((i % 5)==1) & (j==ny//2):
-    #if (i%5==1) & (j==ny//2):
-    #if (j==ny//2):
-    #    pdb.set_trace()
-
-    return f,var
-
-
-
-
-
 def extract_spectrum(stripes, err_stripes, ron_stripes, method='optimal', individual_fibres=False, combined_profiles=False, slit_height=25, RON=0., 
                      savefile=False, filetype='fits', obsname=None, path=None, simu=False, verbose=False, timit=False, debug_level=0):
     """
@@ -923,7 +837,7 @@ def extract_spectrum(stripes, err_stripes, ron_stripes, method='optimal', indivi
         #tramlines = find_tramlines(fibre_profiles_02, fibre_profiles_03, fibre_profiles_21, fibre_profiles_22, mask_02, mask_03, mask_21, mask_22)
         #pix,flux,err = collapse_extract(stripes, err_stripes, tramlines, slit_height=slit_height, verbose=verbose, timit=timit, debug_level=debug_level)
     elif method.lower() == 'optimal':
-        pix,flux,err = optimal_extraction(stripes, err_stripes=err_stripes, ron_stripes=ron_stripes, nfib=28, RON=RON, slit_height=25, individual_fibres=individual_fibres, 
+        pix,flux,err = optimal_extraction(stripes, err_stripes=err_stripes, ron_stripes=ron_stripes, nfib=28, RON=RON, slit_height=slit_height, individual_fibres=individual_fibres, 
                                           combined_profiles=combined_profiles, simu=simu, timit=timit, debug_level=debug_level) 
     else:
         print('ERROR: Nightmare! That should never happen  --  must be an error in the Matrix...')
@@ -1071,7 +985,7 @@ def extract_spectrum_from_indices(img, err_img, stripe_indices, method='optimal'
         #tramlines = find_tramlines(fibre_profiles_02, fibre_profiles_03, fibre_profiles_21, fibre_profiles_22, mask_02, mask_03, mask_21, mask_22)
         #pix,flux,err = collapse_extract_from_indices(img, err_img, stripe_indices, tramlines, slit_height=slit_height, verbose=verbose, timit=timit, debug_level=debug_level)
     elif method.lower() == 'optimal':
-        pix,flux,err = optimal_extraction_from_indices(img, stripe_indices, err_img=err_img, nfib=28, RON=RON, slit_height=25, individual_fibres=individual_fibres, 
+        pix,flux,err = optimal_extraction_from_indices(img, stripe_indices, err_img=err_img, nfib=28, RON=RON, slit_height=slit_height, individual_fibres=individual_fibres, 
                                                        combined_profiles=combined_profiles, simu=simu, timit=timit, debug_level=debug_level) 
     else:
         print('ERROR: Nightmare! That should never happen  --  must be an error in the Matrix...')

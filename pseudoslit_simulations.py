@@ -7,7 +7,7 @@ Created on 11 May 2018
 
 import numpy as np
 import astropy.io.fits as pyfits
-#import time
+import time
 import os
 import scipy.interpolate as interp
 import matplotlib.pyplot as plt
@@ -358,6 +358,9 @@ def make_pseudo_obs(seeing=None, simpath='/Volumes/BERGRAID/data/simu/', nfib=19
     14/06/2018 - CMB added "slitamps.txt" output file; also added 'fixed_slitamps', 'slitamps', and 'norm_slitamps' keywords
     """
     
+    if timit:
+        start_time = time.time()
+    
     ##### (1) #####
     if not fixed_slitamps:
         if seeing is not None:
@@ -476,6 +479,9 @@ def make_pseudo_obs(seeing=None, simpath='/Volumes/BERGRAID/data/simu/', nfib=19
         else:
             master_dict['syntobs'+tstring] = master
     
+    if timit:
+        print('Time elapsed: '+str(np.round(time.time() - start_time,1))+' seconds')
+    
     if savefile:
         #print('Offsets: ',offsets)
         return
@@ -526,6 +532,8 @@ def make_pseudo_obs_with_noise(seeing, snrs=None, RON=0., simpath='/Volumes/BERG
     14/06/2018 - CMB added "slitamps.txt" output file; also added 'fixed_slitamps', 'slitamps', and 'norm_slitamps' keywords
     """
     
+    if timit:
+        start_time = time.time()
     
     ##### (1) #####
     if not fixed_slitamps:
@@ -645,6 +653,9 @@ def make_pseudo_obs_with_noise(seeing, snrs=None, RON=0., simpath='/Volumes/BERG
         else:
             master_dict['seeing'+fwhm.astype(str)] = master
     
+    if timit:
+        print('Time elapsed: '+str(np.round(time.time() - start_time,1))+' seconds')
+    
     if savefile:
         #print('Offsets: ',offsets)
         return
@@ -686,6 +697,8 @@ def make_mult_pseudo_obs(offsets=0., slitamps=1., nfib=19, simpath='/Volumes/BER
     02/07/2018 - CMB create (clone of "make_pseudo_obs")
     """
     
+    if timit:
+        start_time = time.time()
     
     ##### (1) #####
     # fibre-offsets formatting
@@ -845,6 +858,8 @@ def make_mult_pseudo_obs(offsets=0., slitamps=1., nfib=19, simpath='/Volumes/BER
         else:
             master_dict['syntobs_'+str(i+1)] = master
 
+    if timit:
+        print('Time elapsed: '+str(np.round(time.time() - start_time,1))+' seconds')
     
     if savefile:
         #print('Offsets: ',offsets)

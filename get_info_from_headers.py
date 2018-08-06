@@ -15,6 +15,10 @@ import astropy.io.fits as pyfits
 
 
 def identify_obstypes(path):
+    """
+    Identify the type of observation from the card in the FITS header, and create lists of filename for the different observation types.
+    """
+    
     
     file_list = glob.glob(path+"*.fits")
     

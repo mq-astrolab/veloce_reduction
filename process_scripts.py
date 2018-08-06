@@ -14,6 +14,7 @@ from veloce_reduction.cosmic_ray_removal import remove_cosmics
 from veloce_reduction.background import remove_background
 from veloce_reduction.order_tracing import extract_stripes
 from veloce_reduction.extraction import extract_spectrum, extract_spectrum_from_indices
+from veloce_reduction.relative_intensities import get_relints, get_relints_from_indices, append_relints_to_FITS
 
 
 
@@ -176,7 +177,8 @@ def process_whites(white_list, MB=None, ronmask=None, MD=None, gain=None, scalab
 
 
 
-def process_science_images(imglist, P_id, slit_height=25, gain=gain, MB=None, ronmask=None, MD=None, scalable=False, saveall=False, path=None, ext_method='optimal', timit=False):
+def process_science_images(imglist, P_id, mask=None, sampling_size=25, slit_height=25, gain=[1.,1.,1.,1.], MB=None, ronmask=None, MD=None, scalable=False, saveall=False, path=None, ext_method='optimal', 
+                           from_indices=True, timit=False):
     """
     Process all science images. This includes:
     
@@ -219,8 +221,8 @@ def process_science_images(imglist, P_id, slit_height=25, gain=gain, MB=None, ro
             MD = pyfits.getdata(path+'master_dark_t'+str(int(np.round(texp,0)))+'.fits', 0)
 #             err_MD = pyfits.getdata(path+'master_dark_t'+str(int(np.round(texp,0)))+'.fits', 1)
     
-    #if not using "...from_indices"
-    ron_stripes = extract_stripes(ronmask, P_id, return_indices=False, slit_height=slit_height, savefiles=False, timit=True)
+    if not from_indices:
+        ron_stripes = extract_stripes(ronmask, P_id, return_indices=False, slit_height=slit_height, savefiles=False, timit=True)
     
     for filename in imglist:
         #do some housekeeping with filenames
@@ -235,30 +237,42 @@ def process_science_images(imglist, P_id, slit_height=25, gain=gain, MB=None, ro
         err_img = np.sqrt(np.clip(img,0,None) + ronmask*ronmask)   # [e-]
         
         # (2) remove cosmic rays (ERRORS REMAIN UNCHANGED)
-        cosmic_cleaned_img = remove_cosmics(img, ronmask, obsname, path, Flim=3.0, siglim=5.0, maxiter=1, savemask=True, savefile=True, save_err=False, verbose=True, timit=True)
+        cosmic_cleaned_img = remove_cosmics(img, ronmask, obsname, path, Flim=3.0, siglim=5.0, maxiter=1, savemask=True, savefile=True, save_err=False, verbose=True, timit=True)   # [e-]
         #adjust errors?
         
         # (3) fit and remove background (ERRORS REMAIN UNCHANGED)
-        bg_corrected_img = remove_background(cosmic_cleaned_img, P_id, obsname, path, degpol=5, slit_height=slit_height, save_bg=True, savefile=True, save_err=False, exclude_top_and_bottom=True, verbose=True, timit=True)
+        bg_corrected_img = remove_background(cosmic_cleaned_img, P_id, obsname, path, degpol=5, slit_height=slit_height, save_bg=True, savefile=True, save_err=False,
+                                             exclude_top_and_bottom=True, verbose=True, timit=True)   # [e-]
         #adjust errors?
 
         # (4) remove pixel-to-pixel sensitivity variations
         #XXXXXXXXXXXXXXXXXXXXXXXXXXX
         #TEMPFIX
-        final_img = bg_corrected_img.copy()
+        final_img = bg_corrected_img.copy()   # [e-]
         #adjust errors?
 
         # (5) extract stripes
         stripes,stripe_indices = extract_stripes(final_img, P_id, return_indices=True, slit_height=slit_height, savefiles=True, obsname=obsname, path=path, timit=True)
-        err_stripes = extract_stripes(err_img, P_id, return_indices=False, slit_height=slit_height, savefiles=True, obsname=obsname+'_err', path=path, timit=True)
-        
+        if not from_indices:
+            err_stripes = extract_stripes(err_img, P_id, return_indices=False, slit_height=slit_height, savefiles=True, obsname=obsname+'_err', path=path, timit=True)
 
         # (6) perform extraction of 1-dim spectrum
-        pix,flux,err = extract_spectrum(stripes, err_stripes=err_stripes, ron_stripes=ron_stripes, method=ext_method, slit_height=slit_height, RON=ronmask, savefile=True, filetype='fits', obsname=obsname, path=path, timit=True) 
-        #OR
-        pix2,flux2,err2 = extract_spectrum_from_indices(final_img, err_img, stripe_indices, method=ext_method, slit_height=slit_height, RON=ronmask, savefile=False, simu=False)
+        if from_indices:
+            pix,flux,err = extract_spectrum_from_indices(final_img, err_img, stripe_indices, method=ext_method, slit_height=slit_height, RON=ronmask, savefile=True, 
+                                                         filetype='fits', obsname=obsname, path=path, timit=True)
+        else:
+            pix2,flux2,err2 = extract_spectrum(stripes, err_stripes=err_stripes, ron_stripes=ron_stripes, method=ext_method, slit_height=slit_height, RON=ronmask, savefile=False, 
+                                            filetype='fits', obsname=obsname, path=path, timit=True)
     
-        # (7) get wavelength solution
+        # (7) get relative intensities of different fibres
+        if from_indices:
+            relints = get_relints_from_indices(P_id, final_img, err_img, stripe_indices, mask=mask, sampling_size=sampling_size, slit_height=slit_height, return_full=False, timit=True) 
+        else:
+            relints = get_relints(P_id, stripes, err_stripes, mask=mask, sampling_size=sampling_size, slit_height=slit_height, return_full=False, timit=True)
+        #now write these "relints" to the header of the extracted spectrum FITS file
+        dum = append_relints_to_FITS(relints, path+obsname+'_extracted.fits', nfib=19)            
+    
+        # (8) get wavelength solution
     
     
     
