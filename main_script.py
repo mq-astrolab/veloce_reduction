@@ -12,6 +12,7 @@ from veloce_reduction.helper_functions import short_filenames
 from veloce_reduction.calibration import get_bias_and_readnoise_from_bias_frames, make_offmask_and_ronmask, make_master_bias_from_coeffs, make_master_dark, correct_orientation, crop_overscan_region
 from veloce_reduction.order_tracing import find_stripes, make_P_id, make_mask_dict, extract_stripes #, find_tramlines
 from veloce_reduction.process_scripts import process_whites, process_science_images
+from veloce_reduction.spatial_profiles import fit_profiles, fit_profiles_from_indices 
 
 
 
@@ -140,10 +141,16 @@ flat_stripes,fs_indices = extract_stripes(MW, P_id, return_indices=True, slit_he
 
 
 ###
-#if we want to determine spatial profiles, then we should remove cosmics and background from MW before doing the following
-fp = fit_profiles(P_id, stripes, err_stripes, mask=mask, stacking=True, slit_height=10, model='gausslike', return_stats=True, timit=True)
+#if we want to determine spatial profiles, then we should remove cosmics and background from MW like so:
+# cosmic_cleaned_MW = remove_cosmics(MW, ronmask, obsname, path, Flim=3.0, siglim=5.0, maxiter=1, savemask=False, savefile=False, save_err=False, verbose=True, timit=True)
+# bg_corrected_MW = remove_background(cosmic_cleaned_MW, P_id, obsname, path, degpol=5, slit_height=5, save_bg=False, savefile=False, save_err=False, exclude_top_and_bottom=True, verbose=True, timit=True)
+#before doing the following:
+MW_stripes,MW_stripe_indices = extract_stripes(MW, P_id, return_indices=True, slit_height=5)
+err_MW_stripes = extract_stripes(err_MW, P_id, return_indices=False, slit_height=5)
+
+fp = fit_profiles(P_id, MW_stripes, err_MW_stripes, mask=mask, stacking=True, slit_height=5, model='gausslike', return_stats=True, timit=True)
 #OR
-fp2 = fit_profiles_from_indices(P_id, img, err_img, stripe_indices, mask=mask, stacking=True, slit_height=10, model='gausslike', return_stats=True, timit=True)
+fp2 = fit_profiles_from_indices(P_id, MW, err_MW, MW_stripe_indices, mask=mask, stacking=True, slit_height=5, model='gausslike', return_stats=True, timit=True)
 ###
 
 

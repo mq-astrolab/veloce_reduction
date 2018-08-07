@@ -177,6 +177,7 @@ def process_whites(white_list, MB=None, ronmask=None, MD=None, gain=None, scalab
 
 
 
+
 def process_science_images(imglist, P_id, mask=None, sampling_size=25, slit_height=25, gain=[1.,1.,1.,1.], MB=None, ronmask=None, MD=None, scalable=False, saveall=False, path=None, ext_method='optimal', 
                            from_indices=True, timit=False):
     """
@@ -191,6 +192,9 @@ def process_science_images(imglist, P_id, mask=None, sampling_size=25, slit_heig
     (6) extraction of 1-dim spectra
     (7) wavelength solution
     """
+    
+    if timit:
+        start_time = time.time()
     
     #####################################
     ### (1) bias and dark subtraction ###
@@ -275,7 +279,8 @@ def process_science_images(imglist, P_id, mask=None, sampling_size=25, slit_heig
         # (8) get wavelength solution
     
     
-    
+    if timit:
+        print('Total time elapsed: '+str(np.round(time.time() - start_time,1))+' seconds')
     
     return
 

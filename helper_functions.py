@@ -234,7 +234,7 @@ def make_norm_profiles_2(x, col, fppo, fibs='stellar', slope=False, offset=False
         nfib=2
         userange = np.arange(25,27,1)
     else:
-        print('ERROR: fibre selection not recognised')
+        print('ERROR: fibre selection not recognised!!!')
         return
     
     #do we want to include extra "fibres" to take care of slope and/or offset? Default is NO for both (as this should be already taken care of globally)
@@ -397,12 +397,17 @@ def fit_poly_surface_2D(x_norm, y_norm, z, weights=None, polytype = 'chebyshev',
     Calculate 2D polynomial fit to normalized x and y values.
     
     INPUT:
-    x_norm: x-values (pixels) of all the lines, re-normalized to [-1,+1]
-    m_norm: order numbers of all the lines, re-normalized to [-1,+1]
-    orders: order numbers of all the lines
-    
+    'x_norm'      : x-values (pixels) of all the lines, re-normalized to [-1,+1]
+    'm_norm'      : order numbers of all the lines, re-normalized to [-1,+1]
+    'z'           : the 2-dim array of 'observed' values
+    'weights'     : weights to use in the fitting
+    'polytype'    : types of polynomials to use (either '(p)olynomial' (default), '(l)egendre', or '(c)hebyshev' are accepted)
+    'poly_deg'    : degree of the polynomials
+    'timit'       : boolean - do you want to measure execution run time?
+    'debug_level' : for debugging... 
+        
     OUTPUT:
-    polytype: either 'polynomial' (default), 'legendre', or 'chebyshev' are accepted
+    'p'  : coefficients of the best-fit polynomials
     """
     
     if timit:
@@ -568,10 +573,10 @@ def get_datestring():
 
 def get_mean_snr(flux, err=None, per_order=False):
     """ 
-    Calculate the mean SNR of the extracted 1dim spectrum.
+    Calculate the mean SNR of the extracted 1-dim spectrum.
     
     INPUT:
-    'flux'      : dictionary of the 1dim extracted spectrum (keys = orders)
+    'flux'      : dictionary of the 1-dim extracted spectrum (keys = orders)
     'err'       : dictionary of the corresponding uncertainties (if not provided, the SQRT of the flux is used by default)
     'per_order' : boolean - do you want to return the mean SNR of each order? 
     
@@ -698,6 +703,9 @@ def make_median_image(imglist, MB=None, raw=False):
     OUTPUT:
     'medimg'   : median image             
     """
+    
+    from veloce_reduction.calibration import crop_overscan_region
+    
     #prepare array
     allimg = []
     
@@ -721,8 +729,6 @@ def make_median_image(imglist, MB=None, raw=False):
     medimg = np.median(np.array(allimg), axis=0)
     
     return medimg
-
-
 
 
 

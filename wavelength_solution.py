@@ -880,11 +880,10 @@ def fit_dispsol_2D(x_norm, ord_norm, WL, weights=None, polytype = 'chebyshev', p
     """
     Calculate 2D polynomial wavelength fit to normalized x and order values.
 
-    x_norm: x-values (pixels) of all the lines, re-normalized to [-1,+1]
-    m_norm: order numbers of all the lines, re-normalized to [-1,+1]
-    orders: order numbers of all the lines
-
-    polytype: either 'polynomial' (default), 'legendre', or 'chebyshev' are accepted
+    'x_norm'   : x-values (pixels) of all the lines, re-normalized to [-1,+1]
+    'ord_norm' : order numbers of all the lines, re-normalized to [-1,+1]
+    'WL'       : 
+    'polytype' : either '(p)olynomial' (default), '(l)egendre', or '(c)hebyshev' are accepted
     """
     
     if polytype in ['Polynomial','polynomial','p','P']:

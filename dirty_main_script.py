@@ -369,7 +369,7 @@ rv,rverr = get_rvs_from_xcorr(quick_extracted, obsnames, mask, smoothed_flat, de
 lat,long,alt = get_obs_coords_from_header(fn)
 bc = barycorrpy.get_BC_vel(JDUTC=JDUTC,hip_id=8102,lat=lat,longi=long,alt=float(alt),ephemeris='de430',zmeas=0.0)
 bc2 = barycorrpy.get_BC_vel(JDUTC=JDUTC,hip_id=8102,lat=-31.2755,longi=149.0673,alt=1165.0,ephemeris='de430',zmeas=0.0)
-bc3  = get_BC_vel(JDUTC=JDUTC,hip_id=8102,obsname='AAO',ephemeris='de430')
+bc3  = barycorrpy.get_BC_vel(JDUTC=JDUTC,hip_id=8102,obsname='AAO',ephemeris='de430')
 #####################################################################################################################################################
 
 

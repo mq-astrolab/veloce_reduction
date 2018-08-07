@@ -18,6 +18,7 @@ from veloce_reduction.order_tracing import flatten_single_stripe, flatten_single
 
 
 
+
 def determine_spatial_profiles_single_order(sc, sr, err_sc, ordpol, ordmask=None, model='gausslike', sampling_size=50, return_stats=False, debug_level=0, timit=False):
     """
     Calculate the spatial-direction profiles of the fibres for a single order.
@@ -79,6 +80,7 @@ def determine_spatial_profiles_single_order(sc, sr, err_sc, ordpol, ordmask=None
         #NOTE: This also covers row numbers > ny, as in these cases 'sr' is set to zero in "flatten_single_stripe(_from_indices)"
         if ordmask[i]==False:
             fu = 1
+            print('WARNING: this pixel column is masked out due to low signal!!!')
         elif checkprod == 0:
             fu = 1
             checksum = np.sum(sr[:,i])
@@ -102,7 +104,7 @@ def determine_spatial_profiles_single_order(sc, sr, err_sc, ordpol, ordmask=None
                 normdata = np.append(normdata, sc[:,j]/np.sum(sc[:,j]))
                 #errors = np.append(errors, np.sqrt(sc[:,j] + RON**2))
                 #using relative errors for weights in the fit
-                normerr = err_sc[:,j] / np.sum(sc[:,j])
+                normerr = (err_sc[:,j]/sc[:,j]) / np.sum(sc[:,j])
                 pix_w = 1./(normerr*normerr)  
                 pix_w[np.isinf(pix_w)] = 0.
                 weights = np.append(weights, pix_w)
@@ -711,7 +713,7 @@ def fit_profiles_from_indices(P_id, img, err_img, stripe_indices, mask=None, sta
 
 
 
-def make_model_stripes_gausslike(fibre_profiles, flat, err_img, stripe_indices, mask, degpol=5, slit_height=10, debug_level=0):
+def make_model_stripes_gausslike(fibre_profiles, flat, err_img, stripe_indices, mask, degpol=5, slit_height=10, return_fitpars=False, debug_level=0, timit=False):
     """
     Using the fibre_profiles dictionary from "fit_profiles(_from_indices)", we enforce that the parameters describing the spatial fibre profiles
     are only smoothly varying as a function of pixel number in dispersion direction by fitting a low-level polynomial tot the fitted values of the parameters.
@@ -727,7 +729,9 @@ def make_model_stripes_gausslike(fibre_profiles, flat, err_img, stripe_indices, 
     'stripe_indices'  : dictionary (keys = orders) containing the indices of the pixels that are identified as the "stripes" (ie the to-be-extracted regions centred on the orders)
     'mask'            : dictionary of boolean masks (keys = orders) from "find_stripes" (masking out regions of very low signal)
     'slit_height'     : height of the extraction slit (ie the pixel columns are 2*slit_height pixels long)
+    'return_fitpars'  : boolean - do you want to return the best-fit polynomial coefficients for the parameters as well?
     'debug_level'     : for debugging...
+    'timit'           : boolean - do you want to measure execution run time?
     
     OUTPUT:
     'fitted_stripes'  : dictionary (keys=orders) containing the reconstructed model using the best-fit solutions to the individual-pixel-column profile fits
@@ -737,9 +741,14 @@ def make_model_stripes_gausslike(fibre_profiles, flat, err_img, stripe_indices, 
     make this more generic to include different analytical models for the profile shapes
     """
     
+    if timit:
+        start_time = time.time()
+    
     #initialize the dictionaries
     fitted_stripes = {}
     model_stripes = {}
+    if return_fitpars:
+        fitpars = {}
     
     #loop over all orders
     for ord in sorted(fibre_profiles.iterkeys()):
@@ -749,6 +758,8 @@ def make_model_stripes_gausslike(fibre_profiles, flat, err_img, stripe_indices, 
         # initialize the dictionaries for each order
         fitted_stripes[ord] = {}
         model_stripes[ord] = {}
+        if return_fitpars:
+            fitpars[ord] = {}
         
         # fill "fitted_stripes" dictionary
         parms = np.array([fibre_profiles[ord]['mu'],fibre_profiles[ord]['sigma'],fibre_profiles[ord]['amp'],fibre_profiles[ord]['beta']])
@@ -772,12 +783,23 @@ def make_model_stripes_gausslike(fibre_profiles, flat, err_img, stripe_indices, 
         p_sigma = np.poly1d(np.polyfit(xx[mask[ord]], np.array(fibre_profiles[ord]['sigma'])[mask[ord]], degpol, w=w[mask[ord]]))
         p_amp = np.poly1d(np.polyfit(xx[mask[ord]], np.array(fibre_profiles[ord]['amp'])[mask[ord]], degpol, w=w[mask[ord]]))
         p_beta = np.poly1d(np.polyfit(xx[mask[ord]], np.array(fibre_profiles[ord]['beta'])[mask[ord]], degpol, w=w[mask[ord]]))
+        if return_fitpars:
+            fitpars[ord]['p_mu'] = p_mu
+            fitpars[ord]['p_sigma'] = p_sigma
+            fitpars[ord]['p_amp'] = p_amp
+            fitpars[ord]['p_beta'] = p_beta 
         
         # fill "model_stripes" dictionary
         smooth_parms = np.array([p_mu(xx),p_sigma(xx),p_amp(xx),p_beta(xx)])
         model_stripes[ord] = fibmodel_with_amp(sr,*smooth_parms)
+     
+    if timit:
+        print('Time elapsed: '+str(np.round(time.time() - start_time,1))+' seconds...')   
         
-    return fitted_stripes, model_stripes
+    if return_fitpars:
+        return fitted_stripes, model_stripes, fitpars
+    else:
+        return fitted_stripes, model_stripes
 
 
 

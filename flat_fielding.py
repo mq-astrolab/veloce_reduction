@@ -25,6 +25,9 @@ import matplotlib.pyplot as plt
 # 
 # smoothed_MW = MW / pix_sens_image    #ie for the flat fields that means that smoothed_MW = filtered flat...
 # smoothed_img = img / pix_sens_image
+#
+
+# maybe the not-fitted offsets in the model_stripes from "make_model_stripes_gausslike" are causing a Fubar in the division here!?!?!?
 
 
 
