@@ -290,7 +290,7 @@ def get_RV_from_xcorr(f, err, wl, f0, wl0, mask=None, smoothed_flat=None, osf=2,
     
     
     
-    
+
     
     
     

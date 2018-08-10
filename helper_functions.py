@@ -395,6 +395,7 @@ def polyval2d(x, y, m):
 def fit_poly_surface_2D(x_norm, y_norm, z, weights=None, polytype = 'chebyshev', poly_deg=5, timit=False, debug_level=0):
     """
     Calculate 2D polynomial fit to normalized x and y values.
+    Wrapper function for using the astropy fitting library.
     
     INPUT:
     'x_norm'      : x-values (pixels) of all the lines, re-normalized to [-1,+1]
@@ -413,21 +414,22 @@ def fit_poly_surface_2D(x_norm, y_norm, z, weights=None, polytype = 'chebyshev',
     if timit:
         start_time = time.time()
     
-    if polytype in ['Polynomial','polynomial','p','P']:
+    if polytype.lower() in ['p','polynomial']:
         p_init = models.Polynomial2D(poly_deg)
         if debug_level > 0:
             print('OK, using standard polynomials...')
-    elif polytype in ['Chebyshev','chebyshev','c','C']:
+    elif polytype.lower() in ['c','chebyshev']:
         p_init = models.Chebyshev2D(poly_deg,poly_deg)
         if debug_level > 0:
             print('OK, using Chebyshev polynomials...')
-    elif polytype in ['Legendre','legendre','l','L']:
+    elif polytype.lower() in ['l','legendre']:
         p_init = models.Legendre2D(poly_deg,poly_deg)  
         if debug_level > 0:
             print('OK, using Legendre polynomials...')   
     else:
         print("ERROR: polytype not recognised ['(P)olynomial' / '(C)hebyshev' / '(L)egendre']")    
-        
+        return
+    
     fit_p = fitting.LevMarLSQFitter()  
 
     with warnings.catch_warnings():
@@ -752,6 +754,57 @@ def find_maxima(data, gauss_filter_sigma=0., min_peak=0.1, return_values=0):
 
 
 
+def affine_matrix(scale_x=1, scale_y=1, theta=0, dx=0, dy=0, shear_x=0, shear_y=0):
+    """
+    theta in degs clockwise
+    
+    Order:
+    (1) rotation
+    (2) translation
+    (3) scaling
+    (4) shear in x
+    (5) shear in y
+    """
+    #m = np.zeros((3,3))
+    #m[zeile,spalte] = m[row,column]
+    
+    m_scale = np.eye(3)
+    m_scale[0,0] = scale_x
+    m_scale[1,1] = scale_y
+    
+    m_rot = np.eye(3)
+    m_rot[0,0] = np.cos(np.deg2rad(theta))
+    m_rot[0,1] = np.sin(np.deg2rad(theta))
+    m_rot[1,0] = -np.sin(np.deg2rad(theta))
+    m_rot[1,1] = np.cos(np.deg2rad(theta))
+    
+    m_trans = np.eye(3)
+    m_trans[0,2] = dx
+    m_trans[1,2] = dy
+    
+    m_shear_x = np.eye(3)
+    m_shear_x[0,1] = shear_x
+    
+    m_shear_y = np.eye(3)
+    m_shear_y[1,0] = shear_y
+    
+    m = np.matmul(m_shear_y, np.matmul(m_shear_x, np.matmul(m_scale, np.matmul(m_trans, m_rot))))
+    
+    return m
 
+
+
+def affine_transformation(xytuple, scale_x=1, scale_y=1, theta=0, dx=0, dy=0, shear_x=0, shear_y=0):
+    """
+    dummy dunction, not currently used; xy-tuple may not be correctly implemented yet
+    """
+#     x,y = xytuple
+#     #create affine transformation matrix
+#     m = affine_matrix(scale_x=scale_x, scale_y=scale_y, theta=theta, dx=dx, dy=dy, shear_x=shear_x, shear_y=shear_y)
+#     #calculate set of transformed points
+#     new_points = np.dot(m,points)
+#     
+#     return np.dot(m,x)
+    return
 
 

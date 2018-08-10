@@ -18,15 +18,7 @@ from mpl_toolkits import mplot3d
 #from astropy.modeling.functional_models import Gaussian2D
 from scipy.optimize import curve_fit
 
-
-
-def gauss2D(xytuple, amp, x0, y0, x_sig, y_sig, theta):
-    x,y = xytuple
-    a = ((np.cos(theta))**2 / (2*x_sig**2)) + ((np.sin(theta))**2 / (2*y_sig**2))
-    b = -np.sin(2*theta)/(4*x_sig**2) + np.sin(2*theta)/(4*y_sig**2)
-    c = ((np.sin(theta))**2 / (2*x_sig**2)) + ((np.cos(theta))**2 / (2*y_sig**2))
-
-    return amp * np.exp( -(a*(x-x0)**2 + 2*b*(x-x0)*(y-y0) + c*(y-y0)**2) ) 
+from veloce_reduction.helper_functions import gauss2D, affine_matrix
 
 
 
@@ -41,10 +33,14 @@ boxwidth = 11            # size of box to use for the 2D Gaussian peak fitting
 
 imgname = '/Users/christoph/OneDrive - UNSW/simulated_spectra/ES/veloce_laser_comb.fit'
 img = pyfits.getdata(imgname) + 1
-testimg = img[250:450,250:450]
+img1 = img[250:450,250:450]   # contains 19 peaks (1 of which at edge)
+err_img1 = np.sqrt(img1)
+img2 = img[250:450,247:447]   # contains 19 peaks (1 of which at edge)
+err_img2 = np.sqrt(img2)
 
 
-def find_laser_peaks_2D(img, boxwidth=11, bg_thresh=1., count_thresh=2000., gauss_filter_size=1., RON=4., xsigma=1.1, ysigma=0.7, smooth=False, timit=False):
+
+def find_laser_peaks_2D(img, err_img, boxwidth=11, bg_thresh=1., count_thresh=2000., gauss_filter_size=1., RON=None, xsigma=1.2, ysigma=0.7, smooth=False, timit=False):
 
     if timit:
         start_time = time.time()
@@ -85,7 +81,7 @@ def find_laser_peaks_2D(img, boxwidth=11, bg_thresh=1., count_thresh=2000., gaus
     
     labeled, n_peaks = ndimage.label(peaks)
     
-    print('Number of peaks found: '+str(n_peaks))
+    print('Total number of peaks found: '+str(n_peaks))
     
 #     if n_peaks != np.sum(peaks):
 #         print('ERROR: number of peaks found is inconsistent!')
@@ -98,10 +94,10 @@ def find_laser_peaks_2D(img, boxwidth=11, bg_thresh=1., count_thresh=2000., gaus
     
     peakshapes = {'number':[], 'x0':[], 'y0':[], 'amp':[], 'x_sigma':[], 'y_sigma':[], 'theta':[], 'chi2red':[]}
                   
-    #LOOP OVER ALL LABELED MAXIMA...
+    #LOOP OVER ALL LABELLED MAXIMA...
     for i in range(n_peaks):
         
-        #print(i, xy[i,:])
+        print(i, xy[i,:])
         
         #initially I had this the wrong way around
 #         xr = np.arange(int(round(xy[i,0])) - padsize, int(round(xy[i,0])) + padsize +1)
@@ -110,8 +106,9 @@ def find_laser_peaks_2D(img, boxwidth=11, bg_thresh=1., count_thresh=2000., gaus
         xr = np.arange(int(round(xy[i,1])) - padsize, int(round(xy[i,1])) + padsize +1)     #this is x
         xx,yy = np.meshgrid(xr,yr)
         z = img[yr[0]:yr[-1]+1, xr[0]:xr[-1]+1] 
+        err = err_img[yr[0]:yr[-1]+1, xr[0]:xr[-1]+1] 
         
-        #don't use peaks that are too close to the edge of the chip or that have less than 2000 counts:
+        #don't use peaks that are too close to the edge of the chip or that have less than a certain number of counts:
         if (z.size == boxwidth**2) and (np.max(z) >= count_thresh):  
             
             # # METHOD 1: ASTROPY (CANNOT GET IT TO WORK...)
@@ -126,12 +123,13 @@ def find_laser_peaks_2D(img, boxwidth=11, bg_thresh=1., count_thresh=2000., gaus
             xflat = xx.flatten()
             yflat = yy.flatten()
             zflat = z.flatten()
+            errflat = err.flatten()
             lower_bounds = np.array([0., 0., 0., 0., 0., -np.pi/4.])
             upper_bounds = np.array([np.inf, img.shape[1]-1., img.shape[0]-1., np.inf, np.inf, np.pi/4.])
-            popt,pcov = curve_fit(gauss2D, (xflat,yflat), zflat, p0=pguess, bounds=(lower_bounds,upper_bounds))
+            popt,pcov = curve_fit(gauss2D, (xflat,yflat), zflat, sigma=errflat, p0=pguess, bounds=(lower_bounds,upper_bounds))
             bestmodel = gauss2D((xx,yy), *popt)
             res = z - bestmodel
-            err = np.sqrt( z + RON**2 )
+            #err = np.sqrt( z + RON**2 )
             chisqarr = (res/err)**2
             chisq = np.sum(chisqarr)
             dof = z.size - len(pguess)
@@ -145,6 +143,8 @@ def find_laser_peaks_2D(img, boxwidth=11, bg_thresh=1., count_thresh=2000., gaus
             peakshapes['y_sigma'].append(popt[4])
             peakshapes['theta'].append(180.*popt[5]/np.pi)
             peakshapes['chi2red'].append(chi2red)
+    
+    
         
     if timit:
         print('Elapsed time for finding peaks: ',time.time() - start_time,' seconds')
@@ -155,5 +155,39 @@ def find_laser_peaks_2D(img, boxwidth=11, bg_thresh=1., count_thresh=2000., gaus
 
 
 
+def find_affine_transformation_matrix(peakshapes1, peakshapes2):
+    
+    peaks1_xy = np.array([peakshapes1['x0'],peakshapes1['y0']])
+    #go to homogeneous coordinates (ie add a z-component equal to 1, so that we can include translation into the matrix)
+    peaks1_xyz = np.vstack((peaks1_xy, np.expand_dims(np.repeat(1,peaks1_xy.shape[1]), axis=0)))
+    
+    peaks2_xy = np.array([peakshapes2['x0'],peakshapes2['y0']])
+    #go to homogeneous coordinates (ie add a z-component equal to 1, so that we can include translation into the matrix)
+    peaks2_xyz = np.vstack((peaks2_xy, np.expand_dims(np.repeat(1,peaks2_xy.shape[1]), axis=0)))
+    
+    #solve matrix equation: M*r1 = r2  (note the transpose, as linalg.lstsq wants row-vectors)
+    M, res, rank, s = np.linalg.lstsq(peaks1_xyz.T, peaks2_xyz.T)
+    
+    #return affine transformation matrix  (note the transpose again, so that you can do :     new_points = np.dot(M.T,points) 
+    return M.T
+# M, N = src.shape
+# points = np.mgrid[0:N, 0:M].reshape((2, M*N))
 
 
+
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    

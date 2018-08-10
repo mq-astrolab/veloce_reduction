@@ -4,29 +4,23 @@ Created on 29 Nov. 2017
 @author: christoph
 '''
 
-#import numpy as np
+import time
+import numpy as np
 from scipy import signal
+from scipy import ndimage
 import matplotlib.pyplot as plt
 import scipy.optimize as op
-from scipy import ndimage
-import warnings
 import lmfit
-from lmfit import parameter, Parameters, minimizer, Model
-from lmfit.models import *
-#import time
-#import datetime
-#from astropy.io import ascii
-#from astropy.modeling import models, fitting
-#from mpl_toolkits import mplot3d
-
-from veloce_reduction.helper_functions import *
+from lmfit import Model
+from lmfit.models import GaussianModel, LorentzianModel, VoigtModel, PseudoVoigtModel, MoffatModel, Pearson7Model, StudentsTModel, BreitWignerModel, LognormalModel
+from lmfit.models import DampedOscillatorModel, DampedHarmonicOscillatorModel, ExponentialGaussianModel, SkewedGaussianModel, DonaichModel
+from astropy.modeling import models, fitting
+import warnings
 from readcol import readcol 
+import datetime
 
+from veloce_reduction.helper_functions import fibmodel_with_amp, CMB_pure_gaussian, multi_fibmodel_with_amp, CMB_multi_gaussian, offset_pseudo_gausslike, fit_poly_surface_2D
 
-# thardata = np.load('/Users/christoph/OneDrive - UNSW/rvtest/thardata.npy').item()
-# laserdata = np.load('/Users/christoph/OneDrive - UNSW/rvtest/laserdata.npy').item()
-# thdata = thardata['flux']['order_01']
-# ldata = laserdata['flux']['order_01']
 
 
 
@@ -44,10 +38,10 @@ def find_suitable_peaks(rawdata, thresh = 5000., bgthresh = 2000., maxthresh = N
     'thresh'              : minimum height of peak in the FILTERED data to be considered a good peak
     'bgthresh'            : minimum height of peak in the filtered data to be considered a real (but not good) peak
     'maxthresh'           : maximum height of peak in the filtered data to be included (ie you can exclude saturated peaks etc)
-    'gauss_filter_sigma'  : width of the Gaussian smoothing kernel (swet to 0 if you want no smoothing)
+    'gauss_filter_sigma'  : width of the Gaussian smoothing kernel (set to 0 if you want no smoothing)
     'remove_bg'           : boolean - do you want to run a crude background removal before identifying peaks?
     'return_masks'        : boolean - do you want to return the masks as well as the data arrays?
-    'debug_level'         : boolean - for debugging...
+    'debug_level'         : for debugging...
     'timit'               : boolean - do you want to clock execution run-time?
 
     OUTPUT:
@@ -57,7 +51,7 @@ def find_suitable_peaks(rawdata, thresh = 5000., bgthresh = 2000., maxthresh = N
     'first_mask'  : mask that masks out shallow noise peaks from allpeaks (ONLY IF 'return_masks' is set to TRUE)
     'second_mask' : mask that masks out saturated lines above maxthresh from mostpeaks (ONLY IF 'return_masks' is set to TRUE)
     'third_mask'  : mask that masks out lines below thresh from mostpeaks (ONLY IF 'return_masks' is set to TRUE)
-    #ie goodpeaks = allpeaks[first_mask][second_mask][third_mask]
+                    ie: goodpeaks = allpeaks[first_mask][second_mask][third_mask]
     
     TODO:
     (1) make a relative threshold criterion
@@ -139,8 +133,50 @@ def find_suitable_peaks(rawdata, thresh = 5000., bgthresh = 2000., maxthresh = N
 
 
 
-def fit_emission_lines(data, fitwidth=4, thresh = 5000., bgthresh = 2000., maxthresh = None, laser=False, varbeta=True, timit=False, verbose=False, return_all_pars=False, return_qualflag=False):
+def fit_emission_lines(data, fitwidth=4, thresh = 5000., bgthresh = 2000., maxthresh = None, laser=False, varbeta=True, return_all_pars=False, return_qualflag=False, verbose=False, timit=False):
+    """
+    This routine identifies and fits emission lines in a 1-dim spectrum (ie generally speaking it finds and fits peaks in a 1dim array), using "scipy.optimize.curve_fit".
+    Detection threshold, background threshold, and maximum threshold can be provided as keyword parameters. Different models for the peak-like function can be selected.
+
+    INPUT:
+    'data'   : one-dimensional data array
+
+    KEYWORD PARAMETERS:
+    'fitwidth'         : range around the identified peaks to be used for the peak-fitting 
+    'thresh'           : minimum height of peak in the FILTERED data to be considered a good peak
+    'bgthresh'         : minimum height of peak in the FILTERED data to be considered a real (but not good) peak
+    'maxthresh'        : maximum height of peak in the FILTERED data to be included (ie you can exclude saturated peaks etc)
+    'laser'            : boolean - is this a LFC spectrum? (if set to true, there is no check for blended lines)
+    'varbeta'          : boolean - if set to TRUE, use a Gauss-like function for fitting, if set to FALSE use a plain Gaussian  
+    'return_all_pars'  : boolean - do you want to return all fit parameters?
+    'return_qualflag'  : boolean - do you want to return a quality flag for each line fit?
+    'verbose'          : boolean - for debugging...
+    'timit'            : boolean - do you want to clock execution run-time?    
     
+    OUTPUT:
+    'line_pos_fitted'    : fitted line positions
+    'line_sigma_fitted'  : fitted line sigmas
+    'line_amp_fitted'    : fitted line amplitudes
+    'line_beta_fitted'   : fitted line betas (exponent in Gauss-like functions, which is equal to 2 for pure Gaussians)
+    'qualflag'           : quality flag (1=good, 0=bad) for each line (only if 'return_qualflag' is set to TRUE)
+    
+    TODO:
+    (1) make a relative threshold criterion
+    """
+    
+    print('ATTENTION: You should consider using the more up-to-date and more robust function "fit_emission_lines_lmfit" instead!')
+#     choice = None
+#     while choice is None:
+#         choice = raw_input("Do you want to continue? [y/n]: ")
+#         if choice.lower() not in ('y','n'):
+#             print('Invalid input! Please try again...')
+#             choice = None
+#    
+#     #stop here if you'd rather use "fit_emission_lines_lmfit"
+#     if choice.lower() == 'n':
+#         return
+    
+    #OK, continue, you have been warned...
     if timit:
         start_time = time.time()
     
@@ -311,35 +347,39 @@ def fit_emission_lines(data, fitwidth=4, thresh = 5000., bgthresh = 2000., maxth
 def fit_emission_lines_lmfit(data, fitwidth=None, thresh=5000., bgthresh=2000., maxthresh=None, laser=False, model='gauss', no_weights=False,
                              offset=False, return_all_pars=False, return_qualflag=False, return_stats=False, return_full=False, timit=False, debug_level=0):
     """
-    This routine identifies and fits emission lines in a 1dim spectrum (ie generally speaking it finds and fits peaks in a 1dim array), using the LMFIT package.
+    This routine identifies and fits emission lines in a 1-dim spectrum (ie generally speaking it finds and fits peaks in a 1dim array), using the LMFIT package.
     Detection threshold, background threshold, and maximum threshold can be provided as keyword parameters. Different models for the peak-like function can be selected.
 
     INPUT:
     'data'   : one-dimensional data array
 
     KEYWORD PARAMETERS:
-    'fitwidth'            : range around the identified peaks to be used for the peak-fitting 
-                            (if None, it will automatically be determined by the minimum spacing between peaks - this option should only be used for lLFC spectra)
-    'thresh'              : minimum height of peak in the FILTERED data to be considered a good peak
-    'bgthresh'            : minimum height of peak in the FILTERED data to be considered a real (but not good) peak
-    'maxthresh'           : maximum height of peak in the FILTERED data to be included (ie you can exclude saturated peaks etc)
-    'laser'               : boolean - is this a LFC spectrum? (if set to true, there is no check for blended lines)
-    'model'               : peak-like function model to be used for the fitting; valid options are (check code below for exact names):
-                            [gaussian, gauss-like, double gaussian, lorentzian, voigt, pseudo-voigt, offset pseudo-voigt, offset "pseudo-gausslike", 
-                            moffat, pearson7, students, breit-wigner, lognormal, damped oscillator, damped harmonic oscillator, exp gauss, skew gauss, donaich] 
-    'no_weights'          : boolean - set to TRUE if you DO NOT WANT to use weights (not recommended)                        
-    'offset'              : boolean - do you want to estimate and subtract an offset before fitting?                        
-    'return_all_pars'     : boolean - do you want to return all fit parameters?
-    'return_qualflag'     : boolean - do you want to return a quality flag for each line fit?
-    'return_stats'        : boolean - do you want to return goodness of fit statistics (ie AIC, BIC, CHISQ and REDCHISQ)?
-    'return_full'         : boolean - do you want to return the full "fit_result" class for each line? (WARNING: this ONLY returns the line positions and the full 'fit_result' classes,
-                            ,ie it overwrites the 'return_all_pars' / 'return_qualflag' / 'return_stats' keywords)
-    'debug_level'         : boolean - for debugging...
-    'timit'               : boolean - do you want to clock execution run-time?    
+    'fitwidth'         : range around the identified peaks to be used for the peak-fitting 
+                         (if None, it will automatically be determined by the minimum spacing between peaks - this option should only be used for LFC spectra, won't work properly for ThAr or ThXe)
+    'thresh'           : minimum height of peak in the FILTERED data to be considered a good peak
+    'bgthresh'         : minimum height of peak in the FILTERED data to be considered a real (but not good) peak
+    'maxthresh'        : maximum height of peak in the FILTERED data to be included (ie you can exclude saturated peaks etc)
+    'laser'            : boolean - is this a LFC spectrum? (if set to true, there is no check for blended lines)
+    'model'            : peak-like function model to be used for the fitting; valid options are (check code below for exact names):
+                         [gaussian, gauss-like, double gaussian, lorentzian, voigt, pseudo-voigt, offset pseudo-voigt, offset "pseudo-gausslike", 
+                         moffat, pearson7, students, breit-wigner, lognormal, damped oscillator, damped harmonic oscillator, exp gauss, skew gauss, donaich] 
+    'no_weights'       : boolean - set to TRUE if you DO NOT WANT to use weights (not recommended)                        
+    'offset'           : boolean - do you want to estimate and subtract an offset before fitting?                        
+    'return_all_pars'  : boolean - do you want to return all fit parameters?
+    'return_qualflag'  : boolean - do you want to return a quality flag for each line fit?
+    'return_stats'     : boolean - do you want to return goodness of fit statistics (ie AIC, BIC, CHISQ and REDCHISQ)?
+    'return_full'      : boolean - do you want to return the full "fit_result" class for each line? (WARNING: this ONLY returns the line positions and the full 'fit_result' classes,
+                         ie it overwrites the 'return_all_pars' / 'return_qualflag' / 'return_stats' keywords)
+    'debug_level'      : boolean - for debugging...
+    'timit'            : boolean - do you want to clock execution run-time?    
     
     OUTPUT:
-    'line_pos_fitted'     : fitted line positions
-    'qualflag'            : quality flag (1=good, 0=bad) for each line (only if 'return_qualflag' is set to TRUE)
+    'full_results'     : the full results, ie the instance of the LMFIT 'ModelResult' class (if 'return_full' is set to TRUE)
+    -------------------
+    'line_pos_fitted'  : fitted line positions
+    'allpars'          : (only if 'return_all_pars' is set to TRUE)
+    'qualflag'         : quality flag (1=good, 0=bad) for each line (only if 'return_qualflag' is set to TRUE)
+    'stats'            : (only if 'return_stats' is set to TRUE)
     
     TODO:
     (1) make a relative threshold criterion
@@ -593,18 +633,18 @@ def fit_emission_lines_lmfit(data, fitwidth=None, thresh=5000., bgthresh=2000., 
                     if return_stats:
                         stats.append(fitstats)
 
-#             # # #this way you can quickly plot the indidvidual fits for debugging
-            plot_osf = 10
-            plot_os_grid = np.linspace(xrange[0], xrange[-1], plot_osf * (len(xrange) - 1) + 1)
-            guessmodel = mod.eval(fit_result.init_params, x=plot_os_grid)
-            bestmodel = mod.eval(fit_result.params, x=plot_os_grid)
-            plt.figure()
-            plt.title('model = ' + model.title())
-            plt.xlabel('pixel number (dispersion direction)')
-            plt.plot(xrange, fitdata, 'bo')
-            plt.plot(plot_os_grid, guessmodel, 'k--', label='initial guess')
-            plt.plot(plot_os_grid, bestmodel, 'r-', label='best-fit model')
-            plt.legend()
+# #             # # #this way you can quickly plot the indidvidual fits for debugging
+#             plot_osf = 10
+#             plot_os_grid = np.linspace(xrange[0], xrange[-1], plot_osf * (len(xrange) - 1) + 1)
+#             guessmodel = mod.eval(fit_result.init_params, x=plot_os_grid)
+#             bestmodel = mod.eval(fit_result.params, x=plot_os_grid)
+#             plt.figure()
+#             plt.title('model = ' + model.title())
+#             plt.xlabel('pixel number (dispersion direction)')
+#             plt.plot(xrange, fitdata, 'bo')
+#             plt.plot(plot_os_grid, guessmodel, 'k--', label='initial guess')
+#             plt.plot(plot_os_grid, bestmodel, 'r-', label='best-fit model')
+#             plt.legend()
 
 
         else:
@@ -653,334 +693,132 @@ def fit_emission_lines_lmfit(data, fitwidth=None, thresh=5000., bgthresh=2000., 
 
 
 
-# ###########################################
-# thar_refwlord01, thar_relintord01, flag = readcol('/Users/christoph/OneDrive - UNSW/linelists/test_thar_list_order_01.dat',fsep=';',twod=False)
-# thar_refwlord01 *= 1e3
-# refdata = {}
-# refdata['order_01'] = {}
-# refdata['order_01']['wl'] = thar_refwlord01[np.argwhere(flag == ' resolved')][::-1]          #note the array is turned around to match other arrays
-# refdata['order_01']['relint'] = thar_relintord01[np.argwhere(flag == ' resolved')][::-1]     #note the array is turned around to match other arrays
-# ###########################################
-
-
-
-
-
-def get_dispsol_from_thar(thardata, refdata, deg_polynomial=5, timit=False, verbose=False):
-
-    if timit:
-        start_time = time.time()
-
-    thar_dispsol = {}
-    
-    #loop over all orders
-    #for ord in sorted(thardata['flux'].iterkeys()):
-    for ord in ['order_01']:
-    
-        if verbose:
-            print('Finding wavelength solution for '+str(ord))
-    
-        #find fitted x-positions of ThAr peaks
-        fitted_thar_pos, thar_qualflag = fit_emission_lines(thardata['flux'][ord], return_all_pars=False, return_qualflag=True, varbeta=False)
-        x = fitted_thar_pos.copy()
-        
-        #these are the theoretical wavelengths from the NIST linelists
-        lam = (refdata[ord]['wl']).flatten()
-        
-        #exclude some peaks as they are a blend of multiple lines: TODO: clean up
-        filt = np.ones(len(fitted_thar_pos),dtype='bool')
-        filt[[33,40,42,58,60]] = False
-        x = x[filt]
-        
-        #fit polynomial to lambda as a function of x
-        thar_fit = np.poly1d(np.polyfit(x, lam, deg_polynomial))
-        #save to output dictionary
-        thar_dispsol[ord] = thar_fit
-
-    if timit:
-        print('Time taken for finding ThAr wavelength solution: '+str(time.time() - start_time)+' seconds...')
-
-    return thar_dispsol
-
-
-# '''xxx'''
-# #################################################################
-# # the following is needed as input for "get_dispsol_from_laser" #
-# #################################################################
-# laser_ref_wl,laser_relint = readcol('/Users/christoph/OneDrive - UNSW/linelists/laser_linelist_25GHz.dat',fsep=';',twod=False)
-# laser_ref_wl *= 1e3
-# 
-# #wavelength solution from HDF file
-# #read dispersion solution from file
-# dispsol = np.load('/Users/christoph/OneDrive - UNSW/dispsol/mean_dispsol_by_orders_from_zemax.npy').item()
-# #read extracted spectrum from files (obviously this needs to be improved)
-# xx = np.arange(4096)
-# #this is so as to match the order number with the physical order number (66 <= m <= 108)
-# # order01 corresponds to m=66
-# # order43 corresponds to m=108
-# wl = {}
-# for ord in dispsol.keys():
-#     m = ord[5:]
-#     ordnum = str(int(m)-65).zfill(2)
-#     wl['order_'+ordnum] = dispsol['order'+m]['model'](xx)
-    
-
-
-
-
-def get_dispsol_from_laser(laserdata, laser_ref_wl, deg_polynomial=5, timit=False, verbose=False, return_stats=False, varbeta=False):
-    
-    if timit:
-        start_time = time.time()
-
-    if return_stats:
-        stats = {}
-
-    #read in mask for fibre_01 (ie the Laser-comb fibre) from order_tracing as a first step in excluding low-flux regions
-    mask_01 = np.load('/Users/christoph/OneDrive - UNSW/fibre_profiles/masks/mask_01.npy').item()
-
-    laser_dispsol = {}
-    
-    #loop over all orders
-    #order 43 does not work properly, as some laser peaks are missing!!!
-    for ord in sorted(laserdata['flux'].iterkeys())[:-1]:
-
-        if verbose:
-            print('Finding wavelength solution for '+str(ord))
-        
-        #find fitted x-positions of ThAr peaks
-        data = laserdata['flux'][ord] * mask_01[ord]
-        goodpeaks,mostpeaks,allpeaks,first_mask,second_mask,third_mask = find_suitable_peaks(data,return_masks=True)    #from this we just want the masks this time (should be very fast)
-        #fitted_laser_pos, laser_qualflag = fit_emission_lines(data, laser=True, return_all_pars=False, return_qualflag=True, varbeta=varbeta)
-        if varbeta:
-            fitted_laser_pos, fitted_laser_sigma, fitted_laser_amp, fitted_laser_beta = fit_emission_lines(data, laser=True, return_all_pars=True, return_qualflag=False, varbeta=varbeta, timit=timit, verbose=verbose)
-        else:
-            fitted_laser_pos, fitted_laser_sigma, fitted_laser_amp = fit_emission_lines(data, laser=True, return_all_pars=True, return_qualflag=False, varbeta=varbeta, timit=timit, verbose=verbose)
-        x = fitted_laser_pos.copy()
-        #exclude the leftmost and rightmost peaks (nasty edge effects...)
-#         blue_cutoff = int(np.round((x[-1]+x[-2])/2.,0))
-#         red_cutoff = int(np.round((x[0]+x[1])/2.,0))
-        blue_cutoff = int(np.round(allpeaks[-1]+((allpeaks[-1] - allpeaks[-2])/2),0))
-        red_cutoff = int(np.round(allpeaks[0]-((allpeaks[1] - allpeaks[0])/2),0))
-        cond1 = (laser_ref_wl >= wl[ord][blue_cutoff])
-        cond2 = (laser_ref_wl <= wl[ord][red_cutoff])
-        #these are the theoretical wavelengths from the NIST linelists
-        lam = laser_ref_wl[np.logical_and(cond1,cond2)][::-1]
-        lam = lam[first_mask][second_mask][third_mask]
-        
-        #check if the number of lines found equals the number of lines from the line list
-#         if verbose:
-#             print(len(x),len(lam))
-        if len(x) != len(lam):
-            print('fuganda')
-            return 'fuganda'
-        
-        #fit polynomial to lambda as a function of x
-        laser_fit = np.poly1d(np.polyfit(x, lam, deg_polynomial))
-        
-        if return_stats:
-            stats[ord] = {}
-            resid = laser_fit(x) - lam
-            stats[ord]['resids'] = resid
-            #mean error in RV for a single line = c * (stddev(resid) / mean(lambda))
-            stats[ord]['single_rverr'] = 3e8 * (np.std(resid) / np.mean(lam))
-            stats[ord]['rverr'] = 3e8 * (np.std(resid) / np.mean(lam)) / np.sqrt(len(lam))
-            stats[ord]['n_lines'] = len(lam)
-            
-        #save to output dictionary
-        laser_dispsol[ord] = laser_fit
-
-    
-    #let's do order 43 differently because it has the stupid gap in the middle
-    #find fitted x-positions of ThAr peaks
-    ord = 'order_43'
-    if verbose:
-            print('Finding wavelength solution for '+str(ord))
-    data = laserdata['flux'][ord] * mask_01[ord]
-    data1 = data[:2500]
-    data2 = data[2500:]
-    goodpeaks1,mostpeaks1,allpeaks1,first_mask1,second_mask1,third_mask1 = find_suitable_peaks(data1,return_masks=True)    #from this we just want use_mask this time (should be very fast)
-    goodpeaks2,mostpeaks2,allpeaks2,first_mask2,second_mask2,third_mask2 = find_suitable_peaks(data2,return_masks=True)    #from this we just want use_mask this time (should be very fast)
-    #fitted_laser_pos1, laser_qualflag1 = fit_emission_lines(data1, laser=True, return_all_pars=False, return_qualflag=True, varbeta=varbeta)
-    #fitted_laser_pos2, laser_qualflag2 = fit_emission_lines(data2, laser=True, return_all_pars=False, return_qualflag=True, varbeta=varbeta)
-    if varbeta:
-        fitted_laser_pos1, fitted_laser_sigma1, fitted_laser_amp1, fitted_laser_beta1 = fit_emission_lines(data1, laser=True, return_all_pars=True, return_qualflag=False, varbeta=varbeta)
-        fitted_laser_pos2, fitted_laser_sigma2, fitted_laser_amp2, fitted_laser_beta2 = fit_emission_lines(data2, laser=True, return_all_pars=True, return_qualflag=False, varbeta=varbeta)
-    else:
-        fitted_laser_pos1, fitted_laser_sigma1, fitted_laser_amp1 = fit_emission_lines(data1, laser=True, return_all_pars=True, return_qualflag=False, varbeta=varbeta)
-        fitted_laser_pos2, fitted_laser_sigma2, fitted_laser_amp2 = fit_emission_lines(data2, laser=True, return_all_pars=True, return_qualflag=False, varbeta=varbeta)
-    x1 = fitted_laser_pos1.copy()
-    x2 = fitted_laser_pos2.copy() + 2500
-    #exclude the leftmost and rightmost peaks (nasty edge effects...)
-#         blue_cutoff = int(np.round((x[-1]+x[-2])/2.,0))
-#         red_cutoff = int(np.round((x[0]+x[1])/2.,0))
-    blue_cutoff1 = int(np.round(allpeaks1[-1]+((allpeaks1[-1] - allpeaks1[-2])/2),0))
-    blue_cutoff2 = int(np.round(allpeaks2[-1]+((allpeaks2[-1] - allpeaks2[-2])/2)+2500,0))
-    red_cutoff1 = int(np.round(allpeaks1[0]-((allpeaks1[1] - allpeaks1[0])/2),0))
-    red_cutoff2 = int(np.round(allpeaks2[0]-((allpeaks2[1] - allpeaks2[0])/2)+2500,0))
-    cond1_1 = (laser_ref_wl >= wl[ord][blue_cutoff1])
-    cond1_2 = (laser_ref_wl >= wl[ord][blue_cutoff2])
-    cond2_1 = (laser_ref_wl <= wl[ord][red_cutoff1])
-    cond2_2 = (laser_ref_wl <= wl[ord][red_cutoff2])
-    #these are the theoretical wavelengths from the NIST linelists
-    lam1 = laser_ref_wl[np.logical_and(cond1_1,cond2_1)][::-1]
-    lam2 = laser_ref_wl[np.logical_and(cond1_2,cond2_2)][::-1]
-    lam1 = lam1[first_mask1][second_mask1][third_mask1]
-    lam2 = lam2[first_mask2][second_mask2][third_mask2]
-    
-    x = np.r_[x1,x2]
-    lam = np.r_[lam1,lam2]
-    
-    #check if the number of lines found equals the number of lines from the line list
-    if verbose:
-        print(len(x),len(lam))
-    if len(x) != len(lam):
-        print('fuganda')
-        return 'fuganda'
-    
-    #fit polynomial to lambda as a function of x
-    laser_fit = np.poly1d(np.polyfit(x, lam, deg_polynomial))
-    
-    if return_stats:
-        stats[ord] = {}
-        resid = laser_fit(x) - lam
-        stats[ord]['resids'] = resid
-        #mean error in RV for a single line = c * (stddev(resid) / mean(lambda))
-        stats[ord]['single_rverr'] = 3e8 * (np.std(resid) / np.mean(lam))
-        stats[ord]['rverr'] = 3e8 * (np.std(resid) / np.mean(lam)) / np.sqrt(len(lam))
-        stats[ord]['n_lines'] = len(lam)
-    
-    #save to output dictionary
-    laser_dispsol[ord] = laser_fit
-
-    if timit:
-        print('Time taken for finding Laser-comb wavelength solution: '+str(time.time() - start_time)+' seconds...')
-
-    if return_stats:
-        return laser_dispsol, stats 
-    else:
-        return laser_dispsol
-        
-
-
-
-
-###########################################################################################################
-# laser_dispsol2,stats2 = get_dispsol_from_laser(laserdata, laser_ref_wl, verbose=True, timit=True, return_stats=True, deg_polynomial=2)
-# laser_dispsol3,stats3 = get_dispsol_from_laser(laserdata, laser_ref_wl, verbose=True, timit=True, return_stats=True, deg_polynomial=3)
-# laser_dispsol5,stats5 = get_dispsol_from_laser(laserdata, laser_ref_wl, verbose=True, timit=True, return_stats=True, deg_polynomial=5)
-# laser_dispsol11,stats11 = get_dispsol_from_laser(laserdata, laser_ref_wl, verbose=True, timit=True, return_stats=True, deg_polynomial=11)
-###########################################################################################################
-
-
-
-
-
-def fit_dispsol_2D(x_norm, ord_norm, WL, weights=None, polytype = 'chebyshev', poly_deg=5, debug_level=0):
-    """
-    Calculate 2D polynomial wavelength fit to normalized x and order values.
-
-    'x_norm'   : x-values (pixels) of all the lines, re-normalized to [-1,+1]
-    'ord_norm' : order numbers of all the lines, re-normalized to [-1,+1]
-    'WL'       : 
-    'polytype' : either '(p)olynomial' (default), '(l)egendre', or '(c)hebyshev' are accepted
-    """
-    
-    if polytype in ['Polynomial','polynomial','p','P']:
-        p_init = models.Polynomial2D(poly_deg)
-        if debug_level > 0:
-            print('OK, using standard polynomials...')
-    elif polytype in ['Chebyshev','chebyshev','c','C']:
-        p_init = models.Chebyshev2D(poly_deg,poly_deg)
-        if debug_level > 0:
-            print('OK, using Chebyshev polynomials...')
-    elif polytype in ['Legendre','legendre','l','L']:
-        p_init = models.Legendre2D(poly_deg,poly_deg)  
-        if debug_level > 0:
-            print('OK, using Legendre polynomials...')   
-    else:
-        print("ERROR: polytype not recognised ['(P)olynomial' / '(C)hebyshev' / '(L)egendre']")    
-        
-    fit_p = fitting.LevMarLSQFitter()  
-
-    with warnings.catch_warnings():
-        # Ignore model linearity warning from the fitter
-        warnings.simplefilter('ignore')
-        p = fit_p(p_init, x_norm, ord_norm, WL, weights=weights)
-
-
-#     if debug_level > 0:
-#         plt.figure()
-#         index_include = np.array(weights, dtype=bool)
-#         plt.scatter(x_norm[index_include], WL[index_include], c=order_norm[index_include])
-#         plt.scatter(x_norm[np.logical_not(index_include)], WL[np.logical_not(index_include)], facecolors='none',
-#                     edgecolors='r')
-# 
-#         for x, o, oo, wl in zip(x_norm[index_include], order_norm[index_include], orders[index_include],
-#                                 WL[index_include]):
-#             plt.arrow(x, wl, 0, (p(x, o) / oo - wl) * 1000., head_width=0.00005, head_length=0.0001, width=0.00005)
-# 
-#         xi = np.linspace(min(x_norm[index_include]), max(x_norm[index_include]), 101)
-#         yi = np.linspace(min(order_norm[index_include]), max(order_norm[index_include]), 101)
-#         zi = griddata((x_norm[index_include], order_norm[index_include]),
-#                       ((WL[index_include] - p(x_norm[index_include], order_norm[index_include]) / orders[
-#                           index_include]) / np.mean(WL[index_include])) * 3e8,
-#                       (xi[None, :], yi[:, None]), method='linear')
-#         fig, ax = plt.subplots()
-#         ax.set_xlim((np.min(xi), np.max(xi)))
-#         ax.set_ylim((np.min(yi), np.max(yi)))
-#         ax.set_xlabel('Detector x normalized')
-#         ax.set_ylabel('order normalized')
-#         plt.title('Legendre Polynomial Degree: ' + str(poly_deg) + "\n" + "#pars: " + str(len(p.parameters)))
-# 
-#         im = ax.imshow(zi, interpolation='nearest', extent=[np.min(xi), np.max(xi), np.min(yi), np.max(yi)])
-# 
-#         divider = make_axes_locatable(ax)
-#         cax = divider.append_axes("right", size="5%", pad=0.05)
-# 
-#         cb = plt.colorbar(im, cax=cax)
-#         cb.set_label('RV deviation [m/s]')
-# 
-#         plt.tight_layout()
-
-    return p
-
-
-
-
-
-
-# dispsol = np.load('/Users/christoph/OneDrive - UNSW/dispsol/lab_tests/thar_dispsol.npy').item()
-# fitshapes = np.load('/Users/christoph/OneDrive - UNSW/dispsol/lab_tests/fitshapes.npy').item()
-# wavelengths = np.load('/Users/christoph/OneDrive - UNSW/dispsol/lab_tests/wavelengths.npy').item()
-# wl_ref = np.load('/Users/christoph/OneDrive - UNSW/linelists/AAT_folder/wl_ref.npy').item()
-# x = np.array([])
-# m = np.array([])
-# wl = np.array([])
-# wl_ref_arr = np.array([])
-# for ord in sorted(dispsol.keys()):
-#     ordnum = int(ord[-2:])
-#     x = np.append(x,fitshapes[ord]['x'])
-#     order = np.append(order, np.repeat(ordnum,len(fitshapes[ord]['x'])))
-#     wl = np.append(wl, dispsol[ord](fitshapes[ord]['x']))
-#     wl_ref_arr = np.append(wl_ref_arr, wl_ref[ord])
-
-
-
-
-
-def get_wavelength_solution(thflux, thflux2, poly_deg=5, laser=False, polytype='chebyshev', savetable=False, return_full=True, saveplots=False, timit=False, debug_level=0):
+def get_wavelength_solution_from_thorium(thflux, poly_deg=5, polytype='chebyshev', savetable=False, return_full=True, timit=False):
     """ 
     INPUT:
-    'thflux'           : extracted 1-dim thorium / laser-only image 
+    'thflux'           : extracted 1-dim thorium / laser-only image (initial tests used this one : '/Users/christoph/OneDrive - UNSW/veloce_spectra/reduced/tests/...')
     'poly_deg'         : the order of the polynomials to use in the fit (for both dimensions)
-    'laser'            : boolean that tells the code whether it is a laser-comb spectrum or an arc-lamp spectrum
     'polytype'         : either 'polynomial', 'legendre', or 'chebyshev' (default) are accepted 
     'return_full'      : boolean - if TRUE, then the wavelength solution for each pixel for each order is returned; otherwise just the set of coefficients that describe it
     'saveplots'        : boolean - do you want to create plots for each order? 
     'savetable'        : boolean - if TRUE, then an output file is created, containing a summary of all lines used in the fit, and details about the fit
     'timit'            : time it...
-    'debug_level'      : for debugging only
+    
+    OUTPUT:
+    'p'      : functional form of the coefficients that describe the wavelength solution
+    'p_wl'   : wavelength solution for each pixel for each order (n_ord x n_pix numpy-array) 
+    
+    TODO:
+    include order 40 (m=65) as well (just 2 lines!?!?!?)
+    figure out how to properly use weights here (ie what should we use as weights?)
+    """
+    
+    if timit:
+        start_time = time.time()
+    
+#     #read in pre-defined thresholds (needed for line identification)
+#     thresholds = np.load('/Users/christoph/OneDrive - UNSW/linelists/AAT_folder/thresholds.npy').item()
+    
+    #prepare arrays for fitting
+    x = np.array([])
+    order = np.array([])
+    m_order = np.array([])
+    wl = np.array([])
+
+    for ord in sorted(thflux.keys()):    #make sure there are enough lines in every order
+    #for ord in sorted(thflux.keys())[:-1]:    #don't have enough emission lines in order 40
+        ordnum = ord[-2:]
+        #m = 105 - int(ordnum)   #original orientation of the spectra
+        m = 64 + int(ordnum)    #'correct' orientation of the spectra
+        print('OK, fitting '+ord+'   (m = '+str(m)+')')
+        
+        data = thflux[ord]        
+        xx = np.arange(len(data))
+        
+        #adjust thresholds here
+        fitted_line_pos = fit_emission_lines(data,return_all_pars=False,varbeta=False,timit=False,verbose=False,thresh=thresholds['thresh'][ord],bgthresh=thresholds['bgthresh'][ord],maxthresh=thresholds['maxthresh'][ord])
+        #fitted_line_pos = fit_emission_lines_lmfit(data, fitwidth=4, model='gausslike', return_all_pars=False,thresh=thresholds['thresh'][ord],
+        #                                          bgthresh=thresholds['bgthresh'][ord],maxthresh=thresholds['maxthresh'][ord]) 
+        goodpeaks,mostpeaks,allpeaks = find_suitable_peaks(data,thresh=thresholds['thresh'][ord],bgthresh=thresholds['bgthresh'][ord],maxthresh=thresholds['maxthresh'][ord])    
+        
+        #########################################################################################################################################
+        #THIS IS THE STEP THAT NEEDS TO BE AUTOMATED
+        line_number, refwlord = readcol('/Users/christoph/OneDrive - UNSW/linelists/AAT_folder/ThAr_linelist_order_'+ordnum+'.dat',fsep=';',twod=False)        
+        #this tells us which peaks we have known wavelengths for
+        mask_order = np.load('/Users/christoph/OneDrive - UNSW/linelists/posmasks/mask_order'+ordnum+'.npy')
+        xord = fitted_line_pos[mask_order]
+        
+#         #ie we want to do sth like this:
+#         guess_wls = get_wavelengths_for_peaks(fitted_line_pos)   # ie get a rough guess for thew wavelengths of the lines we found
+#         refwlord = identify_lines(guess_wls, linelist)              # ie find the corresponding "true" wavelengths
+        #########################################################################################################################################
+        
+        #fill arrays for fitting
+        x = np.append(x, xord)
+        order = np.append(order, np.repeat(int(ordnum), len(xord)))
+        #m_order = np.append(m_order, np.repeat(105 - int(ordnum), len(xord)))
+        m_order = np.append(m_order, np.repeat(64 + int(ordnum), len(xord)))
+        wl = np.append(wl, refwlord)
+        
+    
+    
+    #now re-normalize arrays to [-1,+1]
+    x_norm = (x / ((len(data)-1)/2.)) - 1.
+    order_norm = ((order-1) / ((len(thflux)-1)/2.)) - 1.       
+           
+    #call the fitting routine
+    p = fit_poly_surface_2D(x_norm, order_norm, wl, weights=None, polytype=polytype, poly_deg=poly_deg, debug_level=0)    
+    
+#     if return_all_pars:
+#         return dispsol,fitshapes
+#     else:
+#         return dispsol
+
+    if savetable:
+        now = datetime.datetime.now()
+        model_wl = p(x_norm, order_norm)
+        resid = wl - model_wl
+        outfn = '/Users/christoph/OneDrive - UNSW/linelists/AAT_folder/lines_used_in_fit_as_of_'+str(now)[:10]+'.dat'
+        outfn = open(outfn, 'w')
+        outfn.write('line number   order_number   physical_order_number     pixel      reference_wl[A]   model_wl[A]    residuals[A]\n')
+        outfn.write('=====================================================================================================================\n')
+        for i in range(len(x)):
+                outfn.write("   %3d             %2d                 %3d           %11.6f     %11.6f     %11.6f     %9.6f\n" %(i+1, order[i], m_order[i], x[i], wl[i], model_wl[i], resid[i]))
+        outfn.close()
+              
+
+    if return_full:
+        #xx = np.arange(len(data))            # already done above
+        xxn = (xx / ((len(xx)-1)/2.)) - 1.
+        oo = np.arange(1,len(thflux))
+        oon = ((oo-1) / ((len(thflux)-1)/2.)) - 1.   
+        X,O = np.meshgrid(xxn,oon)
+        p_wl = p(X,O)
+
+    
+    if timit:
+        print('Time elapsed: ',time.time() - start_time,' seconds')
+        
+
+    if return_full:
+        return p,p_wl
+    else:
+        return p
+
+
+
+
+
+def get_wavelength_solution_labtests(thflux, thflux2, poly_deg=5, polytype='chebyshev', savetable=False, return_full=True, saveplots=False, timit=False):
+    """ 
+    INPUT:
+    'thflux'           : extracted 1-dim thorium / laser-only image (initial tests used this one : '/Users/christoph/OneDrive - UNSW/veloce_spectra/reduced/tests/...')
+    'poly_deg'         : the order of the polynomials to use in the fit (for both dimensions)
+    'polytype'         : either 'polynomial', 'legendre', or 'chebyshev' (default) are accepted 
+    'return_full'      : boolean - if TRUE, then the wavelength solution for each pixel for each order is returned; otherwise just the set of coefficients that describe it
+    'saveplots'        : boolean - do you want to create plots for each order? 
+    'savetable'        : boolean - if TRUE, then an output file is created, containing a summary of all lines used in the fit, and details about the fit
+    'timit'            : time it...
     
     OUTPUT:
     EITHER
@@ -992,7 +830,7 @@ def get_wavelength_solution(thflux, thflux2, poly_deg=5, laser=False, polytype='
     TODO:
     clean-up the 2-version thing about which extracted spectrum to use (thflux / thflux2)
     include order 40 (m=65) as well (just 2 lines!?!?!?)
-    figure out how to properly use weights here
+    figure out how to properly use weights here (ie what should we use as weights?)
     """
     
     if timit:
@@ -1011,9 +849,10 @@ def get_wavelength_solution(thflux, thflux2, poly_deg=5, laser=False, polytype='
     m_order = np.array([])
     wl = np.array([])
 
-    for ord in sorted(thflux.keys())[:-1]:    #don't have enough lines in order 40
+    for ord in sorted(thflux.keys())[:-1]:    #don't have enough emission lines in order 40
         ordnum = ord[-2:]
-        m = 105 - int(ordnum)
+        m = 105 - int(ordnum)   #original orientation of the spectra
+        #m = 64 + int(ordnum)    #'correct' orientation of the spectra
         print('OK, fitting '+ord+'   (m = '+str(m)+')')
         coll = thresholds['collapsed'][ord]
         if coll:
@@ -1028,14 +867,21 @@ def get_wavelength_solution(thflux, thflux2, poly_deg=5, laser=False, polytype='
 #         else:
 #             fitted_line_pos = fit_emission_lines(data,return_all_pars=return_all_pars,varbeta=False,timit=False,verbose=False,thresh=thresholds['thresh'][ord],bgthresh=thresholds['bgthresh'][ord],maxthresh=thresholds['maxthresh'][ord])
         fitted_line_pos = fit_emission_lines(data,return_all_pars=False,varbeta=False,timit=False,verbose=False,thresh=thresholds['thresh'][ord],bgthresh=thresholds['bgthresh'][ord],maxthresh=thresholds['maxthresh'][ord])
+        #fitted_line_pos = fit_emission_lines_lmfit(data, fitwidth=4, model='gausslike', return_all_pars=False,thresh=thresholds['thresh'][ord],
+        #                                          bgthresh=thresholds['bgthresh'][ord],maxthresh=thresholds['maxthresh'][ord]) 
         goodpeaks,mostpeaks,allpeaks = find_suitable_peaks(data,thresh=thresholds['thresh'][ord],bgthresh=thresholds['bgthresh'][ord],maxthresh=thresholds['maxthresh'][ord])    
         
+        #########################################################################################################################################
+        #THIS IS THE STEP THAT NEEDS TO BE AUTOMATED
         line_number, refwlord = readcol('/Users/christoph/OneDrive - UNSW/linelists/AAT_folder/ThAr_linelist_order_'+ordnum+'.dat',fsep=';',twod=False)
         #lam = refwlord.copy()  
         #wl_ref[ord] = lam
         
+        #this tells us which peaks we have known wavelengths for
         mask_order = np.load('/Users/christoph/OneDrive - UNSW/linelists/posmasks/mask_order'+ordnum+'.npy')
         xord = fitted_line_pos[mask_order]
+        #########################################################################################################################################
+        
         #stupid python!?!?!?
         if ordnum == '30':
             xord = np.array([xord[0][0],xord[1][0],xord[2],xord[3]])
@@ -1103,9 +949,8 @@ def get_wavelength_solution(thflux, thflux2, poly_deg=5, laser=False, polytype='
     #order_norm = ((m-1) / ((len(P_id)-1)/2.)) - 1.
            
     #call the fitting routine
-    p = fit_dispsol_2D(x_norm, order_norm, wl, weights=None, polytype = polytype, poly_deg=poly_deg, debug_level=0)         
-            
-
+    p = fit_poly_surface_2D(x_norm, order_norm, wl, weights=None, polytype=polytype, poly_deg=poly_deg, debug_level=0)    
+    
 #     if return_all_pars:
 #         return dispsol,fitshapes
 #     else:
@@ -1125,7 +970,7 @@ def get_wavelength_solution(thflux, thflux2, poly_deg=5, laser=False, polytype='
               
 
     if return_full:
-        #xx = np.arange(4112)            [already done above]
+        #xx = np.arange(4112)            # already done above
         xxn = (xx / ((len(xx)-1)/2.)) - 1.
         oo = np.arange(1,len(thflux))
         oon = ((oo-1) / (38./2.)) - 1.        #TEMP, TODO, FUGANDA, PLEASE FIX ME!!!!!
@@ -1159,24 +1004,364 @@ def get_simu_dispsol(fibre=None, path='/Users/christoph/OneDrive - UNSW/dispsol/
     else:
         dbf = np.load(path + 'dispsol_by_fibres_from_zemax.npy').item()
         orders = dbf['fiber_1'].keys()
-    
+     
     #read extracted spectrum from files (obviously this needs to be improved)
     xx = np.arange(4096)
-    
+     
     #this is so as to match the order number with the physical order number (66 <= m <= 108)
     # order01 corresponds to m=66
     # order43 corresponds to m=108
     wl = {}
-    for ord in orders:
-        m = ord[5:]
+    for o in orders:
+        m = o[5:]
         ordnum = str(int(m)-65).zfill(2)
         if fibre is None:
             wl['order_'+ordnum] = dispsol['order'+m]['model'](xx)
         else:
-            wl['order_'+ordnum] = dbf['fiber_'+str(fibre)][ord]['fitparms'](xx)
-
+            wl['order_'+ordnum] = dbf['fiber_'+str(fibre)][o]['fitparms'](xx)
+ 
     return wl
 
+
+
+
+
+
+# OLDER CODE SNIPPETS
+#
+# THE following routine is now called fit_poly_surface_2D and lives in "helper_functions"
+# def fit_dispsol_2D(x_norm, ord_norm, WL, weights=None, polytype = 'chebyshev', poly_deg=5, debug_level=0):
+#     """
+#     Calculate 2D polynomial wavelength fit to normalized x and order values.
+#     Wrapper function for using the astropy fitting library.
+# 
+#     'x_norm'   : x-values (pixels) of all the lines, re-normalized to [-1,+1]
+#     'ord_norm' : order numbers of all the lines, re-normalized to [-1,+1]
+#     'WL'       : 
+#     'polytype' : either '(p)olynomial' (default), '(l)egendre', or '(c)hebyshev' are accepted
+#     """
+#     
+#     if polytype in ['Polynomial','polynomial','p','P']:
+#         p_init = models.Polynomial2D(poly_deg)
+#         if debug_level > 0:
+#             print('OK, using standard polynomials...')
+#     elif polytype in ['Chebyshev','chebyshev','c','C']:
+#         p_init = models.Chebyshev2D(poly_deg,poly_deg)
+#         if debug_level > 0:
+#             print('OK, using Chebyshev polynomials...')
+#     elif polytype in ['Legendre','legendre','l','L']:
+#         p_init = models.Legendre2D(poly_deg,poly_deg)  
+#         if debug_level > 0:
+#             print('OK, using Legendre polynomials...')   
+#     else:
+#         print("ERROR: polytype not recognised ['(P)olynomial' / '(C)hebyshev' / '(L)egendre']")    
+#         
+#     fit_p = fitting.LevMarLSQFitter()  
+# 
+#     with warnings.catch_warnings():
+#         # Ignore model linearity warning from the fitter
+#         warnings.simplefilter('ignore')
+#         p = fit_p(p_init, x_norm, ord_norm, WL, weights=weights)
+# 
+# 
+# #     if debug_level > 0:
+# #         plt.figure()
+# #         index_include = np.array(weights, dtype=bool)
+# #         plt.scatter(x_norm[index_include], WL[index_include], c=order_norm[index_include])
+# #         plt.scatter(x_norm[np.logical_not(index_include)], WL[np.logical_not(index_include)], facecolors='none',
+# #                     edgecolors='r')
+# # 
+# #         for x, o, oo, wl in zip(x_norm[index_include], order_norm[index_include], orders[index_include],
+# #                                 WL[index_include]):
+# #             plt.arrow(x, wl, 0, (p(x, o) / oo - wl) * 1000., head_width=0.00005, head_length=0.0001, width=0.00005)
+# # 
+# #         xi = np.linspace(min(x_norm[index_include]), max(x_norm[index_include]), 101)
+# #         yi = np.linspace(min(order_norm[index_include]), max(order_norm[index_include]), 101)
+# #         zi = griddata((x_norm[index_include], order_norm[index_include]),
+# #                       ((WL[index_include] - p(x_norm[index_include], order_norm[index_include]) / orders[
+# #                           index_include]) / np.mean(WL[index_include])) * 3e8,
+# #                       (xi[None, :], yi[:, None]), method='linear')
+# #         fig, ax = plt.subplots()
+# #         ax.set_xlim((np.min(xi), np.max(xi)))
+# #         ax.set_ylim((np.min(yi), np.max(yi)))
+# #         ax.set_xlabel('Detector x normalized')
+# #         ax.set_ylabel('order normalized')
+# #         plt.title('Legendre Polynomial Degree: ' + str(poly_deg) + "\n" + "#pars: " + str(len(p.parameters)))
+# # 
+# #         im = ax.imshow(zi, interpolation='nearest', extent=[np.min(xi), np.max(xi), np.min(yi), np.max(yi)])
+# # 
+# #         divider = make_axes_locatable(ax)
+# #         cax = divider.append_axes("right", size="5%", pad=0.05)
+# # 
+# #         cb = plt.colorbar(im, cax=cax)
+# #         cb.set_label('RV deviation [m/s]')
+# # 
+# #         plt.tight_layout()
+# 
+#     return p
+
+
+#
+#
+#
+# thardata = np.load('/Users/christoph/OneDrive - UNSW/rvtest/thardata.npy').item()
+# laserdata = np.load('/Users/christoph/OneDrive - UNSW/rvtest/laserdata.npy').item()
+# thdata = thardata['flux']['order_01']
+# ldata = laserdata['flux']['order_01']
+#
+#
+# dispsol = np.load('/Users/christoph/OneDrive - UNSW/dispsol/lab_tests/thar_dispsol.npy').item()
+# OR
+# dispsol = np.load('/Users/christoph/OneDrive - UNSW/dispsol/lab_tests/thar_dispsol_2D.npy').item()
+# fitshapes = np.load('/Users/christoph/OneDrive - UNSW/dispsol/lab_tests/fitshapes.npy').item()
+# wavelengths = np.load('/Users/christoph/OneDrive - UNSW/dispsol/lab_tests/wavelengths.npy').item()
+# wl_ref = np.load('/Users/christoph/OneDrive - UNSW/linelists/AAT_folder/wl_ref.npy').item()
+# x = np.array([])
+# m = np.array([])
+# wl = np.array([])
+# wl_ref_arr = np.array([])
+# for ord in sorted(dispsol.keys()):
+#     ordnum = int(ord[-2:])
+#     x = np.append(x,fitshapes[ord]['x'])
+#     order = np.append(order, np.repeat(ordnum,len(fitshapes[ord]['x'])))
+#     wl = np.append(wl, dispsol[ord](fitshapes[ord]['x']))
+#     wl_ref_arr = np.append(wl_ref_arr, wl_ref[ord])
+# 
+# 
+# 
+#
+#
+# 
+# 
+# 
+# 
+# 
+# 
+# 
+# 
+# # ###########################################
+# # thar_refwlord01, thar_relintord01, flag = readcol('/Users/christoph/OneDrive - UNSW/linelists/test_thar_list_order_01.dat',fsep=';',twod=False)
+# # thar_refwlord01 *= 1e3
+# # refdata = {}
+# # refdata['order_01'] = {}
+# # refdata['order_01']['wl'] = thar_refwlord01[np.argwhere(flag == ' resolved')][::-1]          #note the array is turned around to match other arrays
+# # refdata['order_01']['relint'] = thar_relintord01[np.argwhere(flag == ' resolved')][::-1]     #note the array is turned around to match other arrays
+# # ###########################################
+# 
+# 
+# 
+# 
+# 
+# def get_dispsol_from_thar(thardata, refdata, deg_polynomial=5, timit=False, verbose=False):
+#     """
+#     NOT CURRENTLY USED
+#     """
+#     if timit:
+#         start_time = time.time()
+# 
+#     thar_dispsol = {}
+#     
+#     #loop over all orders
+#     #for ord in sorted(thardata['flux'].iterkeys()):
+#     for ord in ['order_01']:
+#     
+#         if verbose:
+#             print('Finding wavelength solution for '+str(ord))
+#     
+#         #find fitted x-positions of ThAr peaks
+#         fitted_thar_pos, thar_qualflag = fit_emission_lines(thardata['flux'][ord], return_all_pars=False, return_qualflag=True, varbeta=False)
+#         x = fitted_thar_pos.copy()
+#         
+#         #these are the theoretical wavelengths from the NIST linelists
+#         lam = (refdata[ord]['wl']).flatten()
+#         
+#         #exclude some peaks as they are a blend of multiple lines: TODO: clean up
+#         filt = np.ones(len(fitted_thar_pos),dtype='bool')
+#         filt[[33,40,42,58,60]] = False
+#         x = x[filt]
+#         
+#         #fit polynomial to lambda as a function of x
+#         thar_fit = np.poly1d(np.polyfit(x, lam, deg_polynomial))
+#         #save to output dictionary
+#         thar_dispsol[ord] = thar_fit
+# 
+#     if timit:
+#         print('Time taken for finding ThAr wavelength solution: '+str(time.time() - start_time)+' seconds...')
+# 
+#     return thar_dispsol
+# 
+# 
+# # '''xxx'''
+# # #################################################################
+# # # the following is needed as input for "get_dispsol_from_laser" #
+# # #################################################################
+# # laser_ref_wl,laser_relint = readcol('/Users/christoph/OneDrive - UNSW/linelists/laser_linelist_25GHz.dat',fsep=';',twod=False)
+# # laser_ref_wl *= 1e3
+# # 
+# # #wavelength solution from HDF file
+# # #read dispersion solution from file
+# # dispsol = np.load('/Users/christoph/OneDrive - UNSW/dispsol/mean_dispsol_by_orders_from_zemax.npy').item()
+# # #read extracted spectrum from files (obviously this needs to be improved)
+# # xx = np.arange(4096)
+# # #this is so as to match the order number with the physical order number (66 <= m <= 108)
+# # # order01 corresponds to m=66
+# # # order43 corresponds to m=108
+# # wl = {}
+# # for ord in dispsol.keys():
+# #     m = ord[5:]
+# #     ordnum = str(int(m)-65).zfill(2)
+# #     wl['order_'+ordnum] = dispsol['order'+m]['model'](xx)
+#     
+# 
+# 
+# 
+# 
+# def get_dispsol_from_laser(laserdata, laser_ref_wl, deg_polynomial=5, timit=False, verbose=False, return_stats=False, varbeta=False):
+#     """
+#     NOT CURRENTLY USED
+#     """
+#     
+#     if timit:
+#         start_time = time.time()
+# 
+#     if return_stats:
+#         stats = {}
+# 
+#     #read in mask for fibre_01 (ie the Laser-comb fibre) from order_tracing as a first step in excluding low-flux regions
+#     mask_01 = np.load('/Users/christoph/OneDrive - UNSW/fibre_profiles/masks/mask_01.npy').item()
+# 
+#     laser_dispsol = {}
+#     
+#     #loop over all orders
+#     #order 43 does not work properly, as some laser peaks are missing!!!
+#     for ord in sorted(laserdata['flux'].iterkeys())[:-1]:
+# 
+#         if verbose:
+#             print('Finding wavelength solution for '+str(ord))
+#         
+#         #find fitted x-positions of ThAr peaks
+#         data = laserdata['flux'][ord] * mask_01[ord]
+#         goodpeaks,mostpeaks,allpeaks,first_mask,second_mask,third_mask = find_suitable_peaks(data,return_masks=True)    #from this we just want the masks this time (should be very fast)
+#         #fitted_laser_pos, laser_qualflag = fit_emission_lines(data, laser=True, return_all_pars=False, return_qualflag=True, varbeta=varbeta)
+#         if varbeta:
+#             fitted_laser_pos, fitted_laser_sigma, fitted_laser_amp, fitted_laser_beta = fit_emission_lines(data, laser=True, return_all_pars=True, return_qualflag=False, varbeta=varbeta, timit=timit, verbose=verbose)
+#         else:
+#             fitted_laser_pos, fitted_laser_sigma, fitted_laser_amp = fit_emission_lines(data, laser=True, return_all_pars=True, return_qualflag=False, varbeta=varbeta, timit=timit, verbose=verbose)
+#         x = fitted_laser_pos.copy()
+#         #exclude the leftmost and rightmost peaks (nasty edge effects...)
+# #         blue_cutoff = int(np.round((x[-1]+x[-2])/2.,0))
+# #         red_cutoff = int(np.round((x[0]+x[1])/2.,0))
+#         blue_cutoff = int(np.round(allpeaks[-1]+((allpeaks[-1] - allpeaks[-2])/2),0))
+#         red_cutoff = int(np.round(allpeaks[0]-((allpeaks[1] - allpeaks[0])/2),0))
+#         cond1 = (laser_ref_wl >= wl[ord][blue_cutoff])
+#         cond2 = (laser_ref_wl <= wl[ord][red_cutoff])
+#         #these are the theoretical wavelengths from the NIST linelists
+#         lam = laser_ref_wl[np.logical_and(cond1,cond2)][::-1]
+#         lam = lam[first_mask][second_mask][third_mask]
+#         
+#         #check if the number of lines found equals the number of lines from the line list
+# #         if verbose:
+# #             print(len(x),len(lam))
+#         if len(x) != len(lam):
+#             print('fuganda')
+#             return 'fuganda'
+#         
+#         #fit polynomial to lambda as a function of x
+#         laser_fit = np.poly1d(np.polyfit(x, lam, deg_polynomial))
+#         
+#         if return_stats:
+#             stats[ord] = {}
+#             resid = laser_fit(x) - lam
+#             stats[ord]['resids'] = resid
+#             #mean error in RV for a single line = c * (stddev(resid) / mean(lambda))
+#             stats[ord]['single_rverr'] = 3e8 * (np.std(resid) / np.mean(lam))
+#             stats[ord]['rverr'] = 3e8 * (np.std(resid) / np.mean(lam)) / np.sqrt(len(lam))
+#             stats[ord]['n_lines'] = len(lam)
+#             
+#         #save to output dictionary
+#         laser_dispsol[ord] = laser_fit
+# 
+#     
+#     #let's do order 43 differently because it has the stupid gap in the middle
+#     #find fitted x-positions of ThAr peaks
+#     ord = 'order_43'
+#     if verbose:
+#             print('Finding wavelength solution for '+str(ord))
+#     data = laserdata['flux'][ord] * mask_01[ord]
+#     data1 = data[:2500]
+#     data2 = data[2500:]
+#     goodpeaks1,mostpeaks1,allpeaks1,first_mask1,second_mask1,third_mask1 = find_suitable_peaks(data1,return_masks=True)    #from this we just want use_mask this time (should be very fast)
+#     goodpeaks2,mostpeaks2,allpeaks2,first_mask2,second_mask2,third_mask2 = find_suitable_peaks(data2,return_masks=True)    #from this we just want use_mask this time (should be very fast)
+#     #fitted_laser_pos1, laser_qualflag1 = fit_emission_lines(data1, laser=True, return_all_pars=False, return_qualflag=True, varbeta=varbeta)
+#     #fitted_laser_pos2, laser_qualflag2 = fit_emission_lines(data2, laser=True, return_all_pars=False, return_qualflag=True, varbeta=varbeta)
+#     if varbeta:
+#         fitted_laser_pos1, fitted_laser_sigma1, fitted_laser_amp1, fitted_laser_beta1 = fit_emission_lines(data1, laser=True, return_all_pars=True, return_qualflag=False, varbeta=varbeta)
+#         fitted_laser_pos2, fitted_laser_sigma2, fitted_laser_amp2, fitted_laser_beta2 = fit_emission_lines(data2, laser=True, return_all_pars=True, return_qualflag=False, varbeta=varbeta)
+#     else:
+#         fitted_laser_pos1, fitted_laser_sigma1, fitted_laser_amp1 = fit_emission_lines(data1, laser=True, return_all_pars=True, return_qualflag=False, varbeta=varbeta)
+#         fitted_laser_pos2, fitted_laser_sigma2, fitted_laser_amp2 = fit_emission_lines(data2, laser=True, return_all_pars=True, return_qualflag=False, varbeta=varbeta)
+#     x1 = fitted_laser_pos1.copy()
+#     x2 = fitted_laser_pos2.copy() + 2500
+#     #exclude the leftmost and rightmost peaks (nasty edge effects...)
+# #         blue_cutoff = int(np.round((x[-1]+x[-2])/2.,0))
+# #         red_cutoff = int(np.round((x[0]+x[1])/2.,0))
+#     blue_cutoff1 = int(np.round(allpeaks1[-1]+((allpeaks1[-1] - allpeaks1[-2])/2),0))
+#     blue_cutoff2 = int(np.round(allpeaks2[-1]+((allpeaks2[-1] - allpeaks2[-2])/2)+2500,0))
+#     red_cutoff1 = int(np.round(allpeaks1[0]-((allpeaks1[1] - allpeaks1[0])/2),0))
+#     red_cutoff2 = int(np.round(allpeaks2[0]-((allpeaks2[1] - allpeaks2[0])/2)+2500,0))
+#     cond1_1 = (laser_ref_wl >= wl[ord][blue_cutoff1])
+#     cond1_2 = (laser_ref_wl >= wl[ord][blue_cutoff2])
+#     cond2_1 = (laser_ref_wl <= wl[ord][red_cutoff1])
+#     cond2_2 = (laser_ref_wl <= wl[ord][red_cutoff2])
+#     #these are the theoretical wavelengths from the NIST linelists
+#     lam1 = laser_ref_wl[np.logical_and(cond1_1,cond2_1)][::-1]
+#     lam2 = laser_ref_wl[np.logical_and(cond1_2,cond2_2)][::-1]
+#     lam1 = lam1[first_mask1][second_mask1][third_mask1]
+#     lam2 = lam2[first_mask2][second_mask2][third_mask2]
+#     
+#     x = np.r_[x1,x2]
+#     lam = np.r_[lam1,lam2]
+#     
+#     #check if the number of lines found equals the number of lines from the line list
+#     if verbose:
+#         print(len(x),len(lam))
+#     if len(x) != len(lam):
+#         print('fuganda')
+#         return 'fuganda'
+#     
+#     #fit polynomial to lambda as a function of x
+#     laser_fit = np.poly1d(np.polyfit(x, lam, deg_polynomial))
+#     
+#     if return_stats:
+#         stats[ord] = {}
+#         resid = laser_fit(x) - lam
+#         stats[ord]['resids'] = resid
+#         #mean error in RV for a single line = c * (stddev(resid) / mean(lambda))
+#         stats[ord]['single_rverr'] = 3e8 * (np.std(resid) / np.mean(lam))
+#         stats[ord]['rverr'] = 3e8 * (np.std(resid) / np.mean(lam)) / np.sqrt(len(lam))
+#         stats[ord]['n_lines'] = len(lam)
+#     
+#     #save to output dictionary
+#     laser_dispsol[ord] = laser_fit
+# 
+#     if timit:
+#         print('Time taken for finding Laser-comb wavelength solution: '+str(time.time() - start_time)+' seconds...')
+# 
+#     if return_stats:
+#         return laser_dispsol, stats 
+#     else:
+#         return laser_dispsol
+#         
+# 
+# 
+# 
+# 
+# ###########################################################################################################
+# # laser_dispsol2,stats2 = get_dispsol_from_laser(laserdata, laser_ref_wl, verbose=True, timit=True, return_stats=True, deg_polynomial=2)
+# # laser_dispsol3,stats3 = get_dispsol_from_laser(laserdata, laser_ref_wl, verbose=True, timit=True, return_stats=True, deg_polynomial=3)
+# # laser_dispsol5,stats5 = get_dispsol_from_laser(laserdata, laser_ref_wl, verbose=True, timit=True, return_stats=True, deg_polynomial=5)
+# # laser_dispsol11,stats11 = get_dispsol_from_laser(laserdata, laser_ref_wl, verbose=True, timit=True, return_stats=True, deg_polynomial=11)
+# ###########################################################################################################
 
 
 

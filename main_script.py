@@ -7,6 +7,7 @@ Created on 25 Jul. 2018
 import glob
 import astropy.io.fits as pyfits
 import numpy as np
+#import barycorrpy
 
 from veloce_reduction.helper_functions import short_filenames
 from veloce_reduction.calibration import get_bias_and_readnoise_from_bias_frames, make_offmask_and_ronmask, make_master_bias_from_coeffs, make_master_dark, correct_orientation, crop_overscan_region
@@ -155,9 +156,9 @@ fp2 = fit_profiles_from_indices(P_id, MW, err_MW, MW_stripe_indices, mask=mask, 
 
 
 
-# (4) cosmic ray removal ############################################################################################################################
-
-#####################################################################################################################################################
+# (4) PROCESS SCIENCE IMAGES
+dum = process_science_images(stellar_list, P_id, mask=mask, sampling_size=25, slit_height=25, gain=gain, MB=MB, ronmask=ronmask, MD=MD, scalable=False, 
+                             saveall=True, path=path, ext_method='quick', from_indices=True, timit=False)
 
 
 

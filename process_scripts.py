@@ -249,7 +249,7 @@ def process_science_images(imglist, P_id, mask=None, sampling_size=25, slit_heig
                                              exclude_top_and_bottom=True, verbose=True, timit=True)   # [e-]
         #adjust errors?
 
-        # (4) remove pixel-to-pixel sensitivity variations
+        # (4) remove pixel-to-pixel sensitivity variations (2-dim)
         #XXXXXXXXXXXXXXXXXXXXXXXXXXX
         #TEMPFIX
         final_img = bg_corrected_img.copy()   # [e-]
@@ -277,6 +277,8 @@ def process_science_images(imglist, P_id, mask=None, sampling_size=25, slit_heig
         dum = append_relints_to_FITS(relints, path+obsname+'_extracted.fits', nfib=19)            
     
         # (8) get wavelength solution
+        #XXXXX
+        #now append wl-solution to extracted FITS file
     
     
     if timit:
