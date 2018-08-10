@@ -809,6 +809,39 @@ def get_wavelength_solution_from_thorium(thflux, poly_deg=5, polytype='chebyshev
 
 
 
+def get_wl(p,xx,yy):
+    """
+    Get the wavelength for "full" 2-dim grid of x-pixel number and order number, or x-pixel number and y-pixel number, 
+    depending on how 'p' was created, ie either lambda(x,y) or lambda (x,ord).
+    
+    Example: for the full Veloce Rosso chip (nx,ny) = (4112,4096), call it like so:
+             wl = get_wl(p, np.arange(4112), np.arange(4096))
+             OR for (nx,n_ord) = (4112,40)
+             wl = get_wl(p, np.arange(4112), np.arange(1,41))   #note that orders range from 1...40 (not from 0...39)
+    
+    INPUT:
+    'p'     : the coefficients describing the 2-dim polynomial surface fit from "fit_poly_surface_2D"   
+    'xx'    : x-coordinate(s) at which you want to evaluate the wavelength solution
+    'yy'    : y-coordinate(s) at which you want to evaluate the wavelength solution
+    
+    OUTPUT:
+    p_wl'  : wavelength solution for each pair of coordinates
+    """
+    
+    #re-normalize arrays to [-1,+1]  
+    xxn = np.linspace(-1, 1, len(xx))
+    yyn = np.linspace(-1, 1, len(yy))
+    #make 2D grids of coordinates
+    X,Y = np.meshgrid(xxn,yyn)
+    #actually calculate the wavelengths from the polynomial coefficients
+    p_wl = p(X,Y)
+    
+    return p_wl
+
+
+
+
+
 def get_wavelength_solution_labtests(thflux, thflux2, poly_deg=5, polytype='chebyshev', savetable=False, return_full=True, saveplots=False, timit=False):
     """ 
     INPUT:
