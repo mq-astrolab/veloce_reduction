@@ -811,6 +811,7 @@ def get_wavelength_solution_from_thorium(thflux, poly_deg=5, polytype='chebyshev
 
 def get_wl(p,xx,yy):
     """
+    bla
     Get the wavelength for "full" 2-dim grid of x-pixel number and order number, or x-pixel number and y-pixel number, 
     depending on how 'p' was created, ie either lambda(x,y) or lambda (x,ord).
     
