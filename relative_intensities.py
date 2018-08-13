@@ -595,6 +595,8 @@ def append_relints_to_FITS(relints, fn, nfib=19):
     # L S1 S3 S4 X 2 19  8 3  9 10 4 11 12 1 13 14 5 15 16 6 17 18 7 X S2 S5 ThXe
     #here O1 is the outer ring that is slightly further away from the centre!!!
     fibnums = [2, 19, 8, 3, 9, 10, 4, 11, 12, 1, 13, 14, 5, 15, 16, 6, 17, 18, 7]
+    #the pseudoslit is reversed w.r.t. my simulations - we therefore turn the fibnums array around
+    fibnums = fibnums[::-1]
     
     #loop over all fibres
     for i in np.arange(nfib):

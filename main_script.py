@@ -7,7 +7,8 @@ Created on 25 Jul. 2018
 import glob
 import astropy.io.fits as pyfits
 import numpy as np
-#import barycorrpy
+import datetime
+
 
 from veloce_reduction.helper_functions import short_filenames
 from veloce_reduction.calibration import get_bias_and_readnoise_from_bias_frames, make_offmask_and_ronmask, make_master_bias_from_coeffs, make_master_dark, correct_orientation, crop_overscan_region
@@ -18,41 +19,41 @@ from veloce_reduction.spatial_profiles import fit_profiles, fit_profiles_from_in
 
 
 
-import matplotlib.pyplot as plt
-from scipy import ndimage
-from scipy import signal
-import h5py
-import scipy.sparse as sparse
+# import matplotlib.pyplot as plt
+# from scipy import ndimage
+# from scipy import signal
+# import h5py
+# import scipy.sparse as sparse
+#
+# import copy
+# #import logging
+# import time
 
-import copy
-#import logging
-import time
-import datetime
-from scipy.optimize import curve_fit
-import collections
-from scipy import special
-from lmfit import minimize, Minimizer, Parameters, Parameter, report_fit, Model
-from astropy.io import ascii
-from matplotlib.colors import LogNorm
-from readcol import readcol
+# from scipy.optimize import curve_fit
+# import collections
+# from scipy import special
+# from lmfit import minimize, Minimizer, Parameters, Parameter, report_fit, Model
+# from astropy.io import ascii
+# from matplotlib.colors import LogNorm
+# from readcol import readcol
 #from mpl_toolkits.mplot3d import Axes3D
 
 #from barycorrpy import get_BC_vel
 
 #from veloce_reduction.helper_functions import *
-from veloce_reduction.get_info_from_headers import identify_obstypes, get_obs_coords_from_header
-from veloce_reduction.create_master_frames import create_master_img
+# from veloce_reduction.get_info_from_headers import identify_obstypes, get_obs_coords_from_header
+# from veloce_reduction.create_master_frames import create_master_img
 
-from veloce_reduction.cosmic_ray_removal import remove_cosmics
-from veloce_reduction.background import extract_background, fit_background
-from veloce_reduction.spatial_profiles import fit_profiles_from_indices, make_model_stripes_gausslike
-#from veloce_reduction.find_laser_peaks_2D import find_laser_peaks_2D
-from veloce_reduction.extraction import quick_extract, quick_extract_from_indices, collapse_extract, collapse_extract_from_indices, optimal_extraction, optimal_extraction_from_indices 
-from veloce_reduction.wavelength_solution import get_wavelength_solution, get_simu_dispsol, fit_emission_lines_lmfit, find_suitable_peaks
-from veloce_reduction.flat_fielding import onedim_pixtopix_variations, deblaze_orders
-from veloce_reduction.relative_intensities import get_relints
-#from veloce_reduction.pseudoslit_simulations import *
-from veloce_reduction.get_radial_velocity import get_RV_from_xcorr, get_rvs_from_xcorr
+# from veloce_reduction.cosmic_ray_removal import remove_cosmics
+# from veloce_reduction.background import extract_background, fit_background
+# from veloce_reduction.spatial_profiles import fit_profiles_from_indices, make_model_stripes_gausslike
+# #from veloce_reduction.find_laser_peaks_2D import find_laser_peaks_2D
+# from veloce_reduction.extraction import quick_extract, quick_extract_from_indices, collapse_extract, collapse_extract_from_indices, optimal_extraction, optimal_extraction_from_indices
+# from veloce_reduction.wavelength_solution import get_wavelength_solution, get_simu_dispsol, fit_emission_lines_lmfit, find_suitable_peaks
+# from veloce_reduction.flat_fielding import onedim_pixtopix_variations, deblaze_orders
+# from veloce_reduction.relative_intensities import get_relints
+# #from veloce_reduction.pseudoslit_simulations import *
+# from veloce_reduction.get_radial_velocity import get_RV_from_xcorr, get_rvs_from_xcorr
 
 
 
@@ -101,7 +102,7 @@ np.save(path+'bad_pixel_mask_'+datestring+'.npy', bad_pixel_mask)
 
 
 # (2) CALIBRATION ###################################################################################################################################
-gain = [1.,1.,1.,1.]
+gain = [0.88, 0.93, 0.99, 0.93]   # from "VELOCE_DETECTOR_REPORT_V1.PDF"
 # (i) BIAS 
 # get offsets and read-out noise
 #either from bias frames (units = ADUs)
@@ -162,7 +163,11 @@ dum = process_science_images(stellar_list, P_id, mask=mask, sampling_size=25, sl
 
 
 
+# (5) calculate barycentric correction and append to FITS header
 
+
+
+# (6) calculate RV
 
 
 

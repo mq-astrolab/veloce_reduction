@@ -1120,26 +1120,3 @@ def extract_spectra(filelist, P_id, mask, method='optimal', save_files=True, out
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
