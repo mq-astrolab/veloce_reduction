@@ -4,16 +4,13 @@ Created on 9 Nov. 2017
 @author: christoph
 '''
 
-#import h5py
+
 import numpy as np
 import matplotlib.pyplot as plt
-from astropy.io import ascii
 import scipy.interpolate as interp
 import scipy.optimize as op
 import time
-#from scipy import ndimage
 from veloce_reduction.helper_functions import gausslike_with_amp_and_offset_and_slope, central_parts_of_mask
-from veloce_reduction.wavelength_solution import get_simu_dispsol
 from veloce_reduction.flat_fielding import deblaze_orders
 
 

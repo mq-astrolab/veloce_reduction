@@ -9,10 +9,7 @@ import numpy as np
 import astropy.io.fits as pyfits
 import time
 import os
-import scipy.interpolate as interp
 import matplotlib.pyplot as plt
-
-#from matplotlib.colors import LogNorm
 
 from veloce_reduction.helper_functions import get_iterable, find_nearest, get_datestring
 

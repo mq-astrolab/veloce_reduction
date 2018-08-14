@@ -4,8 +4,8 @@ Created on 28 Mar. 2018
 @author: christoph
 '''
 
+import astropy.io.fits as pyfits
 import numpy as np
-from mpl_toolkits import mplot3d
 
 from veloce_reduction.helper_functions import polyfit2d,polyval2d
 from veloce_reduction.find_laser_peaks_2D import *

@@ -4,20 +4,28 @@ Created on 19 Mar. 2018
 @author: christoph
 '''
 
-thname = '/Users/christoph/UNSW/veloce_spectra/Mar02/clean_thorium-17-12.fits'
-wname = '/Users/christoph/UNSW/veloce_spectra/Mar01/master_white_int.fits'
-flat = pyfits.getdata(wname).T + 1.
-thimg = pyfits.getdata(thname)
-thflux = np.load('/Users/christoph/UNSW/veloce_spectra/reduced/tests/thorium-17-12_40orders.npy').item()
-thflux2 = np.load('/Users/christoph/UNSW/veloce_spectra/reduced/tests/thorium-17-12_collapsed_40orders.npy').item()
+import numpy as np
+from readcol import readcol
+import matplotlib.pyplot as plt
+
+from veloce_reduction.helper_functions import find_nearest
+from veloce_reduction.wavelength_solution import find_suitable_peaks, fit_emission_lines
 
 
-P,tempmask = find_stripes(flat, deg_polynomial=2,min_peak=0.05,debug_level=3)
-P_id = make_P_id(P)
-mask = make_mask_dict(tempmask)
-# collapsed_mask = np.zeros(39,dtype='bool')
-# collapsed_mask[0] = True
-# collapsed_mask[25:] = True
+# thname = '/Users/christoph/UNSW/veloce_spectra/Mar02/clean_thorium-17-12.fits'
+# wname = '/Users/christoph/UNSW/veloce_spectra/Mar01/master_white_int.fits'
+# flat = pyfits.getdata(wname).T + 1.
+# thimg = pyfits.getdata(thname)
+# thflux = np.load('/Users/christoph/UNSW/veloce_spectra/reduced/tests/thorium-17-12_40orders.npy').item()
+# thflux2 = np.load('/Users/christoph/UNSW/veloce_spectra/reduced/tests/thorium-17-12_collapsed_40orders.npy').item()
+#
+#
+# P,tempmask = find_stripes(flat, deg_polynomial=2,min_peak=0.05,debug_level=3)
+# P_id = make_P_id(P)
+# mask = make_mask_dict(tempmask)
+# # collapsed_mask = np.zeros(39,dtype='bool')
+# # collapsed_mask[0] = True
+# # collapsed_mask[25:] = True
 
 
 

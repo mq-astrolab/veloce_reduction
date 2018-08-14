@@ -6,7 +6,6 @@ Created on 11 Aug. 2017
 
 import astropy.io.fits as pyfits
 import numpy as np
-#import veloce_reduction.optics as optics
 import itertools
 import warnings
 import time
@@ -14,8 +13,6 @@ import math
 import datetime
 from astropy.modeling import models, fitting
 import collections
-#from scipy.special import erf
-#from scipy.special import gamma
 from scipy import ndimage
 from scipy import special, signal
 from numpy.polynomial import polynomial

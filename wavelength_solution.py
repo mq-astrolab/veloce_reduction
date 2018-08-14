@@ -14,10 +14,12 @@ import lmfit
 from lmfit import Model
 from lmfit.models import GaussianModel, LorentzianModel, VoigtModel, PseudoVoigtModel, MoffatModel, Pearson7Model, StudentsTModel, BreitWignerModel, LognormalModel
 from lmfit.models import DampedOscillatorModel, DampedHarmonicOscillatorModel, ExponentialGaussianModel, SkewedGaussianModel, DonaichModel
-from astropy.modeling import models, fitting
-import warnings
 from readcol import readcol 
 import datetime
+
+
+
+
 
 from veloce_reduction.helper_functions import fibmodel_with_amp, CMB_pure_gaussian, multi_fibmodel_with_amp, CMB_multi_gaussian, offset_pseudo_gausslike, fit_poly_surface_2D
 
@@ -811,7 +813,6 @@ def get_wavelength_solution_from_thorium(thflux, poly_deg=5, polytype='chebyshev
 
 def get_wl(p,xx,yy):
     """
-    bla
     Get the wavelength for "full" 2-dim grid of x-pixel number and order number, or x-pixel number and y-pixel number, 
     depending on how 'p' was created, ie either lambda(x,y) or lambda (x,ord).
     
@@ -1026,7 +1027,7 @@ def get_wavelength_solution_labtests(thflux, thflux2, poly_deg=5, polytype='cheb
 
 
 
-def get_simu_dispsol(fibre=None, path='/Users/christoph/OneDrive - UNSW/dispsol/'):
+def get_simu_dispsol(fibre=None, path='/Users/christoph/OneDrive - UNSW/dispsol/', npix=4096):
     """
     Get wavelength solution from Veloce Zemax file for a given fibre (1...28)
     WARNING: If no fibre is given, a mean wavelength solution across all orders is calculated!!!
@@ -1040,7 +1041,7 @@ def get_simu_dispsol(fibre=None, path='/Users/christoph/OneDrive - UNSW/dispsol/
         orders = dbf['fiber_1'].keys()
      
     #read extracted spectrum from files (obviously this needs to be improved)
-    xx = np.arange(4096)
+    xx = np.arange(npix)
      
     #this is so as to match the order number with the physical order number (66 <= m <= 108)
     # order01 corresponds to m=66

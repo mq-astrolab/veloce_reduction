@@ -5,19 +5,11 @@ Created on 4 Sep. 2017
 '''
 import matplotlib.pyplot as plt
 import numpy as np
-#import astropy.io.fits as pyfits
 from scipy import ndimage
-#import h5py
 import scipy.sparse as sparse
-#import scipy.optimize as op
-#import logging
 import time
-#import collections
-#from scipy import special
-#from lmfit import minimize, Minimizer, Parameters, Parameter, report_fit, Model
-#from astropy.io import ascii
-#from matplotlib.colors import LogNorm
-from veloce_reduction.helper_functions import sigma_clip #CMB_pure_gaussian, gaussian_with_offset, fibmodel_with_amp_and_offset, fibmodel_with_amp_and_offset_and_slope, fibmodel_with_amp
+
+from veloce_reduction.helper_functions import sigma_clip
 
 
 

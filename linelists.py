@@ -83,21 +83,24 @@ def make_LFC_linelist(delta_f=25., wlmin=550., wlmax=950., shift=0., savefile=Tr
     
     
     
-def make_binmask_from_linelist(refwl, step=0.01):
+def make_binmask_from_linelist(refwl, relint=None, step=0.01):
     
     ### input could be sth like this:
 #     from readcol import readcol
 #     #read in master line list
 #     linelist = readcol('/Users/christoph/OneDrive - UNSW/linelists/thar_mm.arc', twod=False, skipline=8)
 #     refwl = linelist[0]
-    
+
+    if relint is None:
+        relint = np.ones(len(refwl))
+
     refgrid = np.arange(np.floor(np.min(refwl)), np.ceil(np.max(refwl)), step)
     refspec = np.zeros(len(refgrid))
     for i,pos in enumerate(refwl):
         #print('Line '+str(i+1)+'/'+str(len(refwl)))
         ix = find_nearest(refgrid, pos, return_index=True)
         #print('ix = ',ix)
-        refspec[np.max([0,ix-1]) : np.min([ix+2,len(refspec)])] = 1
+        refspec[np.max([0,ix-1]) : np.min([ix+2,len(refspec)])] = relint[i]
         
     return refgrid,refspec
 
@@ -116,7 +119,10 @@ def make_gaussmask_from_linelist(refwl, relint=None, step=0.01, gauss_sigma=1):
 #     linelist = readcol('/Users/christoph/OneDrive - UNSW/linelists/thar_mm.arc', twod=False, skipline=8)
 #     refwl = linelist[0]
 #     relint = 10**linelist[2]
-    
+
+    if relint is None:
+        relint = np.ones(len(refwl))
+
     refgrid = np.arange(np.floor(np.min(refwl)), np.ceil(np.max(refwl)), step)
     refspec = np.zeros(len(refgrid))
     for i,pos in enumerate(refwl):
@@ -128,7 +134,7 @@ def make_gaussmask_from_linelist(refwl, relint=None, step=0.01, gauss_sigma=1):
         else:
             amp = relint[i]
         peak = CMB_pure_gaussian(refgrid[ix-20:ix+21], pos, gauss_sigma * step, amp)
-        refspec[ix-20:ix+21] = refspec[ix-20:ix+21] + peak
+        refspec[ix-20:ix+21] = refspec[ix-20:ix+21] + peak * relint[i]
         
     return refgrid,refspec
 

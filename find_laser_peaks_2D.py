@@ -5,38 +5,30 @@ Created on 25 Oct. 2017
 '''
 
 import time
-import matplotlib.pyplot as plt
 import numpy as np
-import astropy.io.fits as pyfits
 import scipy.ndimage as ndimage
 from scipy.ndimage.morphology import generate_binary_structure, binary_erosion
-from mpl_toolkits.mplot3d import Axes3D
-from astropy.modeling import models, fitting
-from astropy.modeling.models import Gaussian2D
-from matplotlib.colors import LogNorm
-from mpl_toolkits import mplot3d
-#from astropy.modeling.functional_models import Gaussian2D
 from scipy.optimize import curve_fit
 
 from veloce_reduction.helper_functions import gauss2D, affine_matrix
 
 
 
-#some parameters
-RON = 4.                 # my guess for read-out noise
-bg_thresh = 1            # background threshold
-count_thresh = 2000.     # threshold for selection of peaks
-xsigma = 1.1             # sigma of 2D-Gaussian PSF in dispersion direction
-ysigma = 0.7             # sigma of 2D-Gaussian PSF in cross-dispersion direction
-boxwidth = 11            # size of box to use for the 2D Gaussian peak fitting
-
-
-imgname = '/Users/christoph/OneDrive - UNSW/simulated_spectra/ES/veloce_laser_comb.fit'
-img = pyfits.getdata(imgname) + 1
-img1 = img[250:450,250:450]   # contains 19 peaks (1 of which at edge)
-err_img1 = np.sqrt(img1)
-img2 = img[250:450,247:447]   # contains 19 peaks (1 of which at edge)
-err_img2 = np.sqrt(img2)
+# #some parameters
+# RON = 4.                 # my guess for read-out noise
+# bg_thresh = 1            # background threshold
+# count_thresh = 2000.     # threshold for selection of peaks
+# xsigma = 1.1             # sigma of 2D-Gaussian PSF in dispersion direction
+# ysigma = 0.7             # sigma of 2D-Gaussian PSF in cross-dispersion direction
+# boxwidth = 11            # size of box to use for the 2D Gaussian peak fitting
+#
+#
+# imgname = '/Users/christoph/OneDrive - UNSW/simulated_spectra/ES/veloce_laser_comb.fit'
+# img = pyfits.getdata(imgname) + 1
+# img1 = img[250:450,250:450]   # contains 19 peaks (1 of which at edge)
+# err_img1 = np.sqrt(img1)
+# img2 = img[250:450,247:447]   # contains 19 peaks (1 of which at edge)
+# err_img2 = np.sqrt(img2)
 
 
 
@@ -168,10 +160,10 @@ def find_affine_transformation_matrix(peakshapes1, peakshapes2):
     #solve matrix equation: M*r1 = r2  (note the transpose, as linalg.lstsq wants row-vectors)
     M, res, rank, s = np.linalg.lstsq(peaks1_xyz.T, peaks2_xyz.T)
     
-    #return affine transformation matrix  (note the transpose again, so that you can do :     new_points = np.dot(M.T,points) 
+    #return affine transformation matrix  (note the transpose again, so that you can do :  new_points = np.dot(M.T,points) )
     return M.T
-# M, N = src.shape
-# points = np.mgrid[0:N, 0:M].reshape((2, M*N))
+
+
 
 
 
