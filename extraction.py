@@ -20,6 +20,44 @@ from veloce_reduction.relative_intensities import get_relints
 
 
 
+def read_and_overscan_correct(infile, overscan=53, discard_ramp=17):
+    """Read in fits file and overscan correct. Assume that
+    the overscan region is indepedent of binning."""
+    dd = pyfits.getdata(infile)
+    newshape = (dd.shape[0], dd.shape[1] - 2 * overscan)
+    corrected = np.zeros(newshape)
+
+    # Split the y axis in 2
+    for y0, y1 in zip([0, dd.shape[0] // 2], [dd.shape[0] // 2, dd.shape[0]]):
+        loverscan = dd[y0:y1, :overscan]
+        overscan_ramp = np.median(loverscan + \
+                                  np.random.random(size=loverscan.shape) - 0.5, axis=0)
+        overscan_ramp -= overscan_ramp[-1]
+        for i in range(len(loverscan)):
+            loverscan[i] = loverscan[i] - overscan_ramp
+            corrected[y0 + i, :newshape[1] // 2] = dd[y0 + i, overscan:overscan + newshape[1] // 2] - \
+                                                   np.median(
+                                                       loverscan[i] + np.random.random(size=loverscan[i].shape) - 0.5)
+        roverscan = dd[y0:y1, -overscan:]
+        overscan_ramp = np.median(roverscan + \
+                                  np.random.random(size=loverscan.shape) - 0.5, axis=0)
+        overscan_ramp -= overscan_ramp[0]
+        for i in range(len(roverscan)):
+            roverscan[i] = roverscan[i] - overscan_ramp
+            corrected[y0 + i, newshape[1] // 2:] = dd[y0 + i, dd.shape[1] // 2:dd.shape[1] - overscan] - \
+                                                   np.median(
+                                                       roverscan[i] + np.random.random(size=loverscan[i].shape) - 0.5)
+    return corrected
+
+
+# if __name__ == "__main__":
+#     corrected = read_and_overscan_correct('bias1.fits')
+#     corrected[np.where(np.abs(corrected) > 20)] = 0
+#     print(np.std(corrected))
+
+
+
+
 
 def quick_extract(stripes, err_stripes, slit_height=25, verbose=False, timit=False):
     """
