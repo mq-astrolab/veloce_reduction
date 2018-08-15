@@ -830,7 +830,8 @@ def get_wl(p,xx,yy):
     p_wl'  : wavelength solution for each pair of coordinates
     """
     
-    #re-normalize arrays to [-1,+1]  
+    #re-normalize arrays to [-1,+1]
+    print('WRONG!!!!!')
     xxn = np.linspace(-1, 1, len(xx))
     yyn = np.linspace(-1, 1, len(yy))
     #make 2D grids of coordinates

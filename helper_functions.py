@@ -502,18 +502,22 @@ def binary_indices(x):
     
     
     
-def sigma_clip(x,tl,th=None,centre='median'):    
+def sigma_clip(x, tl, th=None, centre='median', return_indices=False):
     """
     Perform sigma-clipping of 1D array.
     
     INPUT:
-    'x'       : the 1D array to be sigma-clipped
-    'tl'      : lower threshold (in terms of sigma)
-    'th'      : higher threshold (in terms of sigma) (if only one threshold is given then th=tl=t)
-    'centre'  : method to determine the centre ('median' or 'mean')
+    'x'              : the 1D array to be sigma-clipped
+    'tl'             : lower threshold (in terms of sigma)
+    'th'             : higher threshold (in terms of sigma) (if only one threshold is given then th=tl=t)
+    'centre'         : method to determine the centre ('median' or 'mean')
+    'return_indices' : boolean - do you also want to return the index masks of the unclipped and clipped data points?
     
     OUTPUT:
     'x'  : the now sigma-clipped array
+
+    TODO:
+    implement return_indices keyword
     """
     
     #make sure both boundaries are defined
@@ -521,25 +525,38 @@ def sigma_clip(x,tl,th=None,centre='median'):
         th = tl
     
     clipped = x.copy()
+
+    all_indices = np.arange(len(x))
+    indices = np.arange(len(x))
+    badix = []
+    #goodix = np.ones(len(x),dtype='bool')
     
     while True:    
         rms = np.std(clipped)
         if centre.lower() == 'median':
-            bad_high = clipped - np.median(clipped) > th*rms 
-            bad_low = np.median(clipped) - clipped > tl*rms 
+            bad_high = clipped - np.median(clipped) > th*rms
+            bad_low = np.median(clipped) - clipped > tl*rms
         elif centre.lower() == 'mean':
-            bad_high = clipped - np.mean(clipped) > th*rms 
-            bad_low = np.mean(clipped) - clipped > tl*rms 
+            bad_high = clipped - np.mean(clipped) > th*rms
+            bad_low = np.mean(clipped) - clipped > tl*rms
         else:
             print('ERROR: Method for computing centre must be "median" or "mean"')
             return
-        goodix = ~bad_high & ~bad_low      
-        if np.sum(~goodix) == 0:
+        new_goodix = ~bad_high & ~bad_low
+        if np.sum(~new_goodix) == 0:
             break
         else:
-            clipped = clipped[goodix]
-    
-    return clipped
+            clipped = clipped[new_goodix]
+            badix = np.r_[badix,indices[~new_goodix]]
+            #badix.append(indices[~new_goodix])
+            indices = indices[new_goodix]
+
+    if return_indices:
+        goodix = np.array(sorted(list(set(all_indices) - set(badix))))
+        badix = np.array(sorted(badix))
+        return clipped, goodix, badix
+    else:
+        return clipped
     
     
     

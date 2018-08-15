@@ -105,7 +105,7 @@ np.save(path+'bad_pixel_mask_'+datestring+'.npy', bad_pixel_mask)
 gain = [0.88, 0.93, 0.99, 0.93]   # from "VELOCE_DETECTOR_REPORT_V1.PDF"
 # (i) BIAS 
 # get offsets and read-out noise
-#either from bias frames (units = ADUs)
+#either from bias frames (units: [offsets] = ADUs; [RON] = e-)
 medbias,coeffs,offsets,rons = get_bias_and_readnoise_from_bias_frames(bias_list, degpol=5, clip=5., gain=gain, debug_level=0, timit=True)
 #or from the overscan regions
 

@@ -54,7 +54,10 @@ def process_whites(white_list, MB=None, ronmask=None, MD=None, gain=None, scalab
         start_time = time.time()
 
     #if the darks have a different exposure time than the whites, then we need to re-scale the master dark
-    texp = pyfits.getval(white_list[0], 'exptime')
+    try:
+        texp = pyfits.getval(white_list[0], 'exptime')
+    except:
+        texp = pyfits.getval(white_list[0], 'EXPOSED')
 
     #if INPUT arrays are not given, read them from default files
     if path is None:
