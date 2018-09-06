@@ -22,7 +22,7 @@ from veloce_reduction.get_info_from_headers import get_obs_coords_from_header
 
 
 
-def process_whites(white_list, MB=None, ronmask=None, MD=None, gain=None, scalable=False, fancy=False, clip=5., savefile=True, saveall=False, diffimg=False, path=None, debug_level=0, timit=False):
+def process_whites(white_list, corrected_white_list, MB=None, ronmask=None, MD=None, gain=None, scalable=False, fancy=False, clip=5., savefile=True, saveall=False, diffimg=False, path=None, debug_level=0, timit=False):
     """
     This routine processes all whites from a given list of file. It corrects the orientation of the image and crops the overscan regions,
     and subtracts both the MASTER BIAS frame [in ADU], and the MASTER DARK frame [in e-] from every image before combining them to create a MASTER WHITE frame.
@@ -63,8 +63,8 @@ def process_whites(white_list, MB=None, ronmask=None, MD=None, gain=None, scalab
     if path is None:
         print('WARNING: output file directory not provided!!!')
         print('Using same directory as input file...')
-        dum = white_list[0].split('/')
-        path = white_list[0][0:-len(dum[-1])]
+        dum = corrected_white_list[0].split('/')
+        path = corrected_white_list[0][0:-len(dum[-1])]
     if MB is None:
         #no need to fix orientation, this is already a processed file [ADU]
         MB = pyfits.getdata(path+'master_bias.fits')
@@ -87,7 +87,7 @@ def process_whites(white_list, MB=None, ronmask=None, MD=None, gain=None, scalab
     allerr = []
 
     #loop over all files in "white_list"; correct for bias and darks on the fly
-    for n,fn in enumerate(white_list):
+    for n,fn in enumerate(corrected_white_list):
         if debug_level >=1:
             print('Now processing file: '+str(fn))
         #call routine that does all the bias and dark correction stuff and converts from ADU to e-
@@ -133,7 +133,7 @@ def process_whites(white_list, MB=None, ronmask=None, MD=None, gain=None, scalab
         for i,j in zip(np.nonzero(master_outie_mask)[0],np.nonzero(master_outie_mask)[1]):
             #access binary numbers and retrieve component(s)
             outnum = binary_indices(master_outie_mask[i,j])   #these are the indices (within allimg) of the images that contain outliers
-            dumix = np.arange(len(white_list))
+            dumix = np.arange(len(corrected_white_list))
             #remove the images containing the outliers in order to compute mean from the remaining images
             useix = np.delete(dumix,outnum)
             if diffimg:
@@ -142,15 +142,15 @@ def process_whites(white_list, MB=None, ronmask=None, MD=None, gain=None, scalab
             #plus the number of affected images times the mean of the pixel values in the unaffected images
             summed[i,j] = len(outnum) * np.mean( np.array([allimg[q][i,j] for q in useix]) ) + np.sum( np.array([allimg[q][i,j] for q in useix]) )
         #once we have finished correcting the outliers, we want to "normalize" (ie divide by number of frames) the master image and the corresponding error array
-        master = summed / len(white_list)
-        err_master = err_summed / len(white_list)
+        master = summed / len(corrected_white_list)
+        err_master = err_summed / len(corrected_white_list)
     else:
         #ie not fancy, just take the median image to remove outliers
         medimg = np.median(np.array(allimg), axis=0)
         #now set master image equal to median image
         master = medimg.copy()
         #estimate of the corresponding error array (estimate only!!!)
-        err_master = err_summed / len(white_list)
+        err_master = err_summed / len(corrected_white_list)
 
 
     #now save master white to file

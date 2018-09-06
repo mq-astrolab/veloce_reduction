@@ -57,8 +57,6 @@ def read_and_overscan_correct(infile, overscan=53, discard_ramp=17):
 
     pyfits.writeto(outfile, corrected, clobber=True)
 
-    print("outfile", outfile)
-
     return outfile
     
 def find_arcs(dir, normal_exptime_only=True):
