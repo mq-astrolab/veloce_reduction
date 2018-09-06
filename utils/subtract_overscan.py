@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 #Change this to run on the veloce commissioning run test data in your directory.
 rootdir = '/Users/Brendan/Dropbox/Brendan/Veloce/Data/veloce/'
 
-def read_and_overscan_correct(infile, overscan=53, discard_ramp=17):
+def read_and_overscan_correct(infile, overscan=53, discard_ramp=17, savefile=False):
     """Read in fits file and overscan correct. Assume that
     the overscan region is indepedent of binning."""
     dd = pyfits.getdata(infile)
@@ -53,14 +53,16 @@ def read_and_overscan_correct(infile, overscan=53, discard_ramp=17):
     corrected[newshape[0]//2:newshape[0],:newshape[1]//2] = quads[2]
     corrected[newshape[0]//2:newshape[0],newshape[1]//2:newshape[1]] = quads[3]
 
-    outfile = infile+'overscan_corrected.fits'
+    if savefile:
+        outfile = infile+'overscan_corrected.fits'
 
-    pyfits.writeto(outfile, corrected, clobber=True)
+        pyfits.writeto(outfile, corrected, clobber=True)
 
-    print("outfile", outfile)
+        print("outfile", outfile)
 
-    return outfile
-    
+        return outfile
+    else:
+        return corrected    
 def find_arcs(dir, normal_exptime_only=True):
     all_fn = np.sort(glob.glob(dir + '/?????30???.fits'))
     arc_fn = []

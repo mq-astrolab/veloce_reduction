@@ -23,6 +23,8 @@ biases = np.array(biases)
 
 files = glob.glob('/Users/mireland/data/veloce/Dark_25_8_2018/Bias_Pre_Dark*.fit')
 #files = glob.glob('/Users/mireland/data/veloce/Dark_27_7_2018/Bias_Cold_10?.fit')
+files = glob.glob('/Users/mireland/data/veloce/Darks_4_9_2018/bs_dark_2hr_*.fit')
+
 dark_biases = []
 for f in files:
     print(f)
@@ -31,6 +33,8 @@ dark_biases = np.array(dark_biases)
 
 files = glob.glob('/Users/mireland/data/veloce/Dark_25_8_2018/Dark_2_Hour*.fit')
 #files = glob.glob('/Users/mireland/data/veloce/Dark_27_7_2018/Exp_1h_Cold_10[45].fit')
+files = glob.glob('/Users/mireland/data/veloce/Darks_4_9_2018/Dark_2_hour*.fit')
+
 darks = []
 for f in files:
     print(f)
@@ -38,5 +42,5 @@ for f in files:
 darks = np.array(darks)
 
 mn_bias = np.mean(dark_biases, axis=0)
-for d in darks:
-    print(np.median(d - mn_bias))
+for f, d in zip(files,darks):
+    print("Dark current (ADU/frame) for file {:s}: {:6.2f}".format(f, np.median(d - mn_bias)))
