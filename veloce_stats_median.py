@@ -17,16 +17,28 @@ def stats(directories):
     fluxMedArr = []
     flux95Arr = []
     flux99Arr = []
+    MMedArr = []
+    M95Arr = []
+    M99Arr = []
+
 
     filterArr = ["Umag", "Vmag", "Bmag", "Imag", "Rmag", "mpg"]
 
     for i in directories:
         for extracted_file in glob.glob(i):
-            original_file = extracted_file[:len(extracted_file)-15]+".fits"
+            if "14aug" in extracted_file:
+                original_file = "/data/malice/brendano/veloce/180814/ccd_3/"+extracted_file[26:len(extracted_file)-15]+".fits"
+            elif "15aug" in extracted_file:
+                original_file = "/data/malice/brendano/veloce/180815/ccd_3/"+extracted_file[26:len(extracted_file)-15]+".fits"
+    
             object_name = pyfits.getheader(original_file)["OBJECT"]
             print(object_name)
             if object_name not in not_source_arr:
-                result_table = Vizier.query_object(object_name)
+                if "Acq" in object_name:
+                    query_name = object_name[:len(object_name)-3]
+                else:
+                    query_name = object_name
+                result_table = Vizier.query_object(query_name)
 
                 for i in result_table[2].keys():
                     if i in filterArr:
@@ -35,28 +47,22 @@ def stats(directories):
 
                         magArr.append(mag)
                         expArr.append(pyfits.getheader(original_file)["EXPOSED"])
-                        rArr.append(pyfits.getheader(original_file)["SPEED"])    
                         
                         fluxData = pyfits.getdata(extracted_file)
                         for flux in fluxData:
                             fluxMedArr.append(np.median(flux))   
                             flux95Arr.append(np.percentile(flux, 95))   
-                            flux99Arr.append(np.percentile(flux, 99))   
+                            flux99Arr.append(np.percentile(flux, 99))
+
+                        MMedArr.append(np.median(fluxMedArr))
+                        M95Arr.append(np.median(flux95Arr))
+                        M99Arr.append(np.median(flux99Arr))
 
     rvArr = np.zeros(len(objectArr))
     rvErrArr = np.zeros(len(objectArr))
-    
-    print("len(objectArr)", len(objectArr))
-    print("len(magArr)", len(magArr))
-    print("len(fluxMedArr)", len(fluxMedArr))
-    print("len(flux95Arr)", len(flux95Arr))
-    print("len(flux99Arr)", len(flux99Arr))
-    print("len(expArr)", len(expArr))
-    print("len(rvArr)", len(rvArr))
-    print("len(rvErrArr)", len(rvErrArr))
 
-    columns=['Object', 'Magnitude', 'Median Flux', '95% Flux', '99% Flux' 'Exposure Time', 'Radial Velocity', 'RV Uncertainty']
-    df = pd.DataFrame({'Object': objectArr, 'Magnitude': magArr, 'Median Flux': fluxMedArr, '95% Flux': flux95Arr, '99% Flux': flux99Arr, 'Exposure Time': expArr, 'Radial Velocity': rvArr, 'RV Uncertainty': rvErrArr}, columns=columns)
+    columns=['Object', 'Magnitude', 'Median Flux', '95% Flux', '99% Flux', 'Exposure Time', 'Radial Velocity', 'RV Uncertainty']
+    df = pd.DataFrame({'Object': objectArr, 'Magnitude': magArr, 'Median Flux': MMedArr, '95% Flux': M95Arr, '99% Flux': M99Arr, 'Exposure Time': expArr, 'Radial Velocity': rvArr, 'RV Uncertainty': rvErrArr}, columns=columns)
                       
     print(df)
 
