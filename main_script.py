@@ -62,6 +62,7 @@ from veloce_reduction.spatial_profiles import fit_profiles, fit_profiles_from_in
 
 
 path = '/Volumes/BERGRAID/data/veloce/tests_20180723/'
+path = '/Users/christoph/data/commissioning/20180916/'
 
 
 
