@@ -23,7 +23,8 @@ biases = np.array(biases)
 
 files = glob.glob('/Users/mireland/data/veloce/Dark_25_8_2018/Bias_Pre_Dark*.fit')
 #files = glob.glob('/Users/mireland/data/veloce/Dark_27_7_2018/Bias_Cold_10?.fit')
-files = glob.glob('/Users/mireland/data/veloce/Darks_4_9_2018/bs_dark_2hr_*.fit')
+files = glob.glob('/Users/mireland/data/veloce/Darks_4_9_2018/bias_*.fit')
+files = glob.glob('/Users/mireland/data/veloce/bias_tests_180908/Rosso000.fits')
 
 dark_biases = []
 for f in files:
@@ -33,7 +34,9 @@ dark_biases = np.array(dark_biases)
 
 files = glob.glob('/Users/mireland/data/veloce/Dark_25_8_2018/Dark_2_Hour*.fit')
 #files = glob.glob('/Users/mireland/data/veloce/Dark_27_7_2018/Exp_1h_Cold_10[45].fit')
+files = glob.glob('/Users/mireland/data/veloce/Darks_4_9_2018/bs_dark_2hr_*.fit')
 files = glob.glob('/Users/mireland/data/veloce/Darks_4_9_2018/Dark_2_hour*.fit')
+files = glob.glob('/Users/mireland/data/veloce/bias_tests_180908/Rosso002.fits')
 
 darks = []
 for f in files:
