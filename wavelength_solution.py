@@ -28,7 +28,8 @@ from veloce_reduction.helper_functions import fibmodel_with_amp, CMB_pure_gaussi
 
 
 
-def find_suitable_peaks(rawdata, thresh = 5000., bgthresh = 2000., maxthresh = None, gauss_filter_sigma=1., remove_bg=False, return_masks=False, debug_level=0, timit=False):
+def find_suitable_peaks(rawdata, thresh = 5000., bgthresh = 2000., maxthresh = None, gauss_filter_sigma=1., slope=1e-4,
+                        remove_bg=False, return_masks=False, debug_level=0, timit=False):
     """
     This routine finds (rough, to within 1 pixel) peak locations in 1D data.
     Detection threshold, background threshold, maximum threshold, and smoothing kernel width can be provided as keyword parameters.
@@ -41,6 +42,7 @@ def find_suitable_peaks(rawdata, thresh = 5000., bgthresh = 2000., maxthresh = N
     'bgthresh'            : minimum height of peak in the filtered data to be considered a real (but not good) peak
     'maxthresh'           : maximum height of peak in the filtered data to be included (ie you can exclude saturated peaks etc)
     'gauss_filter_sigma'  : width of the Gaussian smoothing kernel (set to 0 if you want no smoothing)
+    'slope'               : value of the (tiny) slope that's added in order to break possible degeneracies between adjacent pixels
     'remove_bg'           : boolean - do you want to run a crude background removal before identifying peaks?
     'return_masks'        : boolean - do you want to return the masks as well as the data arrays?
     'debug_level'         : for debugging...
@@ -73,7 +75,7 @@ def find_suitable_peaks(rawdata, thresh = 5000., bgthresh = 2000., maxthresh = N
     data = rawdata - bgfit
     
     #smooth data to make sure we are not finding noise peaks, and add tiny slope to make sure peaks are found even when pixel-values are like [...,3,6,18,41,41,21,11,4,...]
-    filtered_data = ndimage.gaussian_filter(data.astype(np.float), gauss_filter_sigma) + xx*1e-4
+    filtered_data = ndimage.gaussian_filter(data.astype(np.float), gauss_filter_sigma) + xx*slope
     
     #find all local maxima in smoothed data (and exclude the leftmost and rightmost maxima to avoid nasty edge effects...)
     allpeaks = signal.argrelextrema(filtered_data, np.greater)[0]
@@ -135,7 +137,7 @@ def find_suitable_peaks(rawdata, thresh = 5000., bgthresh = 2000., maxthresh = N
 
 
 
-def fit_emission_lines(data, fitwidth=4, thresh = 5000., bgthresh = 2000., maxthresh = None, laser=False, varbeta=True, return_all_pars=False, return_qualflag=False, verbose=False, timit=False):
+def fit_emission_lines(data, fitwidth=4, thresh = 5000., bgthresh = 2000., maxthresh = None, slope=1e-4, laser=False, varbeta=True, return_all_pars=False, return_qualflag=False, verbose=False, timit=False):
     """
     This routine identifies and fits emission lines in a 1-dim spectrum (ie generally speaking it finds and fits peaks in a 1dim array), using "scipy.optimize.curve_fit".
     Detection threshold, background threshold, and maximum threshold can be provided as keyword parameters. Different models for the peak-like function can be selected.
@@ -148,6 +150,7 @@ def fit_emission_lines(data, fitwidth=4, thresh = 5000., bgthresh = 2000., maxth
     'thresh'           : minimum height of peak in the FILTERED data to be considered a good peak
     'bgthresh'         : minimum height of peak in the FILTERED data to be considered a real (but not good) peak
     'maxthresh'        : maximum height of peak in the FILTERED data to be included (ie you can exclude saturated peaks etc)
+    'slope'            : value of the (tiny) slope that's added in order to break possible degeneracies between adjacent pixels
     'laser'            : boolean - is this a LFC spectrum? (if set to true, there is no check for blended lines)
     'varbeta'          : boolean - if set to TRUE, use a Gauss-like function for fitting, if set to FALSE use a plain Gaussian  
     'return_all_pars'  : boolean - do you want to return all fit parameters?
@@ -185,7 +188,7 @@ def fit_emission_lines(data, fitwidth=4, thresh = 5000., bgthresh = 2000., maxth
     xx = np.arange(len(data))
     
     #find rough peak locations
-    goodpeaks,mostpeaks,allpeaks = find_suitable_peaks(data, thresh=thresh, bgthresh=bgthresh, maxthresh=maxthresh)    
+    goodpeaks,mostpeaks,allpeaks = find_suitable_peaks(data, thresh=thresh, bgthresh=bgthresh, maxthresh=maxthresh, slope=slope)
     
     if verbose:
         print('Fitting '+str(len(goodpeaks))+' emission lines...')

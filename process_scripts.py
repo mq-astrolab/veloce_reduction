@@ -196,8 +196,9 @@ def process_science_images(imglist, P_id, mask=None, sampling_size=25, slit_heig
     =============================
     (5) extraction of stripes
     (6) extraction of 1-dim spectra
-    (7) wavelength solution
-    (8) barycentric correction
+    (7) get relative intensities of different fibres
+    (8) wavelength solution
+    (9) barycentric correction
     """
     
     if timit:

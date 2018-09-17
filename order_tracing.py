@@ -102,7 +102,7 @@ def find_stripes(flat, deg_polynomial=2, gauss_filter_sigma=3., min_peak=0.05, m
             if ~(p[0]==p[1] and p[0]==p[2]):
                 start_row = args[np.argmax(p)]
             orders[m, column] = start_row
-            #build mask - exclude pixels at upper/lower end of chip; also exclude peaks that do not lie at least 5 sigmas above rms of 3-sigma clipped bcakground (+/- cliprange pixels from peak location)
+            #build mask - exclude pixels at upper/lower end of chip; also exclude peaks that do not lie at least 5 sigmas above rms of 3-sigma clipped background (+/- cliprange pixels from peak location)
             #if ((p < 10).all()) or ((column > 3500) and (mask[m,column-1]==False)) or (start_row in (0,nx-1)) or (m==42 and (p < 100).all()):
             if slowmask:
                 cliprange = 25

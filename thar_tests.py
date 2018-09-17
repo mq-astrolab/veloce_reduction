@@ -7,8 +7,8 @@ thflux2 = pyfits.getdata('/Users/christoph/data/commissioning/20180814/14aug3006
 linenum, ordnum, m, pix, wl, model_wl, res = readcol('/Users/christoph/OneDrive - UNSW/linelists/AAT_folder/5th_order_'+
                                                    'clipped_lines_used_in_fit_as_of_2018-08-16.dat',
                                                    twod=False,skipline=2)
-
-new_ordnum = 29
+#H-alpha:
+#new_ordnum = 29
 
 
 
@@ -58,15 +58,20 @@ for new_ordnum in np.arange(2,40):
 
 
 #METHOD 2 - find new line positions by checking a small region around each line in the mastertable
-lam = []
-x = []
+lam = np.array([])
+x = np.array([])
+order = np.array([])
+ref_wl = np.array([])
 search_region_size = 1
 for new_ordnum in np.arange(2,40):
 
     print('order ', new_ordnum)
 
     #fix fails
-    if new_ordnum == 25:
+    if new_ordnum == 17:
+        thresh = 2000
+        bgthresh = 1500
+    elif new_ordnum == 25:
         thresh = 4000
         bgthresh = 2000
     else:
@@ -84,23 +89,105 @@ for new_ordnum in np.arange(2,40):
     data = quick_bg_fix(raw_data)
     data2 = quick_bg_fix(raw_data2)
 
-    # fix more fails (eventually we want to mask out regions around super bright / saturated lines so we don't need to fix the fails)
-    if new_ordnum == 16:
-        data = data[:2400]
+    # fix more fails, ie mask out regions around super bright / saturated lines
+    # TODO: make this a predefined set of masks, so that the if statement does not have to be evaluated all the time
+    if new_ordnum == 2:
+        mask = np.zeros(len(data), dtype='bool')
+        mask[3040:3110] = True
+        data[mask] = 0
+        data2[mask] = 0
     if new_ordnum == 3:
-        data = data[:2000]
+        mask = np.zeros(len(data),dtype='bool')
+        mask[2300:2600] = True
+        data[mask] = 0
+        data2[mask] = 0
+    if new_ordnum == 8:
+        mask = np.zeros(len(data),dtype='bool')
+        mask[1670:1860] = True
+        mask[3560:3660] = True
+        data[mask] = 0
+        data2[mask] = 0
+    if new_ordnum == 9:
+        mask = np.zeros(len(data),dtype='bool')
+        mask[1180:1420] = True
+        mask[1560:1850] = True
+        data[mask] = 0
+        data2[mask] = 0
+    if new_ordnum == 10:
+        mask = np.zeros(len(data),dtype='bool')
+        mask[2270:2430] = True
+        data[mask] = 0
+        data2[mask] = 0
+    if new_ordnum == 11:
+        mask = np.zeros(len(data),dtype='bool')
+        mask[3000:3400] = True
+        data[mask] = 0
+        data2[mask] = 0
+    if new_ordnum == 12:
+        mask = np.zeros(len(data),dtype='bool')
+        mask[540:1100] = True
+        mask[2930:3220] = True
+        data[mask] = 0
+        data2[mask] = 0
+    if new_ordnum == 13:
+        mask = np.zeros(len(data),dtype='bool')
+        mask[470:830] = True
+        mask[2130:2330] = True
+        data[mask] = 0
+        data2[mask] = 0
+    if new_ordnum == 15:
+        mask = np.zeros(len(data), dtype='bool')
+        mask[2630:2810] = True
+        data[mask] = 0
+        data2[mask] = 0
+    if new_ordnum == 16:
+        mask = np.zeros(len(data), dtype='bool')
+        mask[2400:2800] = True
+        data[mask] = 0
+        data2[mask] = 0
+    if new_ordnum == 17:
+        mask = np.zeros(len(data),dtype='bool')
+        mask[3060:3160] = True
+        mask[3260:3370] = True
+        data[mask] = 0
+        data2[mask] = 0
+    if new_ordnum == 18:
+        mask = np.zeros(len(data),dtype='bool')
+        mask[800:960] = True
+        mask[1090:1320] = True
+        data[mask] = 0
+        data2[mask] = 0
+    if new_ordnum == 19:
+        mask = np.zeros(len(data), dtype='bool')
+        mask[1850:2080] = True
+        data[mask] = 0
+        data2[mask] = 0
+    if new_ordnum == 23:
+        mask = np.zeros(len(data), dtype='bool')
+        mask[1325:1400] = True
+        data[mask] = 0
+        data2[mask] = 0
+    if new_ordnum == 24:
+        mask = np.zeros(len(data), dtype='bool')
+        mask[1900:2010] = True
+        data[mask] = 0
+        data2[mask] = 0
+
 
     fitted_line_pos2 = fit_emission_lines(data2, return_all_pars=False, varbeta=False, timit=False, verbose=False,
                                           thresh=thresh, bgthresh=bgthresh)
 
     for i,checkval in enumerate(fitted_line_pos2):
         print(i)
-        q = np.logical_and(ord_x > checkval - search_region_size, ord_x < checkval + search_region_size)
+        q = np.logical_and(ord_pix > checkval - search_region_size, ord_pix < checkval + search_region_size)
         found = np.sum(q)
         if found > 0:
             if found == 1:
-                lam.append(ord_wl[q])
-                x.append(ord_pix[q])
+                print('OK')
+                lam = np.append(lam, ord_wl[q])
+                x = np.append(x, ord_pix[q])
+                order = np.append(order, new_ordnum)
+                ref_wl = np.append(ref_wl, ord_wl[np.argwhere(q==True)])
             else:
                 print('ERROR')
 
@@ -117,4 +204,24 @@ def quick_bg_fix(raw_data):
     data[left_xx] = raw_data[left_xx] - left_bg
     data[right_xx] = raw_data[right_xx] - right_bg
     return data
+
+
+
+
+#re-normalize arrays to [-1,+1]
+x_norm = (x / ((len(data)-1)/2.)) - 1.
+order_norm = ((order-2) / (37./2.)) - 1.       #TEMP, TODO, FUGANDA, PLEASE FIX ME!!!!!
+#order_norm = ((m-1) / ((len(P_id)-1)/2.)) - 1.
+
+#call the fitting routine
+p = fit_poly_surface_2D(x_norm, order_norm, ref_wl, weights=None, polytype='chebyshev', poly_deg=5, debug_level=0)
+
+#if return_full:
+xx = np.arange(4112)
+xxn = (xx / ((len(xx) - 1) / 2.)) - 1.
+oo = np.arange(1, len(thflux))
+oon = ((oo - 1) / (38. / 2.)) - 1.  # TEMP, TODO, FUGANDA, PLEASE FIX ME!!!!!
+# oon = ((oo-1) / ((len(thflux)-1)/2.)) - 1.
+X, O = np.meshgrid(xxn, oon)
+p_wl = p(X, O)
 
