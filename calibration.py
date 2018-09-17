@@ -348,9 +348,9 @@ def get_bias_and_readnoise_from_bias_frames(bias_list, degpol=5, clip=5, gain=No
 
     #do some formatting things for real observations
     #bring to "correct" orientation
-    img = correct_orientation(img)
+    #img = correct_orientation(img)
     #remove the overscan region, which looks crap for actual bias images
-    img = crop_overscan_region(img)
+    #img = crop_overscan_region(img)
 
 
     ny,nx = img.shape
@@ -376,13 +376,25 @@ def get_bias_and_readnoise_from_bias_frames(bias_list, degpol=5, clip=5, gain=No
     sigs_q4 = []
     allimg = []
 
+    for name in bias_list:
+
+        img = pyfits.getdata(name)
+        print(img.shape)
+
     #first get mean / median for all bias images (per quadrant)
     for name in bias_list:
+
         img = pyfits.getdata(name)
         #bring to "correct" orientation
         img = correct_orientation(img)
+
+        ny,nx = img.shape
+
+        #define four quadrants via masks
+        q1,q2,q3,q4 = make_quadrant_masks(nx,ny)
+
         #remove the overscan region, which looks crap for actual bias images
-        img = crop_overscan_region(img)
+        #img = crop_overscan_region(img)
         #means_q1.append(np.nanmean(img[q1]))
         medians_q1.append(np.nanmedian(img[q1]))
         #means_q2.append(np.nanmean(img[q2]))
@@ -400,16 +412,25 @@ def get_bias_and_readnoise_from_bias_frames(bias_list, degpol=5, clip=5, gain=No
         # read in observations and bring to right format
         img1 = pyfits.getdata(name1)
         img2 = pyfits.getdata(name2)
+
         img1 = correct_orientation(img1)
-        img1 = crop_overscan_region(img1)
+        #img1 = crop_overscan_region(img1)
         img2 = correct_orientation(img2)
-        img2 = crop_overscan_region(img2)
+        #img2 = crop_overscan_region(img2)
         #take difference and do sigma-clipping
-        diff = img1.astype(long) - img2.astype(long)
-        sigs_q1.append(np.nanstd(sigma_clip(diff[q1], 5))/np.sqrt(2))
-        sigs_q2.append(np.nanstd(sigma_clip(diff[q2], 5))/np.sqrt(2))
-        sigs_q3.append(np.nanstd(sigma_clip(diff[q3], 5))/np.sqrt(2))
-        sigs_q4.append(np.nanstd(sigma_clip(diff[q4], 5))/np.sqrt(2))
+
+        if img1.shape==img2.shape:
+
+            ny,nx = img1.shape
+
+            #define four quadrants via masks
+            q1,q2,q3,q4 = make_quadrant_masks(nx,ny)
+
+            diff = img1.astype(long) - img2.astype(long)
+            sigs_q1.append(np.nanstd(sigma_clip(diff[q1], 5))/np.sqrt(2))
+            sigs_q2.append(np.nanstd(sigma_clip(diff[q2], 5))/np.sqrt(2))
+            sigs_q3.append(np.nanstd(sigma_clip(diff[q3], 5))/np.sqrt(2))
+            sigs_q4.append(np.nanstd(sigma_clip(diff[q4], 5))/np.sqrt(2))
 
     #now average over all images
     #allmeans = np.array([np.median(medians_q1), np.median(medians_q2), np.median(medians_q3), np.median(medians_q4)])
@@ -838,12 +859,12 @@ def correct_for_bias_and_dark_from_filename(imgname, MB, MD, gain=None, scalable
 
     #(0) read in raw image [ADU] 
     img = pyfits.getdata(imgname)
+
     if not simu:
         #bring to "correct" orientation
         img = correct_orientation(img)
         #remove the overscan region
-        img = crop_overscan_region(img)
-
+        #img = crop_overscan_region(img)
 
     #(1) BIAS SUBTRACTION [ADU]
     #bias-corrected_image
