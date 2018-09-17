@@ -29,7 +29,7 @@ from veloce_reduction.helper_functions import fibmodel_with_amp, CMB_pure_gaussi
 
 
 def find_suitable_peaks(rawdata, thresh = 5000., bgthresh = 2000., maxthresh = None, gauss_filter_sigma=1., slope=1e-4,
-                        remove_bg=False, return_masks=False, debug_level=0, timit=False):
+                        clip_edges=True, remove_bg=False, return_masks=False, debug_level=0, timit=False):
     """
     This routine finds (rough, to within 1 pixel) peak locations in 1D data.
     Detection threshold, background threshold, maximum threshold, and smoothing kernel width can be provided as keyword parameters.
@@ -43,6 +43,7 @@ def find_suitable_peaks(rawdata, thresh = 5000., bgthresh = 2000., maxthresh = N
     'maxthresh'           : maximum height of peak in the filtered data to be included (ie you can exclude saturated peaks etc)
     'gauss_filter_sigma'  : width of the Gaussian smoothing kernel (set to 0 if you want no smoothing)
     'slope'               : value of the (tiny) slope that's added in order to break possible degeneracies between adjacent pixels
+    'clip_edges'          : boolean - do you want to clip the first and last peak, just to be on the safe side and avoid edge effects?
     'remove_bg'           : boolean - do you want to run a crude background removal before identifying peaks?
     'return_masks'        : boolean - do you want to return the masks as well as the data arrays?
     'debug_level'         : for debugging...
@@ -85,7 +86,8 @@ def find_suitable_peaks(rawdata, thresh = 5000., bgthresh = 2000., maxthresh = N
     #testpeaks = np.arange(len(xx))[testix]
     
     #exclude first and last peaks to avoid nasty edge effects
-    allpeaks = allpeaks[1:-1]
+    if clip_edges:
+        allpeaks = allpeaks[1:-1]
     
     #make first mask to determine which peaks from linelist to use in wavelength solution
     first_mask = np.ones(len(allpeaks), dtype='bool')
@@ -207,7 +209,7 @@ def fit_emission_lines(data, fitwidth=4, thresh = 5000., bgthresh = 2000., maxth
 #             print('xguess = ',xguess)
         ################################################################################################################################################################################
         #METHOD 1 (using curve_fit; slightly faster than method 2, but IDK how to make sure the fit converged (as with .ier below))
-        
+
         if not laser:
             #check if there are any other peaks in the vicinity of the peak in question (exclude the peak itself)
             checkrange = np.r_[xx[xguess - 2*fitwidth : xguess], xx[xguess+1 : xguess + 2*fitwidth+1]]
@@ -221,13 +223,13 @@ def fit_emission_lines(data, fitwidth=4, thresh = 5000., bgthresh = 2000., maxth
                 #define new checkrange
                 checkrange = xx[peaks[0] - 2*fitwidth : peaks[-1] + 2*fitwidth + 1]
                 dum = np.in1d(checkrange, peaks)
-                checkrange = checkrange[~dum]      
+                checkrange = checkrange[~dum]
         else:
             peaks = np.r_[xguess]
-            
-        npeaks = len(peaks)        
+
+        npeaks = len(peaks)
         xrange = xx[peaks[0] - fitwidth : peaks[-1] + fitwidth + 1]      #this should satisfy: len(xrange) == len(checkrange) - 2*fitwidth + len(peaks)
-        
+
         if npeaks == 1:
             if varbeta:
                 guess = np.array([xguess, 1., data[xguess], 2.])
@@ -260,8 +262,8 @@ def fit_emission_lines(data, fitwidth=4, thresh = 5000., bgthresh = 2000., maxth
             if varbeta:
                 popt, pcov = op.curve_fit(multi_fibmodel_with_amp, xrange, data[xrange], p0=guess, bounds=(lower_bounds,upper_bounds))
             else:
-                popt, pcov = op.curve_fit(CMB_multi_gaussian, xrange, data[xrange], p0=guess, bounds=(lower_bounds,upper_bounds))           
-            
+                popt, pcov = op.curve_fit(CMB_multi_gaussian, xrange, data[xrange], p0=guess, bounds=(lower_bounds,upper_bounds))
+
             #now figure out which peak is the one we wanted originally
             q = np.argwhere(peaks==xguess)[0]
             if varbeta:
@@ -275,9 +277,9 @@ def fit_emission_lines(data, fitwidth=4, thresh = 5000., bgthresh = 2000., maxth
                 if return_all_pars:
                     fitted_sigma = popt[q*3+1]
                     fitted_amp = popt[q*3+2]
-                
-        
-        
+
+
+
         #make sure we actually found a good peak
         if abs(fitted_pos - xguess) >= 2.:
             line_pos_fitted.append(xguess)

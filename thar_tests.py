@@ -2,7 +2,9 @@
 
 
 thflux = pyfits.getdata('/Users/christoph/data/commissioning/20180814/14aug30044_extracted.fits',0)
-thflux2 = pyfits.getdata('/Users/christoph/data/commissioning/20180814/14aug30064_extracted.fits',0)
+#thflux2 = pyfits.getdata('/Users/christoph/data/commissioning/20180814/14aug30064_extracted.fits',0)
+thflux2 = pyfits.getdata('/Users/christoph/data/commissioning/20180916/working/16sep30009_extracted.fits',0)
+
 
 linenum, ordnum, m, pix, wl, model_wl, res = readcol('/Users/christoph/OneDrive - UNSW/linelists/AAT_folder/5th_order_'+
                                                    'clipped_lines_used_in_fit_as_of_2018-08-16.dat',
@@ -54,6 +56,8 @@ for new_ordnum in np.arange(2,40):
 
     shift.append(mu - (len(xc)//2))
     wshift.append(wmu - (len(wxc) // 2))
+
+
 
 
 
@@ -195,11 +199,11 @@ for new_ordnum in np.arange(2,40):
 
 
 
-def quick_bg_fix(raw_data):
-    left_xx = np.arange(2056)
-    right_xx = np.arange(2056, 4112)
-    left_bg = ndimage.minimum_filter(ndimage.gaussian_filter(raw_data[:2056],3), size=100)
-    right_bg = ndimage.minimum_filter(ndimage.gaussian_filter(raw_data[2056:],3), size=100)
+def quick_bg_fix(raw_data, npix=4112):
+    left_xx = np.arange(npix/2)
+    right_xx = np.arange(npix/2, npix)
+    left_bg = ndimage.minimum_filter(ndimage.gaussian_filter(raw_data[:npix/2],3), size=100)
+    right_bg = ndimage.minimum_filter(ndimage.gaussian_filter(raw_data[npix/2:],3), size=100)
     data = raw_data.copy()
     data[left_xx] = raw_data[left_xx] - left_bg
     data[right_xx] = raw_data[right_xx] - right_bg

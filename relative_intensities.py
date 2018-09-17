@@ -8,9 +8,10 @@ import matplotlib.pyplot as plt
 import time
 import numpy as np
 import astropy.io.fits as pyfits
-from scipy import signal
-from scipy import ndimage
+import scipy.optimize as op
 
+# from scipy import signal
+# from scipy import ndimage
 # from lmfit import Parameters, Model
 # from lmfit.models import *
 # from lmfit.minimizer import *
@@ -586,8 +587,8 @@ def get_relints_from_indices(P_id, img, err_img, stripe_indices, mask=None, samp
 
 
 
-def get_relints_single_order(sc, sr, err_sc, ordpol, fppo, ordmask=None, nfib=19, sampling_size=25, step_size=None,
-                             return_snr=True, debug_level=0, timit=False):
+def get_relints_single_order_gaussian(sc, sr, err_sc, ordpol, ordmask=None, nfib=24, sampling_size=25, step_size=None,
+                                      return_snr=True, debug_level=0, timit=False):
     """
     INPUT:
     'sc'             : the flux in the extracted, flattened stripe
@@ -596,7 +597,7 @@ def get_relints_single_order(sc, sr, err_sc, ordpol, fppo, ordmask=None, nfib=19
     'ordpol'         : set of polynomial coefficients from P_id for that order (ie p = P_id[ord])
     'fppo'           : Fibre Profile Parameters by Order (dictionary containing the fitted fibre profile parameters)
     'ordmask'        : gives user the option to provide a mask (eg from "find_stripes")
-    'nfib'           : number of fibres for which to retrieve the relative intensities (default is 19, b/c there are 19 object fibres for VeloceRosso)
+    'nfib'           : number of fibres for which to retrieve the relative intensities (default is 24, b/c there are 19 object fibres plus 5 sky fibres for VeloceRosso)
     'slit_height'    : height of the 'extraction slit' is 2*slit_height
     'sampling_size'  : how many pixels (in dispersion direction) either side of current i-th pixel do you want to consider?
                        (ie stack profiles for a total of 2*sampling_size+1 pixels in dispersion direction...)
@@ -632,8 +633,11 @@ def get_relints_single_order(sc, sr, err_sc, ordpol, fppo, ordmask=None, nfib=19
     if step_size is None:
         step_size = 2 * sampling_size
     userange = np.arange(np.arange(npix)[ordmask][0] + sampling_size, np.arange(npix)[ordmask][-1], step_size)
+    #don't use pixel columns 200 pixels from either end of the chip
+    userange = userange[np.logical_and(userange > 200, userange < npix - 200)]
 
     # prepare output arrays
+    positions = np.zeros((len(userange), nfib))
     relints = np.zeros((len(userange), nfib))
     relints_norm = np.zeros((len(userange), nfib))
     if return_snr:
@@ -658,6 +662,9 @@ def get_relints_single_order(sc, sr, err_sc, ordpol, fppo, ordmask=None, nfib=19
         # NOTE: This also covers row numbers > ny, as in these cases 'sr' is set to zero in "flatten_single_stripe(_from_indices)"
         if ordmask[pix] == False:
             fu = 1
+            line_pos_fitted = np.repeat(-1, nfib)
+            line_amp_fitted = np.repeat(-1, nfib)
+            line_sigma_fitted = np.repeat(-1, nfib)
         elif checkprod == 0:
             fu = 1
             checksum = np.sum(sr[:, pix])
@@ -667,6 +674,9 @@ def get_relints_single_order(sc, sr, err_sc, ordpol, fppo, ordmask=None, nfib=19
             else:
                 print('WARNING: parts of the cutout lie outside the chip!!!')
                 # best_values = {'amp':-1., 'beta':-1., 'mu':-1., 'sigma':-1.}
+            line_pos_fitted = np.repeat(-1, nfib)
+            line_amp_fitted = np.repeat(-1, nfib)
+            line_sigma_fitted = np.repeat(-1, nfib)
         else:
             # this is the NORMAL case, where the entire cutout lies on the chip
             grid = np.array([])
@@ -700,38 +710,57 @@ def get_relints_single_order(sc, sr, err_sc, ordpol, fppo, ordmask=None, nfib=19
             weights = weights[grid.argsort()]
             grid = grid[grid.argsort()]
 
+            if debug_level >= 2:
+                plt.plot(grid,normdata)
+
             # smooth data to make sure we are not finding noise peaks, and add tiny slope to make sure peaks are found even when pixel-values are like [...,3,6,18,41,41,21,11,4,...]
             # this uses snippets from "find_suitable_peaks" and "fit_emission_lines"
-            xx = np.arange(len(normdata))
-            filtered_data = ndimage.gaussian_filter(normdata.astype(np.float), 5.) + xx * 1e-8
-            allpeaks = signal.argrelextrema(filtered_data, np.greater)[0]
-            mostpeaks = allpeaks.copy()
-            goodpeaks = allpeaks.copy()
-            line_pos_fitted = []
-            line_amp_fitted = []
-            line_sigma_fitted = []
+            # xx = np.arange(len(normdata))
+            # filtered_data = ndimage.gaussian_filter(normdata.astype(np.float), 5.) + xx * 1e-8
+            # allpeaks = signal.argrelextrema(filtered_data, np.greater)[0]
+            # mostpeaks = allpeaks.copy()
+            # goodpeaks = allpeaks.copy()
+            goodpeaks, mostpeaks, allpeaks = find_suitable_peaks(normdata, thresh=0.005, bgthresh=0.002,
+                                                                 clip_edges=False, gauss_filter_sigma=10, slope=1e-8)
+            #print('Number of fibres found: ',len(goodpeaks))
+            if len(goodpeaks) != 24 :
+                print('FUUUUU!!! pix = ',pix)
+                line_pos_fitted = np.repeat(-1, nfib)
+                line_amp_fitted = np.repeat(-1, nfib)
+                line_sigma_fitted = np.repeat(-1, nfib)
+            else:
+                line_pos_fitted = []
+                line_amp_fitted = []
+                line_sigma_fitted = []
 
-            for xguess in goodpeaks:
-                ################################################################################################################################################################################
-                # METHOD 1 (using curve_fit; slightly faster than method 2, but IDK how to make sure the fit converged (as with .ier below))
+                for xguess in goodpeaks:
+                    ################################################################################################################################################################################
+                    # METHOD 1 (using curve_fit; slightly faster than method 2, but IDK how to make sure the fit converged (as with .ier below))
 
-                peaks = np.r_[xguess]
+                    peaks = np.r_[grid[xguess]]
 
-                npeaks = len(peaks)
-                xrange = xx[peaks[0] - fitwidth: peaks[-1] + fitwidth + 1]
+                    npeaks = len(peaks)
+                    #xrange = xx[peaks[0] - fitwidth: peaks[-1] + fitwidth + 1]
+                    xrange = grid[xguess - fitwidth: xguess + fitwidth + 1]
 
-                guess = np.array([xguess, 1., data[xguess]])
-                popt, pcov = op.curve_fit(CMB_pure_gaussian, xrange, data[xrange], p0=guess,
-                                          bounds=([xguess - 2, 0, 0], [xguess + 2, np.inf, np.inf]))
-                fitted_pos = popt[0]
-                fitted_sigma = popt[1]
-                fitted_amp = popt[2]
+                    guess = np.array([grid[xguess], 0.6, normdata[xguess]])
+                    popt, pcov = op.curve_fit(CMB_pure_gaussian, xrange, normdata[xguess - fitwidth: xguess + fitwidth + 1], p0=guess,
+                                              bounds=([grid[xguess] - 1, 0, 0], [grid[xguess] + 1, np.inf, np.inf]))
+                    fitted_pos = popt[0]
+                    fitted_sigma = popt[1]
+                    fitted_amp = popt[2]
 
-                line_pos_fitted.append(fitted_pos)
-                line_sigma_fitted.append(fitted_sigma)
-                line_amp_fitted.append(fitted_amp)
+                    line_pos_fitted.append(fitted_pos)
+                    line_sigma_fitted.append(fitted_sigma)
+                    line_amp_fitted.append(fitted_amp)
+
+                    if debug_level >= 2:
+                        plt.plot(xrange, CMB_pure_gaussian(xrange, *popt))
+
+
 
         # fill output array
+        positions[i,:] = line_pos_fitted
         relints[i, :] = line_amp_fitted
         fnorm = line_amp_fitted / np.sum(line_amp_fitted)
         relints_norm[i, :] = fnorm
@@ -740,16 +769,16 @@ def get_relints_single_order(sc, sr, err_sc, ordpol, fppo, ordmask=None, nfib=19
         print('Elapsed time for retrieving relative intensities: ' + np.round(time.time() - start_time, 2).astype(str) + ' seconds...')
 
     if return_snr:
-        return relints, relints_norm, snr
+        return relints, relints_norm, positions, snr
     else:
-        return relints, relints_norm
+        return relints, relints_norm, positions
 
 
 
 
 
 def get_relints_from_indices_gaussian(P_id, img, err_img, stripe_indices, mask=None, sampling_size=25, slit_height=25,
-                                      return_full=False, simu=False, debug_level=0, timit=False):
+                                      debug_level=0, timit=False):
     """
     This routine computes the relative intensities in the individual fibres of a Veloce spectrum.
 
@@ -764,8 +793,6 @@ def get_relints_from_indices_gaussian(P_id, img, err_img, stripe_indices, mask=N
     'sampling_size'  : 'sampling_size'  : how many pixels (in dispersion direction) either side of current i-th pixel do you want to consider?
                        (ie stack profiles for a total of 2*sampling_size+1 pixels in dispersion direction...)
     'slit_height'    : height of the extraction slit (ie the pixel columns are 2*slit_height pixels long)
-    'return_full'    : boolean - do you want to return the full model as well?
-    'simu'           : boolean - are you using simulated spectra?
     'debug_level'    : for debugging...
     'timit'          : boolean - do you want to measure execution run time?
 
@@ -773,8 +800,6 @@ def get_relints_from_indices_gaussian(P_id, img, err_img, stripe_indices, mask=N
     'wm_relints'    : weighted mean (averaged over all pixel columns of all orders) of the relative intensities in the individual fibres
     'relints'       : relative intensities in the individual fibres (only if 'return_full' is set to TRUE)
     'relints_norm'  : normalized relative intensities in the individual fibres (only if 'return_full' is set to TRUE)
-    'fmodel'        : full model (only if 'return_full' is set to TRUE)
-    'model_grid'    : "x-grid" for the full model (only if 'return_full' is set to TRUE)
     """
 
     print('Fitting relative intensities of fibres...')
@@ -790,12 +815,10 @@ def get_relints_from_indices_gaussian(P_id, img, err_img, stripe_indices, mask=N
     #     fibparms = np.load('/Users/christoph/OneDrive - UNSW/fibre_profiles/real/from_master_white_40orders.npy').item()
 
     # create output dictionaries
+    pos = {}
     relints = {}
     snr = {}
     relints_norm = {}
-    if return_full:
-        fmodel = {}
-        model_grid = {}
 
     if mask is None:
         cenmask = {}
@@ -814,27 +837,20 @@ def get_relints_from_indices_gaussian(P_id, img, err_img, stripe_indices, mask=N
 
         # define stripe
         indices = stripe_indices[ord]
+
         # find the "order-box"
         sc, sr = flatten_single_stripe_from_indices(img, indices, slit_height=slit_height, timit=False)
         err_sc, err_sr = flatten_single_stripe_from_indices(err_img, indices, slit_height=slit_height, timit=False)
+
 
         if mask is None:
             cenmask[ord] = np.ones(sc.shape[1], dtype='bool')
 
         # fit profile for single order and save result in "global" parameter dictionary for entire chip
-        if return_full:
-            relints_ord, relints_ord_norm, fmodel_ord, modgrid_ord, snr_ord = get_relints_single_order_gaussian(sc, sr, err_sc,
-                                                                                                       ordpol,
-                                                                                                       ordmask=cenmask[
-                                                                                                           ord],
-                                                                                                       nfib=19,
-                                                                                                       sampling_size=sampling_size,
-                                                                                                       return_full=return_full)
-        else:
-            relints_ord, relints_ord_norm, snr_ord = get_relints_single_order_gaussian(sc, sr, err_sc, ordpol,
-                                                                              ordmask=cenmask[ord], nfib=19,
-                                                                              sampling_size=sampling_size,
-                                                                              return_full=return_full)
+        relints_ord, relints_ord_norm, positions, snr_ord = get_relints_single_order_gaussian(sc, sr, err_sc, ordpol,
+                                                                                   ordmask=cenmask[ord], nfib=24,
+                                                                                   sampling_size=sampling_size)
+
 
         if debug_level >= 2:
             # try to find cause for NaNs
@@ -844,12 +860,13 @@ def get_relints_from_indices_gaussian(P_id, img, err_img, stripe_indices, mask=N
             print('n_elements(SNR) should be:   ' + str(len(snr_ord)) + '   ;   ' + str(
                 np.sum(snr_ord == snr_ord).all()))
 
+        pos[ord] = positions
         relints[ord] = relints_ord
         snr[ord] = snr_ord
         relints_norm[ord] = relints_ord_norm
-        if return_full:
-            fmodel[ord] = fmodel_ord
-            model_grid[ord] = modgrid_ord
+        # if return_full:
+        #     fmodel[ord] = fmodel_ord
+        #     model_grid[ord] = modgrid_ord
 
     # get weighted mean of all relints (weights = SNRs)
     allsnr = np.array([])
@@ -865,11 +882,11 @@ def get_relints_from_indices_gaussian(P_id, img, err_img, stripe_indices, mask=N
     if timit:
         print('Time elapsed: ' + str(int(time.time() - start_time)) + ' seconds...')
 
-    if return_full:
-        return wm_relints, relints, relints_norm, fmodel, model_grid
-    else:
-        return wm_relints
-
+    # if return_full:
+    #     return wm_relints, relints, relints_norm, fmodel, model_grid
+    # else:
+    #     return wm_relints
+    return wm_relints, relints, relints_norm, pos, allsnr
 
 
 

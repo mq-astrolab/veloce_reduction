@@ -903,12 +903,7 @@ def correct_for_bias_and_dark_from_filename(imgname, MB, MD, gain=None, scalable
 
 ########################################3
 
-
-
-
-
-
-
+#below are old code snippets, currently not in use!!!
 
 
 def bias_subtraction(imglist, MB, noneg=True, savefile=True):
