@@ -8,7 +8,7 @@ import glob
 import numpy as np
 import astropy.io.fits as pyfits
 
-from veloce_reduction.order_tracing import find_stripes, make_P_id, extract_stripes, flatten_single_stripe
+from .order_tracing import find_stripes, make_P_id, extract_stripes, flatten_single_stripe
 
 
 

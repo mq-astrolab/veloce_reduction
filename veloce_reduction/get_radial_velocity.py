@@ -10,8 +10,8 @@ import matplotlib.pyplot as plt
 import scipy.interpolate as interp
 import scipy.optimize as op
 import time
-from veloce_reduction.helper_functions import gausslike_with_amp_and_offset_and_slope, central_parts_of_mask
-from veloce_reduction.flat_fielding import deblaze_orders
+from .helper_functions import gausslike_with_amp_and_offset_and_slope, central_parts_of_mask
+from .flat_fielding import deblaze_orders
 
 
 # #speed of light in m/s

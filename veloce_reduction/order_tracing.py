@@ -9,7 +9,7 @@ from scipy import ndimage
 import scipy.sparse as sparse
 import time
 
-from veloce_reduction.helper_functions import sigma_clip
+from .helper_functions import sigma_clip
 
 
 

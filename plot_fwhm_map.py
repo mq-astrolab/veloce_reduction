@@ -6,6 +6,7 @@ Created on 28 Mar. 2018
 
 import astropy.io.fits as pyfits
 import numpy as np
+import sys
 
 from veloce_reduction.helper_functions import polyfit2d,polyval2d
 from veloce_reduction.find_laser_peaks_2D import *

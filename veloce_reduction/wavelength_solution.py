@@ -17,11 +17,7 @@ from lmfit.models import DampedOscillatorModel, DampedHarmonicOscillatorModel, E
 from readcol import readcol 
 import datetime
 
-
-
-
-
-from veloce_reduction.helper_functions import fibmodel_with_amp, CMB_pure_gaussian, multi_fibmodel_with_amp, CMB_multi_gaussian, offset_pseudo_gausslike, fit_poly_surface_2D
+from .helper_functions import fibmodel_with_amp, CMB_pure_gaussian, multi_fibmodel_with_amp, CMB_multi_gaussian, offset_pseudo_gausslike, fit_poly_surface_2D
 
 
 
