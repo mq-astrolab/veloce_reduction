@@ -224,7 +224,7 @@ def fit_emission_lines(data, fitwidth=4, thresh = 5000., bgthresh = 2000., maxth
             peaks = np.r_[xguess]
 
         npeaks = len(peaks)
-        xrange = xx[peaks[0] - fitwidth : peaks[-1] + fitwidth + 1]      #this should satisfy: len(xrange) == len(checkrange) - 2*fitwidth + len(peaks)
+        xrange = xx[np.max([0,peaks[0] - fitwidth]) : np.min([peaks[-1] + fitwidth + 1,len(data)-1])]      #this should satisfy: len(xrange) == len(checkrange) - 2*fitwidth + len(peaks)
 
         if npeaks == 1:
             if varbeta:
@@ -481,8 +481,7 @@ def fit_emission_lines_lmfit(data, fitwidth=None, thresh=5000., bgthresh=2000., 
             peaks = np.r_[xguess]
 
         npeaks = len(peaks)
-        xrange = xx[peaks[0] - fitwidth: peaks[-1] + fitwidth + 1]  # this should satisfy: len(xrange) == len(checkrange) - 2*fitwidth + len(peaks)
-
+        xrange = xx[np.max([0, peaks[0] - fitwidth]): np.min([peaks[-1] + fitwidth + 1, len(data) - 1])]   # this should satisfy: len(xrange) == len(checkrange) - 2*fitwidth + len(peaks)
         
 
         ################################################################################################################################################################################
