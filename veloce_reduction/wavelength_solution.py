@@ -217,7 +217,7 @@ def fit_emission_lines(data, fitwidth=4, thresh = 5000., bgthresh = 2000., maxth
                 other_peaks = np.intersect1d(checkrange, mostpeaks)
                 peaks = np.sort(np.r_[peaks, other_peaks])
                 #define new checkrange
-                checkrange = xx[peaks[0] - 2*fitwidth : peaks[-1] + 2*fitwidth + 1]
+                checkrange = xx[np.max([0,peaks[0] - 2*fitwidth]) : np.min([peaks[-1] + 2*fitwidth + 1,len(data)-1])]
                 dum = np.in1d(checkrange, peaks)
                 checkrange = checkrange[~dum]
         else:
@@ -474,7 +474,7 @@ def fit_emission_lines_lmfit(data, fitwidth=None, thresh=5000., bgthresh=2000., 
                 other_peaks = np.intersect1d(checkrange, mostpeaks)
                 peaks = np.sort(np.r_[peaks, other_peaks])
                 # define new checkrange
-                checkrange = xx[peaks[0] - 2 * fitwidth: peaks[-1] + 2 * fitwidth + 1]
+                checkrange = xx[np.max([0, peaks[0] - 2 * fitwidth]): np.min([peaks[-1] + 2 * fitwidth + 1, len(data) - 1])]
                 dum = np.in1d(checkrange, peaks)
                 checkrange = checkrange[~dum]
         else:
