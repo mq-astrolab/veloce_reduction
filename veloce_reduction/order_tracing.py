@@ -616,7 +616,6 @@ def find_tramlines_single_order(uu, ul, lu, ll, mask_uu, mask_ul, mask_lu, mask_
     upper_boundary = 0.5 * (p_uu(xx) + p_ul(xx))
     lower_boundary = 0.5 * (p_lu(xx) + p_ll(xx))
     
-    
     return upper_boundary, lower_boundary
 
 

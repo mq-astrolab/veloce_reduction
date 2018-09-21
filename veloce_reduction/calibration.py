@@ -10,7 +10,7 @@ from itertools import combinations
 import time
 import matplotlib.pyplot as plt
 
-from .helper_functions import make_quadrant_masks, correct_orientation, sigma_clip, make_median_image, polyfit2d, polyval2d
+from veloce_reduction.veloce_reduction.helper_functions import make_quadrant_masks, correct_orientation, sigma_clip, make_median_image, polyfit2d, polyval2d
 #from . import *
 
 
@@ -321,7 +321,7 @@ def get_bias_and_readnoise_from_overscan(img, timit=False):
 
 def get_bias_and_readnoise_from_bias_frames(bias_list, degpol=5, clip=5, gain=None, debug_level=0, timit=False):
     """
-    Calculate the median bias frame, the offsets in the foru different quadrants (assuming bias frames are flat within a quadrant),
+    Calculate the median bias frame, the offsets in the four different quadrants (assuming bias frames are flat within a quadrant),
     and the read-out noise per quadrant (ie the STDEV of the signal, but from difference images).
     
     INPUT:
@@ -488,6 +488,20 @@ def get_bias_and_readnoise_from_bias_frames(bias_list, degpol=5, clip=5, gain=No
     print('Done!!!')
     if timit:
         print('Time elapsed: '+str(np.round(time.time() - start_time,1))+' seconds')
+
+    if savefile:
+        #save median bias image
+        dum = bias_list[0].split('/')
+        path = bias_list[0][0:-len(dum[-1])]
+        #get header from the read-noise mask file
+        h = pyfits.getheader(path+'read_noise_mask.fits')
+        #change a few things
+        for i in range(1,5):
+            del h['offset_'+str(i)]
+        h['UNITS'] = 'ADU'
+        h['HISTORY'][0] = ('   median BIAS frame - created '+time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())+' (GMT)')
+        #write master bias to file
+        pyfits.writeto(path+'median_bias.fits', medimg, h, clobber=True)
 
     return medimg,coeffs,offsets,rons
 

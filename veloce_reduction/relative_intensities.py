@@ -620,6 +620,8 @@ def get_relints_single_order_gaussian(sc, sr, err_sc, ordpol, ordmask=None, nfib
     03/08/2018 - CMB added proper error treatment
     """
 
+    fitwidth = 30
+
     if timit:
         start_time = time.time()
     if debug_level >= 1:
@@ -652,7 +654,7 @@ def get_relints_single_order_gaussian(sc, sr, err_sc, ordpol, ordmask=None, nfib
         # fail-check variable
         fu = 0
 
-        # calculate SNR of collapsed super-pixel at this location
+        # calculate SNR of collapsed super-pixel at this location (ignoring RON)
         if return_snr:
             #snr.append(np.sqrt(np.sum(sc[:,pix])))
             snr.append(np.sum(sc[:, pix]) / np.sqrt(np.sum(err_sc[:, pix] ** 2)))
@@ -720,7 +722,8 @@ def get_relints_single_order_gaussian(sc, sr, err_sc, ordpol, ordmask=None, nfib
             # allpeaks = signal.argrelextrema(filtered_data, np.greater)[0]
             # mostpeaks = allpeaks.copy()
             # goodpeaks = allpeaks.copy()
-            goodpeaks, mostpeaks, allpeaks = find_suitable_peaks(normdata, thresh=0.005, bgthresh=0.002,
+            dynrange = np.max(normdata) - np.min(normdata)
+            goodpeaks, mostpeaks, allpeaks = find_suitable_peaks(normdata, thresh=np.min(normdata)+0.5*dynrange, bgthresh=np.min(normdata)+0.25*dynrange,
                                                                  clip_edges=False, gauss_filter_sigma=10, slope=1e-8)
             #print('Number of fibres found: ',len(goodpeaks))
             if len(goodpeaks) != 24 :

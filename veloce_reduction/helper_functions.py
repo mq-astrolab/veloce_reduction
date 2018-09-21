@@ -18,7 +18,7 @@ from scipy import special, signal
 from numpy.polynomial import polynomial
 
 
-#from veloce_reduction.calibration import crop_overscan_region
+from veloce_reduction.veloce_reduction.calibration import crop_overscan_region
 
 
 
@@ -720,7 +720,7 @@ def make_median_image(imglist, MB=None, raw=False):
     'medimg'   : median image             
     """
     
-    from veloce_reduction.calibration import crop_overscan_region
+    #from veloce_reduction.calibration import crop_overscan_region
     
     #prepare array
     allimg = []
