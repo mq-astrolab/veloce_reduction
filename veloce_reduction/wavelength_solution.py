@@ -208,7 +208,7 @@ def fit_emission_lines(data, fitwidth=4, thresh = 5000., bgthresh = 2000., maxth
 
         if not laser:
             #check if there are any other peaks in the vicinity of the peak in question (exclude the peak itself)
-            checkrange = np.r_[xx[xguess - 2*fitwidth : xguess], xx[xguess+1 : xguess + 2*fitwidth+1]]
+            checkrange = np.r_[xx[np.max([0,xguess - 2*fitwidth]) : xguess], xx[xguess+1 : np.min([xguess + 2*fitwidth+1, len(data)-1])]]
             peaks = np.r_[xguess]
             #while len((set(checkrange) & set(allpeaks))) > 0:    THE RESULTS ARE COMPARABLE, BUT USING MOSTPEAKS IS MUCH FASTER
             while len((set(checkrange) & set(mostpeaks))) > 0:
@@ -465,7 +465,7 @@ def fit_emission_lines_lmfit(data, fitwidth=None, thresh=5000., bgthresh=2000., 
 
         if not laser:
             # check if there are any other peaks in the vicinity of the peak in question (exclude the peak itself)
-            checkrange = np.r_[xx[xguess - 2 * fitwidth: xguess], xx[xguess + 1: xguess + 2 * fitwidth + 1]]
+            checkrange = np.r_[xx[np.max([0, xguess - 2 * fitwidth]): xguess], xx[xguess + 1: np.min([xguess + 2 * fitwidth + 1, len(data) - 1])]]
             peaks = np.r_[xguess]
             # while len((set(checkrange) & set(allpeaks))) > 0:    THE RESULTS ARE COMPARABLE, BUT USING MOSTPEAKS IS MUCH FASTER
             while len((set(checkrange) & set(mostpeaks))) > 0:

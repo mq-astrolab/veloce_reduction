@@ -735,6 +735,10 @@ def get_relints_single_order_gaussian(sc, sr, err_sc, ordpol, ordmask=None, nfib
                 line_pos_fitted = []
                 line_amp_fitted = []
                 line_sigma_fitted = []
+                global_model = np.zeros(grid.shape)
+
+                if debug_level >= 2:
+                    plt.plot(grid, normdata)
 
                 for xguess in goodpeaks:
                     ################################################################################################################################################################################
@@ -756,6 +760,8 @@ def get_relints_single_order_gaussian(sc, sr, err_sc, ordpol, ordmask=None, nfib
                     line_pos_fitted.append(fitted_pos)
                     line_sigma_fitted.append(fitted_sigma)
                     line_amp_fitted.append(fitted_amp)
+
+                    global_model += CMB_pure_gaussian(grid,*popt)
 
                     if debug_level >= 2:
                         plt.plot(xrange, CMB_pure_gaussian(xrange, *popt))
