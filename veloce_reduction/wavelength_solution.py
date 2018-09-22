@@ -208,7 +208,7 @@ def fit_emission_lines(data, fitwidth=4, thresh = 5000., bgthresh = 2000., maxth
 
         if not laser:
             #check if there are any other peaks in the vicinity of the peak in question (exclude the peak itself)
-            checkrange = np.r_[xx[xguess - 2*fitwidth : xguess], xx[xguess+1 : xguess + 2*fitwidth+1]]
+            checkrange = np.r_[xx[np.max([0,xguess - 2*fitwidth]) : xguess], xx[xguess+1 : np.min([xguess + 2*fitwidth+1, len(data)-1])]]
             peaks = np.r_[xguess]
             #while len((set(checkrange) & set(allpeaks))) > 0:    THE RESULTS ARE COMPARABLE, BUT USING MOSTPEAKS IS MUCH FASTER
             while len((set(checkrange) & set(mostpeaks))) > 0:
@@ -217,14 +217,14 @@ def fit_emission_lines(data, fitwidth=4, thresh = 5000., bgthresh = 2000., maxth
                 other_peaks = np.intersect1d(checkrange, mostpeaks)
                 peaks = np.sort(np.r_[peaks, other_peaks])
                 #define new checkrange
-                checkrange = xx[peaks[0] - 2*fitwidth : peaks[-1] + 2*fitwidth + 1]
+                checkrange = xx[np.max([0,peaks[0] - 2*fitwidth]) : np.min([peaks[-1] + 2*fitwidth + 1,len(data)-1])]
                 dum = np.in1d(checkrange, peaks)
                 checkrange = checkrange[~dum]
         else:
             peaks = np.r_[xguess]
 
         npeaks = len(peaks)
-        xrange = xx[peaks[0] - fitwidth : peaks[-1] + fitwidth + 1]      #this should satisfy: len(xrange) == len(checkrange) - 2*fitwidth + len(peaks)
+        xrange = xx[np.max([0,peaks[0] - fitwidth]) : np.min([peaks[-1] + fitwidth + 1,len(data)-1])]      #this should satisfy: len(xrange) == len(checkrange) - 2*fitwidth + len(peaks)
 
         if npeaks == 1:
             if varbeta:
@@ -465,7 +465,7 @@ def fit_emission_lines_lmfit(data, fitwidth=None, thresh=5000., bgthresh=2000., 
 
         if not laser:
             # check if there are any other peaks in the vicinity of the peak in question (exclude the peak itself)
-            checkrange = np.r_[xx[xguess - 2 * fitwidth: xguess], xx[xguess + 1: xguess + 2 * fitwidth + 1]]
+            checkrange = np.r_[xx[np.max([0, xguess - 2 * fitwidth]): xguess], xx[xguess + 1: np.min([xguess + 2 * fitwidth + 1, len(data) - 1])]]
             peaks = np.r_[xguess]
             # while len((set(checkrange) & set(allpeaks))) > 0:    THE RESULTS ARE COMPARABLE, BUT USING MOSTPEAKS IS MUCH FASTER
             while len((set(checkrange) & set(mostpeaks))) > 0:
@@ -474,15 +474,14 @@ def fit_emission_lines_lmfit(data, fitwidth=None, thresh=5000., bgthresh=2000., 
                 other_peaks = np.intersect1d(checkrange, mostpeaks)
                 peaks = np.sort(np.r_[peaks, other_peaks])
                 # define new checkrange
-                checkrange = xx[peaks[0] - 2 * fitwidth: peaks[-1] + 2 * fitwidth + 1]
+                checkrange = xx[np.max([0, peaks[0] - 2 * fitwidth]): np.min([peaks[-1] + 2 * fitwidth + 1, len(data) - 1])]
                 dum = np.in1d(checkrange, peaks)
                 checkrange = checkrange[~dum]
         else:
             peaks = np.r_[xguess]
 
         npeaks = len(peaks)
-        xrange = xx[peaks[0] - fitwidth: peaks[-1] + fitwidth + 1]  # this should satisfy: len(xrange) == len(checkrange) - 2*fitwidth + len(peaks)
-
+        xrange = xx[np.max([0, peaks[0] - fitwidth]): np.min([peaks[-1] + fitwidth + 1, len(data) - 1])]   # this should satisfy: len(xrange) == len(checkrange) - 2*fitwidth + len(peaks)
         
 
         ################################################################################################################################################################################

@@ -18,8 +18,6 @@ from scipy import special, signal
 from numpy.polynomial import polynomial
 
 
-#from veloce_reduction.calibration import crop_overscan_region
-
 
 
 
@@ -677,21 +675,6 @@ def short_filenames(file_list):
 
 
 
-def make_quadrant_masks(nx,ny):
-    
-    #define four quadrants via masks
-    q1 = np.zeros((ny,nx),dtype='bool')
-    q1[:(ny/2), :(nx/2)] = True
-    q2 = np.zeros((ny,nx),dtype='bool')
-    q2[:(ny/2), (nx/2):] = True
-    q3 = np.zeros((ny,nx),dtype='bool')
-    q3[(ny/2):, (nx/2):] = True
-    q4 = np.zeros((ny,nx),dtype='bool')
-    q4[(ny/2):, :(nx/2)] = True
-    
-    return q1,q2,q3,q4
-
-
 
 def correct_orientation(img, orient=1):
     """
@@ -705,46 +688,6 @@ def correct_orientation(img, orient=1):
     return img
 
 
-
-def make_median_image(imglist, MB=None, raw=False):
-    """
-    Make a median image from a given list of images.
-    
-    INPUT:
-    'imglist'  : list of files (incl. directories)
-    'MB'       : master bias frame - if provided, it will be subtracted from every image before median image is computed
-    'raw'      : boolean - set to TRUE if you want to retain the original size and orientation; 
-                 otherwise the image will be brought to the 'correct' orientation and the overscan regions will be cropped
-                 
-    OUTPUT:
-    'medimg'   : median image             
-    """
-    
-    from veloce_reduction.calibration import crop_overscan_region
-    
-    #prepare array
-    allimg = []
-    
-    #loop over all files in "dark_list"
-    for file in imglist:
-        #read in dark image
-        img = pyfits.getdata(file)
-        if not raw:
-            #bring to "correct" orientation
-            img = correct_orientation(img)
-            #remove the overscan region
-            img = crop_overscan_region(img)
-        if MB is not None: 
-            #subtract master bias (if provided)
-            img = img - MB
-        
-        #add image to list
-        allimg.append(img)
-
-    #get median image
-    medimg = np.median(np.array(allimg), axis=0)
-    
-    return medimg
 
 
 

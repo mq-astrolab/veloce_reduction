@@ -620,6 +620,8 @@ def get_relints_single_order_gaussian(sc, sr, err_sc, ordpol, ordmask=None, nfib
     03/08/2018 - CMB added proper error treatment
     """
 
+    fitwidth = 30
+
     if timit:
         start_time = time.time()
     if debug_level >= 1:
@@ -652,7 +654,7 @@ def get_relints_single_order_gaussian(sc, sr, err_sc, ordpol, ordmask=None, nfib
         # fail-check variable
         fu = 0
 
-        # calculate SNR of collapsed super-pixel at this location
+        # calculate SNR of collapsed super-pixel at this location (ignoring RON)
         if return_snr:
             #snr.append(np.sqrt(np.sum(sc[:,pix])))
             snr.append(np.sum(sc[:, pix]) / np.sqrt(np.sum(err_sc[:, pix] ** 2)))
@@ -720,7 +722,8 @@ def get_relints_single_order_gaussian(sc, sr, err_sc, ordpol, ordmask=None, nfib
             # allpeaks = signal.argrelextrema(filtered_data, np.greater)[0]
             # mostpeaks = allpeaks.copy()
             # goodpeaks = allpeaks.copy()
-            goodpeaks, mostpeaks, allpeaks = find_suitable_peaks(normdata, thresh=0.005, bgthresh=0.002,
+            dynrange = np.max(normdata) - np.min(normdata)
+            goodpeaks, mostpeaks, allpeaks = find_suitable_peaks(normdata, thresh=np.min(normdata)+0.5*dynrange, bgthresh=np.min(normdata)+0.25*dynrange,
                                                                  clip_edges=False, gauss_filter_sigma=10, slope=1e-8)
             #print('Number of fibres found: ',len(goodpeaks))
             if len(goodpeaks) != 24 :
@@ -733,29 +736,44 @@ def get_relints_single_order_gaussian(sc, sr, err_sc, ordpol, ordmask=None, nfib
                 line_amp_fitted = []
                 line_sigma_fitted = []
 
-                for xguess in goodpeaks:
-                    ################################################################################################################################################################################
-                    # METHOD 1 (using curve_fit; slightly faster than method 2, but IDK how to make sure the fit converged (as with .ier below))
 
-                    peaks = np.r_[grid[xguess]]
+                #do the fitting
+                peaks = np.r_[grid[goodpeaks]]
 
-                    npeaks = len(peaks)
-                    #xrange = xx[peaks[0] - fitwidth: peaks[-1] + fitwidth + 1]
-                    xrange = grid[xguess - fitwidth: xguess + fitwidth + 1]
 
-                    guess = np.array([grid[xguess], 0.6, normdata[xguess]])
-                    popt, pcov = op.curve_fit(CMB_pure_gaussian, xrange, normdata[xguess - fitwidth: xguess + fitwidth + 1], p0=guess,
-                                              bounds=([grid[xguess] - 1, 0, 0], [grid[xguess] + 1, np.inf, np.inf]))
-                    fitted_pos = popt[0]
-                    fitted_sigma = popt[1]
-                    fitted_amp = popt[2]
 
-                    line_pos_fitted.append(fitted_pos)
-                    line_sigma_fitted.append(fitted_sigma)
-                    line_amp_fitted.append(fitted_amp)
 
-                    if debug_level >= 2:
-                        plt.plot(xrange, CMB_pure_gaussian(xrange, *popt))
+
+                # global_model = np.zeros(grid.shape)
+                #
+                # # if debug_level >= 2:
+                #     plt.plot(grid, normdata)
+                #
+                # for xguess in goodpeaks:
+                #     ################################################################################################################################################################################
+                #     # METHOD 1 (using curve_fit; slightly faster than method 2, but IDK how to make sure the fit converged (as with .ier below))
+                #
+                #     peaks = np.r_[grid[xguess]]
+                #
+                #     npeaks = len(peaks)
+                #     #xrange = xx[peaks[0] - fitwidth: peaks[-1] + fitwidth + 1]
+                #     xrange = grid[xguess - fitwidth: xguess + fitwidth + 1]
+                #
+                #     guess = np.array([grid[xguess], 0.6, normdata[xguess]])
+                #     popt, pcov = op.curve_fit(CMB_pure_gaussian, xrange, normdata[xguess - fitwidth: xguess + fitwidth + 1], p0=guess,
+                #                               bounds=([grid[xguess] - 1, 0, 0], [grid[xguess] + 1, np.inf, np.inf]))
+                #     fitted_pos = popt[0]
+                #     fitted_sigma = popt[1]
+                #     fitted_amp = popt[2]
+                #
+                #     line_pos_fitted.append(fitted_pos)
+                #     line_sigma_fitted.append(fitted_sigma)
+                #     line_amp_fitted.append(fitted_amp)
+                #
+                #     global_model += CMB_pure_gaussian(grid,*popt)
+                #
+                #     if debug_level >= 2:
+                #         plt.plot(xrange, CMB_pure_gaussian(xrange, *popt))
 
 
 

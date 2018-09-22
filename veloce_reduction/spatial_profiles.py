@@ -591,8 +591,8 @@ def fit_profiles_single_order(stripe_rows, stripe_columns, ordpol, osf=1, method
 
 def fit_profiles(P_id, stripes, err_stripes, mask=None, stacking=True, slit_height=25, model='gausslike', return_stats=False, timit=False):
     """
-    This routine determines the profiles of the fibres in spatial direction. This is an extremely crucial step, as the pre-defined profiles are then used during
-    the optimal extraction, as well as during the determination of the relative fibre intensities!!!
+    This routine determines the profiles of the fibres in spatial direction. This is an extremely crucial step, as the pre-defined profiles
+    are then used during the optimal extraction, as well as during the determination of the relative fibre intensities!!!
     
     INPUT:
     'P_id'          : dictionary of the form of {order: np.poly1d, ...} (as returned by "identify_stripes")
