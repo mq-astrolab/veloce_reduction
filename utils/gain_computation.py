@@ -13,39 +13,59 @@ import astropy.io.fits as pyfits
 import glob
 import subtract_overscan as so
 import quadrant_medians as qm
+import scipy.ndimage as nd
 import pdb
 
-nbins = 20
-bin_min = 100
+gfile = open('/Users/mireland/delete_this/gains.csv','w')
+rfile = open('/Users/mireland/delete_this/rnoise.csv','w')
 
-#FIXME hardwired
+nbins = 20
+bin_min = -10
+
+#NB hardwired
 szy=4112
 szx=4096
-gfile = open('gains.csv','w')
-rfile = open('rnoise.csv','w')
+ylos = [0, 0, szy//2, szy//2]
+yhis = [szy//2, szy//2, szy, szy]
+xlos = [0, szx//2, szx//2, 0]
+xhis = [szx//2, szx, szx, szx//2]
+quadrants = [0,1,2,3]
+
 
 for speed in [0,1,2,3]:
-#for speed in [1]:
-    for gain in [2,5]:
-        dark_prefix = '/Users/mireland/data/veloce/gain_biases/s{:d}g{:d}'.format(speed, gain)
+#    for gain in [2,5]:
+    for gain in [5]:
+        #Ignore
         bright_prefix = '/Users/mireland/data/veloce/gain_bright/s{:d}g{:d}'.format(speed, gain)
 
-        #--------Automatic from here---------
-        dark_files = glob.glob(dark_prefix + "*fits")
-        dark_meds, dark_sdev = qm.quadrant_medians(dark_files[0], median_filter=False)
         bright_files = glob.glob(bright_prefix + "*fits")
 
-        ylos = [0, 0, szy//2, szy//2]
-        yhis = [szy//2, szy//2, szy, szy]
-        xlos = [0, szx//2, szx//2, 0]
-        xhis = [szx//2, szx, szx, szx//2]
-        quadrants = [0,1,2,3]
-
         #Read in the bright files and compute a pixel-based variance
-        bright_cube = []
+        bright_smoothed = []
+        bright_resid = []
         for fn in bright_files:
-            bright_cube.append(so.read_and_overscan_correct(fn))
-        bright_cube = np.array(bright_cube)    
+            frame, overscans = so.read_and_overscan_correct(fn, return_overscan=True)
+            quads = qm.split_to_quadrants(frame, overscan=0)
+            q_smoothed = []
+            q_resid = []
+            for q,o in zip(quads,overscans):
+                #First, create a smoothed version of the quadrant...
+                medfilt_fullquad = nd.median_filter(q,7)
+                q_smoothed.append(medfilt_fullquad[3:-3,3:-3])
+                q_resid = (q - medfilt_fullquad)[3:-3,3:-3]
+
+                
+                #!!! the following didn't work adequately
+                #Median of a chi-squared distribution is 0.4545 times the mean. So
+                #we can use the median square to estimate the mean square.
+                #q_var = nd.median_filter((q - q_medfilt)**2, 7)[3:-3,3:-3]/0.4545
+                #print(np.median(q_medfilt[3:-3,3:-3]/q_var))
+            bright_smoothed.append(q_smoothed)
+            bright_resid.append(q_smoothed)
+        pdb.set_trace()
+        
+        #bright_cube.append(so.read_and_overscan_correct(fn))
+        #bright_cube = np.array(bright_cube)    
 
         #Now the tricky bit... scale each frame to account for varying flux from the source.
         mean_bright = np.mean(bright_cube, axis=0)
@@ -85,10 +105,12 @@ for speed in [0,1,2,3]:
             plt.clf()
             plt.plot(binned_means, binned_vars,'o')
             plt.plot(binned_means, dark_sdev[quadrant]**2**2 + gain_ADU_e*binned_means)
+            plt.title('Gain ix: {:d} Speed ix: {:d}'.format(gain, speed))
             plt.axis([0,np.max(binned_means),0,2.5*np.median(binned_vars)])
             plt.xlabel("Flux")
             plt.ylabel("Variance")
             plt.pause(.01)
+            #pdb.set_trace()
     
 
             print("Gain in e/ADU {:5.3f}".format(1/gain_ADU_e))
