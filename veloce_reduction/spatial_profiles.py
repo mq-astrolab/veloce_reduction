@@ -19,6 +19,8 @@ from .order_tracing import flatten_single_stripe, flatten_single_stripe_from_ind
 
 
 
+
+
 def determine_spatial_profiles_single_order(sc, sr, err_sc, ordpol, ordmask=None, model='gausslike', sampling_size=50, return_stats=False, debug_level=0, timit=False):
     """
     Calculate the spatial-direction profiles of the fibres for a single order.
