@@ -136,8 +136,8 @@ def find_suitable_peaks(rawdata, thresh = 5000., bgthresh = 2000., maxthresh = N
 
 
 def fit_emission_lines(data, fitwidth=4, thresh = 5000., bgthresh = 2000., maxthresh = None, slope=1e-4, laser=False,
-                       varbeta=True, minsigma=0., maxsigma=np.inf, minbeta=1., maxbeta=4., return_all_pars=False,
-                       return_qualflag=False, verbose=False, timit=False):
+                       varbeta=True, offset=False, minsigma=0., maxsigma=np.inf, sigma_0=1., minamp=0., maxamp=np.inf,
+                       minbeta=1., maxbeta=4., beta_0=2., return_all_pars=False, return_qualflag=False, verbose=False, timit=False):
     """
     This routine identifies and fits emission lines in a 1-dim spectrum (ie generally speaking it finds and fits peaks in a 1dim array), using "scipy.optimize.curve_fit".
     Detection threshold, background threshold, and maximum threshold can be provided as keyword parameters. Different models for the peak-like function can be selected.
@@ -153,10 +153,15 @@ def fit_emission_lines(data, fitwidth=4, thresh = 5000., bgthresh = 2000., maxth
     'slope'            : value of the (tiny) slope that's added in order to break possible degeneracies between adjacent pixels
     'laser'            : boolean - is this a LFC spectrum? (if set to true, there is no check for blended lines)
     'varbeta'          : boolean - if set to TRUE, use a Gauss-like function for fitting, if set to FALSE use a plain Gaussian
+    'offset'           : boolean - do you want to fit an offset to each peak as well?
     'minsigma'         : lower threshold for allowed sigma values
     'maxsigma'         : upper threshold for allowed sigma values
+    'sigma_0'          : initial guess for sigma
+    'minamp'           : lower threshold for allowed amplitude values
+    'maxamp'           : upper threshold for allowed amplitude values
     'minbeta'          : lower threshold for allowed beta values
     'maxbeta'          : upper threshold for allowed beta values
+    'beta_0'           : initial guess for beta
     'return_all_pars'  : boolean - do you want to return all fit parameters?
     'return_qualflag'  : boolean - do you want to return a quality flag for each line fit?
     'verbose'          : boolean - for debugging...
@@ -207,8 +212,8 @@ def fit_emission_lines(data, fitwidth=4, thresh = 5000., bgthresh = 2000., maxth
         qualflag = []
         
     for xguess in goodpeaks:
-#         if verbose:
-#             print('xguess = ',xguess)
+        if verbose:
+            print('xguess = ',xguess)
         ################################################################################################################################################################################
         #METHOD 1 (using curve_fit; slightly faster than method 2, but IDK how to make sure the fit converged (as with .ier below))
 
@@ -230,15 +235,23 @@ def fit_emission_lines(data, fitwidth=4, thresh = 5000., bgthresh = 2000., maxth
             peaks = np.r_[xguess]
 
         npeaks = len(peaks)
-        xrange = xx[np.max([0,peaks[0] - fitwidth]) : np.min([peaks[-1] + fitwidth + 1,len(data)-1])]      #this should satisfy: len(xrange) == len(checkrange) - 2*fitwidth + len(peaks)
+        xrange = xx[np.max([0,peaks[0] - fitwidth]) : np.min([peaks[-1] + fitwidth + 1,len(data)-1])]      # this should satisfy: len(xrange) == len(checkrange) - 2*fitwidth + len(peaks)
 
         if npeaks == 1:
-            if varbeta:
-                guess = np.array([xguess, 1., data[xguess], 2.])
-                popt, pcov = op.curve_fit(fibmodel_with_amp, xrange, data[xrange], p0=guess, bounds=([xguess-2,minsigma,0,minbeta],[xguess+2,maxsigma,np.inf,maxbeta]))
+            if offset:
+                if varbeta:
+                    guess = np.array([xguess, sigma_0, data[xguess], beta_0, 0])
+                    popt, pcov = op.curve_fit(fibmodel_with_amp_and_offset, xrange, data[xrange], p0=guess, bounds=([xguess-2,minsigma,minamp,minbeta,0],[xguess+2,maxsigma,maxamp,maxbeta,thresh]))
+                else:
+                    guess = np.array([xguess, sigma_0, data[xguess], 0])
+                    popt, pcov = op.curve_fit(gaussian_with_offset, xrange, data[xrange], p0=guess, bounds=([xguess-2,minsigma,minamp,0],[xguess+2,maxsigma,maxamp,]))
             else:
-                guess = np.array([xguess, 1., data[xguess]])
-                popt, pcov = op.curve_fit(CMB_pure_gaussian, xrange, data[xrange], p0=guess, bounds=([xguess-2,minsigma,0],[xguess+2,maxsigma,np.inf]))
+                if varbeta:
+                    guess = np.array([xguess, sigma_0, data[xguess], beta_0])
+                    popt, pcov = op.curve_fit(fibmodel_with_amp, xrange, data[xrange], p0=guess, bounds=([xguess-2,minsigma,minamp,minbeta],[xguess+2,maxsigma,maxamp,maxbeta]))
+                else:
+                    guess = np.array([xguess, sigma_0, data[xguess]])
+                    popt, pcov = op.curve_fit(CMB_pure_gaussian, xrange, data[xrange], p0=guess, bounds=([xguess-2,minsigma,minamp],[xguess+2,maxsigma,maxamp]))
             fitted_pos = popt[0]
             if return_all_pars:
                 fitted_sigma = popt[1]
@@ -251,13 +264,13 @@ def fit_emission_lines(data, fitwidth=4, thresh = 5000., bgthresh = 2000., maxth
             upper_bounds = []
             for i in range(npeaks):
                 if varbeta:
-                    guess.append(np.array([peaks[i], 1., data[peaks[i]], 2.]))
-                    lower_bounds.append([peaks[i]-2,minsigma,0,minbeta])
-                    upper_bounds.append([peaks[i]+2,maxsigma,np.inf,maxbeta])
+                    guess.append(np.array([peaks[i], sigma_0, data[peaks[i]], beta_0]))
+                    lower_bounds.append([peaks[i]-2,minsigma,minamp,minbeta])
+                    upper_bounds.append([peaks[i]+2,maxsigma,maxamp,maxbeta])
                 else:
-                    guess.append(np.array([peaks[i], 1., data[peaks[i]]]))
-                    lower_bounds.append([peaks[i]-2,minsigma,0])
-                    upper_bounds.append([peaks[i]+2,maxsigma,np.inf])
+                    guess.append(np.array([peaks[i], sigma_0, data[peaks[i]]]))
+                    lower_bounds.append([peaks[i]-2,minsigma,minamp])
+                    upper_bounds.append([peaks[i]+2,maxsigma,maxamp])
             guess = np.array(guess).flatten()
             lower_bounds = np.array(lower_bounds).flatten()
             upper_bounds = np.array(upper_bounds).flatten()
@@ -281,7 +294,7 @@ def fit_emission_lines(data, fitwidth=4, thresh = 5000., bgthresh = 2000., maxth
                     fitted_amp = popt[q*3+2]
 
 
-
+        print('haehaehae')
         #make sure we actually found a good peak
         if abs(fitted_pos - xguess) >= 2.:
             line_pos_fitted.append(xguess)

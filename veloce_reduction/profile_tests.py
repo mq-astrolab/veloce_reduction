@@ -1,3 +1,16 @@
+
+
+import time
+import numpy as np
+import matplotlib.pyplot as plt
+import scipy.optimize as op
+
+from veloce_reduction.veloce_reduction.wavelength_solution import find_suitable_peaks
+from veloce_reduction.veloce_reduction.helper_functions import multi_fibmodel_with_amp, CMB_multi_gaussian
+
+
+
+
 def get_fibre_profiles_single_order(sc, sr, err_sc, ordpol, ordmask=None, nfib=24, sampling_size=25, step_size=None,
                                     varbeta=True, return_snr=True, debug_level=0, timit=False):
     """
@@ -8,30 +21,36 @@ def get_fibre_profiles_single_order(sc, sr, err_sc, ordpol, ordmask=None, nfib=2
     'ordpol'         : set of polynomial coefficients from P_id for that order (ie p = P_id[ord])
     'fppo'           : Fibre Profile Parameters by Order (dictionary containing the fitted fibre profile parameters)
     'ordmask'        : gives user the option to provide a mask (eg from "find_stripes")
-    'nfib'           : number of fibres for which to retrieve the relative intensities (default is 24, b/c there are 19 object fibres plus 5 sky fibres for VeloceRosso)
+    'nfib'           : number of fibres for which to retrieve the relative intensities (default is 24, b/c there are
+                       19 object fibres plus 5 sky fibres for VeloceRosso)
     'slit_height'    : height of the 'extraction slit' is 2*slit_height
-    'sampling_size'  : how many pixels (in dispersion direction) either side of current i-th pixel do you want to consider?
-                       (ie stack profiles for a total of 2*sampling_size+1 pixels in dispersion direction...)
-    'step_size'      : only calculate the relative intensities every so and so many pixels (should not change, plus it takes ages...)
-    'return_full'    : boolean - do you want to also return the full model (if FALSE, then only the relative intensities are returned)
-    'return_snr'     : boolean - do you want to return the SNR of the collapsed super-pixel at each location in 'userange'?
+    'sampling_size'  : how many pixels (in dispersion direction) either side of current i-th pixel do you want to
+                       consider? (ie stack profiles for a total of 2*sampling_size+1 pixels in dispersion direction...)
+    'step_size'      : only calculate the relative intensities every so and so many pixels (should not change, plus it
+                       takes ages...)
+    'return_full'    : boolean - do you want to also return the full model (if FALSE, then only the relative intensities
+                       are returned)
+    'return_snr'     : boolean - do you want to return the SNR of the collapsed super-pixel at each location
+                       in 'userange'?
     'debug_level'    : for debugging...
 
     OUTPUT:
     'relints'        : relative intensities in the fibres
     'relints_norm'   : relative intensities in the fibres re-normalized to a sum of 1
     'full_model'     : a list containing the full model of every cutout (only if 'return_full' is set to TRUE)
-    'modgrid'        : a list containing the grid on which the full model is evaluated (only if 'return_full' is set to TRUE)
+    'modgrid'        : a list containing the grid on which the full model is evaluated (only if 'return_full' is
+                       set to TRUE)
 
 
     MODHIST:
-    14/06/2018 - CMB create (essentially a clone of "determine_spatial_profiles_single_order", but removed all the parts concerning the testing of different models)
+    14/06/2018 - CMB create (essentially a clone of "determine_spatial_profiles_single_order", but removed all the parts
+                 concerning the testing of different models)
     25/06/2018 - CMB added call to "linalg_extract_column" rather than naively fitting some model
     28/06/2018 - CMB added 'return_snr' keyword
     03/08/2018 - CMB added proper error treatment
     """
 
-    #TODO: add offset and/or slope to fit
+    # TODO: add offset and/or slope to fit
 
     if timit:
         start_time = time.time()
@@ -46,12 +65,12 @@ def get_fibre_profiles_single_order(sc, sr, err_sc, ordpol, ordmask=None, nfib=2
     if step_size is None:
         step_size = 2 * sampling_size
     userange = np.arange(np.arange(npix)[ordmask][0] + sampling_size, np.arange(npix)[ordmask][-1], step_size)
-    #don't use pixel columns 200 pixels from either end of the chip
+    # don't use pixel columns 200 pixels from either end of the chip
     userange = userange[np.logical_and(userange > 200, userange < npix - 200)]
 
     # prepare output dictionary
     fibre_profiles_ord = {}
-    fibre_profiles_ord['mu'] = np.zeros((len(userange),nfib))
+    fibre_profiles_ord['mu'] = np.zeros((len(userange), nfib))
     fibre_profiles_ord['sigma'] = np.zeros((len(userange), nfib))
     fibre_profiles_ord['amp'] = np.zeros((len(userange), nfib))
     if varbeta:
@@ -64,7 +83,6 @@ def get_fibre_profiles_single_order(sc, sr, err_sc, ordpol, ordmask=None, nfib=2
 
         if debug_level >= 1:
             print('pix = ', str(pix))
-
 
         # calculate SNR of collapsed super-pixel at this location (including RON)
         if return_snr:
@@ -196,18 +214,7 @@ def get_fibre_profiles_single_order(sc, sr, err_sc, ordpol, ordmask=None, nfib=2
                 #     full_model += CMB_pure_gaussian(grid, *popt)
 
 
-
-
-        # fill output array
-        positions[i,:] = line_pos_fitted
-        relints[i, :] = line_amp_fitted
-        fnorm = line_amp_fitted / np.sum(line_amp_fitted)
-        relints_norm[i, :] = fnorm
-
     if timit:
         print('Elapsed time for retrieving relative intensities: ' + np.round(time.time() - start_time, 2).astype(str) + ' seconds...')
 
-    if return_snr:
-        return relints, relints_norm, positions, snr
-    else:
-        return relints, relints_norm, positions
+    return fibre_profiles_ord
