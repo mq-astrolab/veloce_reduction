@@ -134,7 +134,7 @@ def find_stripes(flat, deg_polynomial=2, gauss_filter_sigma=3., min_peak=0.05, m
                 if (filtered_flat[start_row,column] - np.median(clipped) < 5.*np.std(clipped)) or (start_row in (0,nx-1)):
                     mask[m,column] = False
             else:
-                if ((p < maskthresh).all()) or (start_row in (0,ny-1)) or (simu==True and m==0 and column < 1300):
+                if ((p < maskthresh).all()) or (start_row in (0,ny-1)) or (simu==True and m==0 and column < 1300) or (simu==False and m==0 and column < 900):
                     mask[m,column] = False
     # do Polynomial fit for each order
     #logging.info('Fit polynomial of order %d to each stripe' % deg_polynomial)

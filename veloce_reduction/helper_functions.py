@@ -108,6 +108,9 @@ def CMB_multi_gaussian(x, *p):
         f += CMB_pure_gaussian(x, *p[i*3:i*3+3])
     return f
 
+def CMB_multi_gaussian_with_offset(x, *p):
+    return CMB_multi_gaussian(x,*p[:-2]) + p[-1]
+
 def CMB_pure_gaussian(x, mu, sig, amp):
     return (amp * np.exp(-np.power(x - mu, 2.) / (2 * np.power(sig, 2.))))
 
@@ -131,6 +134,12 @@ def multi_fibmodel_with_amp(x, *p):
     for i in range(len(p)//4):
         f += fibmodel_with_amp(x, *p[i*4:i*4+4])
     return f
+
+def multi_fibmodel_with_amp_and_offset(x, *p):
+    f = np.zeros(len(x))
+    for i in range(len(p)//4):
+        f += fibmodel_with_amp(x, *p[i*4:i*4+4])
+    return f + p[-1]
 
 def fibmodel_with_offset(x, mu, sigma, beta, offset):
     return fibmodel(x, mu, sigma, beta=beta, alpha=0, norm=0) + offset
