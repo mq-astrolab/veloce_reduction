@@ -773,7 +773,7 @@ def get_relints_single_order_gaussian(sc, sr, err_sc, ordpol, ordmask=None, nfib
                 global_model = np.zeros(grid.shape)
 
                 # if debug_level >= 2:
-                    plt.plot(grid, normdata)
+                #    plt.plot(grid, normdata)
 
                 for xguess in goodpeaks:
                     ################################################################################################################################################################################
