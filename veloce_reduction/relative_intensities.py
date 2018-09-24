@@ -33,7 +33,8 @@ def get_relints_single_order(sc, sr, err_sc, ordpol, fppo, ordmask=None, nfib=19
     'ordpol'         : set of polynomial coefficients from P_id for that order (ie p = P_id[ord])
     'fppo'           : Fibre Profile Parameters by Order (dictionary containing the fitted fibre profile parameters)
     'ordmask'        : gives user the option to provide a mask (eg from "find_stripes")
-    'nfib'           : number of fibres for which to retrieve the relative intensities (default is 19, b/c there are 19 object fibres for VeloceRosso)
+    'nfib'           : number of fibres for which to retrieve the relative intensities (default is 19, b/c there are 19
+                       object fibres for Veloce Rosso)
     'slit_height'    : height of the 'extraction slit' is 2*slit_height
     'sampling_size'  : how many pixels (in dispersion direction) either side of current i-th pixel do you want to consider? 
                        (ie stack profiles for a total of 2*sampling_size+1 pixels in dispersion direction...)

@@ -428,23 +428,24 @@ def optimal_extraction(stripes, err_stripes=None, ron_stripes=None, nfib=28, RON
                 phi /= np.max([np.sum(phi),0.001])   #we can do this because grid-stepsize = 1; also make sure that we do not divide by zero
                 phi = phi.reshape(len(phi),1)   #stupid python...
             else:
-                #get normalized profiles for all fibres for this cutout
+                # get normalized profiles for all fibres for this cutout
                 if combined_profiles:
-                    phi_laser = np.sum(make_norm_profiles_2(sr[:,i], i, fppo, fibs='laser'), axis=1)
-                    phi_thxe = np.sum(make_norm_profiles_2(sr[:,i], i, fppo, fibs='thxe'), axis=1)
-                    phis_sky3 = make_norm_profiles_2(sr[:,i], i, fppo, fibs='sky3')
-                    phi_sky3 = np.sum(phis_sky3, axis=1)/3.
-                    phis_stellar = make_norm_profiles_2(sr[:,i], i, fppo, fibs='stellar')
-                    phi_stellar = np.sum(phis_stellar * relints, axis=1) 
-                    phis_sky2 = make_norm_profiles_2(sr[:,i], i, fppo, fibs='sky2')
-                    phi_sky2 = np.sum(phis_sky2, axis=1)/2.    
-                    phi_sky = (phi_sky3 + phi_sky2)/2.
+                    print('WARNING: we currently do not have a profile estimate for the calibration fibres!!!')
+                    phi_laser = np.sum(make_norm_profiles_3(sr[:, i], i, fppo, fibs='laser'), axis=1)
+                    phi_thxe = np.sum(make_norm_profiles_3(sr[:, i], i, fppo, fibs='thxe'), axis=1)
+                    phis_sky3 = make_norm_profiles_3(sr[:, i], i, fppo, fibs='sky3')
+                    phi_sky3 = np.sum(phis_sky3, axis=1) / 3.
+                    phis_stellar = make_norm_profiles_3(sr[:, i], i, fppo, fibs='stellar')
+                    phi_stellar = np.sum(phis_stellar * relints, axis=1)
+                    phis_sky2 = make_norm_profiles_3(sr[:, i], i, fppo, fibs='sky2')
+                    phi_sky2 = np.sum(phis_sky2, axis=1) / 2.
+                    phi_sky = (phi_sky3 + phi_sky2) / 2.
                     phi = np.vstack((phi_laser, phi_sky, phi_stellar, phi_thxe)).T
                 else:
-                    #phi = make_norm_profiles(sr[:,i], ord, i, fibparms)
-                    #phi = make_norm_profiles_temp(sr[:,i], ord, i, fibparms)
-                    #phi = make_norm_single_profile_temp(sr[:,i], ord, i, fibparms)
-                    phi = make_norm_profiles_2(sr[:,i], i, fppo, fibs='all')
+                    # phi = make_norm_profiles(sr[:,i], ord, i, fibparms)
+                    # phi = make_norm_profiles_temp(sr[:,i], ord, i, fibparms)
+                    # phi = make_norm_single_profile_temp(sr[:,i], ord, i, fibparms)
+                    phi = make_norm_profiles_3(sr[:, i], i, fppo, fibs='all')
             
 #             print('WARNING: TEMPORARY offset correction is not commented out!!!')
 #             #subtract the median as the offset if BG is not properly corrected for
@@ -547,7 +548,7 @@ def optimal_extraction_from_indices(img, stripe_indices, err_img=None, nfib=28, 
         start_time = time.time()
         
     if err_img is None:
-        print('WARNING: errors not provided! Using sqrt(RON**2 + flux) as an estimate...')
+        print('WARNING: errors not provided! Using sqrt(flux + RON**2) as an estimate...')
     
     #read in polynomial coefficients of best-fit individual-fibre-profile parameters
     if simu:
@@ -657,13 +658,14 @@ def optimal_extraction_from_indices(img, stripe_indices, err_img=None, nfib=28, 
             else:
                 #get normalized profiles for all fibres for this cutout
                 if combined_profiles:
-                    phi_laser = np.sum(make_norm_profiles_2(sr[:,i], i, fppo, fibs='laser'), axis=1)
-                    phi_thxe = np.sum(make_norm_profiles_2(sr[:,i], i, fppo, fibs='thxe'), axis=1)
-                    phis_sky3 = make_norm_profiles_2(sr[:,i], i, fppo, fibs='sky3')
+                    print('WARNING: we currently do not have a profile estimate for the calibration fibres!!!')
+                    phi_laser = np.sum(make_norm_profiles_3(sr[:,i], i, fppo, fibs='laser'), axis=1)
+                    phi_thxe = np.sum(make_norm_profiles_3(sr[:,i], i, fppo, fibs='thxe'), axis=1)
+                    phis_sky3 = make_norm_profiles_3(sr[:,i], i, fppo, fibs='sky3')
                     phi_sky3 = np.sum(phis_sky3, axis=1)/3.
-                    phis_stellar = make_norm_profiles_2(sr[:,i], i, fppo, fibs='stellar')
+                    phis_stellar = make_norm_profiles_3(sr[:,i], i, fppo, fibs='stellar')
                     phi_stellar = np.sum(phis_stellar * relints, axis=1) 
-                    phis_sky2 = make_norm_profiles_2(sr[:,i], i, fppo, fibs='sky2')
+                    phis_sky2 = make_norm_profiles_3(sr[:,i], i, fppo, fibs='sky2')
                     phi_sky2 = np.sum(phis_sky2, axis=1)/2.    
                     phi_sky = (phi_sky3 + phi_sky2)/2.
                     phi = np.vstack((phi_laser, phi_sky, phi_stellar, phi_thxe)).T
@@ -671,7 +673,7 @@ def optimal_extraction_from_indices(img, stripe_indices, err_img=None, nfib=28, 
                     #phi = make_norm_profiles(sr[:,i], ord, i, fibparms)
                     #phi = make_norm_profiles_temp(sr[:,i], ord, i, fibparms)
                     #phi = make_norm_single_profile_temp(sr[:,i], ord, i, fibparms)
-                    phi = make_norm_profiles_2(sr[:,i], i, fppo, fibs='all')
+                    phi = make_norm_profiles_3(sr[:,i], i, fppo, fibs='all')
             
 #             print('WARNING: TEMPORARY offset correction is not commented out!!!')
 #             #subtract the median as the offset if BG is not properly corrected for

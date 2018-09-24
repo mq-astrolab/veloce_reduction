@@ -7,8 +7,8 @@ import scipy.optimize as op
 
 from veloce_reduction.veloce_reduction.wavelength_solution import find_suitable_peaks
 from veloce_reduction.veloce_reduction.helper_functions import multi_fibmodel_with_amp, CMB_multi_gaussian, \
-    central_parts_of_mask
-from veloce_reduction.veloce_reduction.order_tracing import flatten_single_stripe
+    central_parts_of_mask, multi_fibmodel_with_amp_and_offset, CMB_multi_gaussian_with_offset
+from veloce_reduction.veloce_reduction.order_tracing import flatten_single_stripe, flatten_single_stripe_from_indices
 
 
 
@@ -95,12 +95,14 @@ def get_multiple_fibre_profiles_single_order(sc, sr, err_sc, ordpol, ordmask=Non
         if return_snr:
             #snr.append(np.sqrt(np.sum(sc[:,pix])))
             #snr.append(np.sum(sc[:, pix]) / np.sqrt(np.sum(err_sc[:, pix] ** 2)))
-            fibre_profiles_ord['SNR'].append(np.sum(sc[:, pix]) / np.sqrt(np.sum(err_sc[:, pix] ** 2)))
+            snr = np.sum(sc[:, pix]) / np.sqrt(np.sum(err_sc[:, pix] ** 2))
+            fibre_profiles_ord['SNR'].append(snr)
 
         # check if that particular cutout falls fully onto CCD
         checkprod = np.product(sr[1:, pix].astype(float))  # exclude the first row number, as that can legitimately be zero
         # NOTE: This also covers row numbers > ny, as in these cases 'sr' is set to zero in "flatten_single_stripe(_from_indices)"
         if ordmask[pix] == False:
+            print('WARNING: this pixel column was masked out during order tracing!!!')
             fibre_profiles_ord['mu'][i, :] = np.repeat(-1., nfib)
             fibre_profiles_ord['sigma'][i, :] = np.repeat(-1., nfib)
             fibre_profiles_ord['amp'][i, :] = np.repeat(-1., nfib)
@@ -108,7 +110,15 @@ def get_multiple_fibre_profiles_single_order(sc, sr, err_sc, ordpol, ordmask=Non
                 fibre_profiles_ord['beta'][i, :] = np.repeat(-1., nfib)
             if offset:
                 fibre_profiles_ord['offset'].append(-1.)
-
+        elif snr < 400:
+            print('WARNING: SNR too low!!!')
+            fibre_profiles_ord['mu'][i, :] = np.repeat(-1., nfib)
+            fibre_profiles_ord['sigma'][i, :] = np.repeat(-1., nfib)
+            fibre_profiles_ord['amp'][i, :] = np.repeat(-1., nfib)
+            if varbeta:
+                fibre_profiles_ord['beta'][i, :] = np.repeat(-1., nfib)
+            if offset:
+                fibre_profiles_ord['offset'].append(-1.)
         elif checkprod == 0:
             checksum = np.sum(sr[:, pix])
             if checksum == 0:
@@ -286,6 +296,7 @@ def fit_multiple_profiles(P_id, stripes, err_stripes, mask=None, slit_height=25,
     # create "global" parameter dictionary for entire chip
     fibre_profiles = {}
 
+    # make sure we have a proper mask
     if mask is None:
         cenmask = {}
     else:
@@ -293,8 +304,8 @@ def fit_multiple_profiles(P_id, stripes, err_stripes, mask=None, slit_height=25,
         cenmask = central_parts_of_mask(mask)
 
     # loop over all orders
-    # for ord in sorted(P_id.iterkeys()):
-    for ord in ['order_01', 'order_19', 'order_39']:
+    #for ord in sorted(P_id.iterkeys()):
+    for ord in sorted(P_id.keys())[31:]:
         print('OK, now processing ' + str(ord))
 
         ordpol = P_id[ord]
@@ -319,6 +330,7 @@ def fit_multiple_profiles(P_id, stripes, err_stripes, mask=None, slit_height=25,
         #                                                       return_stats=return_stats, timit=timit)
         # else:
         #     colfits = fit_profiles_single_order(sr, sc, ordpol, osf=1, silent=True, timit=timit)
+
         fibre_profiles[ord] = fpo
 
     if timit:
@@ -359,6 +371,14 @@ def fit_multiple_profiles_from_indices(P_id, img, err_img, stripe_indices, mask=
 
     # create "global" parameter dictionary for entire chip
     fibre_profiles = {}
+
+    # make sure we have a proper mask
+    if mask is None:
+        cenmask = {}
+    else:
+        # we also only want to use the central TRUE parts of the masks, ie want ONE consecutive stretch per order
+        cenmask = central_parts_of_mask(mask)
+
     # loop over all orders
     for ord in sorted(P_id.iterkeys()):
         print('OK, now processing ' + str(ord))
@@ -371,18 +391,21 @@ def fit_multiple_profiles_from_indices(P_id, img, err_img, stripe_indices, mask=
         sc, sr = flatten_single_stripe_from_indices(img, indices, slit_height=slit_height, timit=False)
         err_sc, err_sr = flatten_single_stripe_from_indices(err_img, indices, slit_height=slit_height, timit=False)
 
-        npix = sc.shape[1]
         if mask is None:
-            mask = {}
-            mask[ord] = np.ones(npix, dtype='bool')
+            cenmask[ord] = np.ones(sc.shape[1], dtype='bool')
 
-        # fit profile for single order and save result in "global" parameter dictionary for entire chip
-        if stacking:
-            colfits = determine_spatial_profiles_single_order(sc, sr, err_sc, ordpol, ordmask=mask[ord], model=model,
-                                                              return_stats=return_stats, timit=timit)
-        else:
-            colfits = fit_profiles_single_order(sr, sc, ordpol, osf=1, silent=True, timit=timit)
-        fibre_profiles[ord] = colfits
+            # fit profile for single order and save result in "global" parameter dictionary for entire chip
+            fpo = get_multiple_fibre_profiles_single_order(sc, sr, err_sc, ordpol, ordmask=cenmask[ord], nfib=24,
+                                                           sampling_size=25, varbeta=varbeta, offset=offset,
+                                                           return_snr=True, debug_level=debug_level, timit=timit)
+
+            # if stacking:
+            #     colfits = determine_spatial_profiles_single_order(sc, sr, err_sc, ordpol, ordmask=mask[ord], model=model,
+            #                                                       return_stats=return_stats, timit=timit)
+            # else:
+            #     colfits = fit_profiles_single_order(sr, sc, ordpol, osf=1, silent=True, timit=timit)
+
+            fibre_profiles[ord] = fpo
 
     if timit:
         print('Time elapsed: ' + str(int(time.time() - start_time)) + ' seconds...')

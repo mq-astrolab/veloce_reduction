@@ -7,8 +7,92 @@ Created on 21 Nov. 2017
 import glob
 import numpy as np
 import astropy.io.fits as pyfits
+import datetime
 
-from .order_tracing import find_stripes, make_P_id, extract_stripes, flatten_single_stripe
+from veloce_reduction.veloce_reduction.order_tracing import find_stripes, make_P_id, extract_stripes, flatten_single_stripe
+
+
+
+
+# fp_in = np.load('/Users/christoph/OneDrive - UNSW/fibre_profiles/individual_fibre_profiles_20180924.npy').item()
+
+def make_real_fibparms_by_ord(fp_in, savefile=True, degpol=6):
+
+    path = '/Users/christoph/OneDrive - UNSW/fibre_profiles/'
+
+    fibparms = {}
+
+    for ord in sorted(fp_in.keys()):
+
+        print('OK, processing ',ord)
+
+        fibparms[ord] = {}
+
+        #sanity check the dimensions are right
+        nfib = fp_in['order_01']['mu'].shape[1]
+        if nfib != 24:
+            print('ERROR: input dictionary does NOT contain data for all 24 fibres!!!')
+            return
+
+        # fibre numbers here increase from red to blue, ie from ThXe side to LFC side, as in:
+        # pseudo-slit layout:   S5 S2 X 7 18 17 6 16 15 5 14 13  1 12 11  4 10  9  3  8 19  2 X S4 S3 S1
+        # array indices     :    0  1   2  3  4 5  6  7 8  9 10 .................................. 22 23
+
+        pix = np.array(fp_in[ord]['pix'])
+        snr = np.array(fp_in[ord]['SNR'])
+
+        #these are the "names" of the stellar and sky fibres (01=LFC, 05=blank, 25=blank, 28=ThXe)
+        allfibs = ['fibre_02', 'fibre_03', 'fibre_04', 'fibre_06', 'fibre_07', 'fibre_08', 'fibre_09', 'fibre_10',
+                   'fibre_11', 'fibre_12', 'fibre_13', 'fibre_14', 'fibre_15', 'fibre_16', 'fibre_17', 'fibre_18',
+                   'fibre_19', 'fibre_20', 'fibre_21', 'fibre_22', 'fibre_23', 'fibre_24', 'fibre_26', 'fibre_27']
+
+        # loop over 24 fibres (19 stellar + 5 sky)
+        # for i in range(24):
+        for i,fib in enumerate(allfibs[::-1]):
+
+            fibparms[ord][fib] = {}
+
+            mu = np.array(fp_in[ord]['mu'][:,i])
+            sigma = np.array(fp_in[ord]['sigma'][:,i])
+            beta = np.array(fp_in[ord]['beta'][:,i])
+
+            goodmu = mu > 0
+            goodsigma = sigma > 0
+            goodbeta = beta > 0
+
+            if (goodmu == goodsigma).all() and (goodmu == goodbeta).all():
+                good = goodmu.copy()
+                del goodmu
+                del goodsigma
+                del goodbeta
+            else:
+                print('ERROR: "mu", "sigma" and "beta" do not have the same dimensions for ',ord)
+                return
+
+            # define weights for the fitting based on the SNR
+            w = np.array(fp[ord]['SNR']) ** 2
+
+            # now fit polynomial to the fit parameters of profile measurements across the order
+            mu_fit = np.poly1d(np.polyfit(pix[good], mu[good], degpol, w=w[good]))
+            sigma_fit = np.poly1d(np.polyfit(pix[good], sigma[good], degpol, w=w[good]))
+            beta_fit = np.poly1d(np.polyfit(pix[good], beta[good], degpol, w=w[good]))
+
+            # TODO: add nice plots if debug_level>2 or sth
+
+            # save fit parameters to dictionary - they will be used by "make_norm_profiles_3" to create the
+            # normalized profiles during optimal extraction
+            fibparms[ord][fib]['mu_fit'] = mu_fit
+            fibparms[ord][fib]['sigma_fit'] = sigma_fit
+            fibparms[ord][fib]['beta_fit'] = beta_fit
+            # fibparms[fib][ord]['offset_fit'] = offset_fit
+            # fibparms[fib][ord]['onchip'] = onchip
+
+
+    if savefile:
+        now = datetime.datetime.now()
+        np.save(path + 'fibre_profile_fits_'+str(now)[:10].replace('-','')+'.npy', fibparms)
+
+    return fibparms
 
 
 
