@@ -325,7 +325,8 @@ def optimal_extraction(stripes, err_stripes=None, ron_stripes=None, nfib=28, RON
         fibparms = np.load('/Users/christoph/OneDrive - UNSW/fibre_profiles/sim/fibparms_by_ord.npy').item()
     else:
         #fibparms = np.load('/Users/christoph/OneDrive - UNSW/fibre_profiles/real/first_real_veloce_test_fps.npy').item()
-        fibparms = np.load('/Users/christoph/OneDrive - UNSW/fibre_profiles/real/from_master_white_40orders.npy').item()
+        #fibparms = np.load('/Users/christoph/OneDrive - UNSW/fibre_profiles/real/from_master_white_40orders.npy').item()
+        fibparms = np.load('/Users/christoph/OneDrive - UNSW/fibre_profiles/fibre_profile_fits_20180925.npy').item()
     
     
     flux = {}
@@ -335,13 +336,12 @@ def optimal_extraction(stripes, err_stripes=None, ron_stripes=None, nfib=28, RON
     #loop over all orders
     for ord in sorted(stripes.iterkeys()):
         if debug_level > 0:
-            print('Processing order '+ord)
+            print('OK, now processing order: ' + ordnum)
         if timit:
             order_start_time = time.time()
         
         #order number
         ordnum = ord[-2:]
-        print('OK, now processing order: '+ordnum)
         
         #fibre profile parameters for that order
         fppo = fibparms[ord]
@@ -555,7 +555,8 @@ def optimal_extraction_from_indices(img, stripe_indices, err_img=None, nfib=28, 
         fibparms = np.load('/Users/christoph/OneDrive - UNSW/fibre_profiles/sim/fibparms_by_ord.npy').item()
     else:
         #fibparms = np.load('/Users/christoph/OneDrive - UNSW/fibre_profiles/real/first_real_veloce_test_fps.npy').item()
-        fibparms = np.load('/Users/christoph/OneDrive - UNSW/fibre_profiles/real/from_master_white_40orders.npy').item()
+        #fibparms = np.load('/Users/christoph/OneDrive - UNSW/fibre_profiles/real/from_master_white_40orders.npy').item()
+        fibparms = np.load('/Users/christoph/OneDrive - UNSW/fibre_profiles/fibre_profile_fits_20180925.npy').item()
     
     
     flux = {}
@@ -565,16 +566,17 @@ def optimal_extraction_from_indices(img, stripe_indices, err_img=None, nfib=28, 
     #loop over all orders
     for ord in sorted(stripe_indices.iterkeys()):
         if debug_level > 0:
-            print('Processing order '+ord)
+            print('OK, now processing order: ' + ordnum)
         if timit:
             order_start_time = time.time()
         
         #order number
         ordnum = ord[-2:]
-        print('OK, now processing order: '+ordnum)
         
         #fibre profile parameters for that order
+        print('harharhar')
         fppo = fibparms[ord]
+
         
         # define stripe
         #stripe = stripes[ord]
@@ -767,7 +769,7 @@ def optimal_extraction_from_indices(img, stripe_indices, err_img=None, nfib=28, 
 
 
 
-def extract_spectrum(stripes, err_stripes, ron_stripes, method='optimal', individual_fibres=False, combined_profiles=False, slit_height=25, RON=0., 
+def extract_spectrum(stripes, err_stripes, ron_stripes, method='optimal', individual_fibres=True, combined_profiles=False, slit_height=25, RON=0.,
                      savefile=False, filetype='fits', obsname=None, path=None, simu=False, verbose=False, timit=False, debug_level=0):
     """
     This routine is simply a wrapper code for the different extraction methods. There are a total FIVE (1,2,3a,3b,3c) different extraction methods implemented, 
@@ -838,7 +840,7 @@ def extract_spectrum(stripes, err_stripes, ron_stripes, method='optimal', indivi
         #tramlines = find_tramlines(fibre_profiles_02, fibre_profiles_03, fibre_profiles_21, fibre_profiles_22, mask_02, mask_03, mask_21, mask_22)
         #pix,flux,err = collapse_extract(stripes, err_stripes, tramlines, slit_height=slit_height, verbose=verbose, timit=timit, debug_level=debug_level)
     elif method.lower() == 'optimal':
-        pix,flux,err = optimal_extraction(stripes, err_stripes=err_stripes, ron_stripes=ron_stripes, nfib=28, RON=RON, slit_height=slit_height, individual_fibres=individual_fibres, 
+        pix,flux,err = optimal_extraction(stripes, err_stripes=err_stripes, ron_stripes=ron_stripes, nfib=24, RON=RON, slit_height=slit_height, individual_fibres=individual_fibres,
                                           combined_profiles=combined_profiles, simu=simu, timit=timit, debug_level=debug_level) 
     else:
         print('ERROR: Nightmare! That should never happen  --  must be an error in the Matrix...')
@@ -915,7 +917,7 @@ def extract_spectrum(stripes, err_stripes, ron_stripes, method='optimal', indivi
 
 
 
-def extract_spectrum_from_indices(img, err_img, stripe_indices, method='optimal', individual_fibres=False, combined_profiles=False, slit_height=25, RON=0., 
+def extract_spectrum_from_indices(img, err_img, stripe_indices, method='optimal', individual_fibres=True, combined_profiles=False, slit_height=25, RON=0.,
                                   savefile=False, filetype='fits', obsname=None, path=None, simu=False, verbose=False, timit=False, debug_level=0):
     """
     CLONE OF 'extract_spectrum'!
@@ -986,13 +988,13 @@ def extract_spectrum_from_indices(img, err_img, stripe_indices, method='optimal'
         #tramlines = find_tramlines(fibre_profiles_02, fibre_profiles_03, fibre_profiles_21, fibre_profiles_22, mask_02, mask_03, mask_21, mask_22)
         #pix,flux,err = collapse_extract_from_indices(img, err_img, stripe_indices, tramlines, slit_height=slit_height, verbose=verbose, timit=timit, debug_level=debug_level)
     elif method.lower() == 'optimal':
-        pix,flux,err = optimal_extraction_from_indices(img, stripe_indices, err_img=err_img, nfib=28, RON=RON, slit_height=slit_height, individual_fibres=individual_fibres, 
+        pix,flux,err = optimal_extraction_from_indices(img, stripe_indices, err_img=err_img, nfib=24, RON=RON, slit_height=slit_height, individual_fibres=individual_fibres,
                                                        combined_profiles=combined_profiles, simu=simu, timit=timit, debug_level=debug_level) 
     else:
         print('ERROR: Nightmare! That should never happen  --  must be an error in the Matrix...')
         return    
         
-        #now save to FITS file or PYTHON DICTIONARY if desired
+    #now save to FITS file or PYTHON DICTIONARY if desired
     if savefile:
         if path is None:
             print('ERROR: path to output directory not provided!!!')
