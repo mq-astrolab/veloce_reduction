@@ -370,6 +370,7 @@ def make_norm_profiles_temp(x, o, col, fibparms, slope=False, offset=False):
     #return normalized_profiles
     return phi/np.sum(phi,axis=0)
 
+
 def make_norm_single_profile_temp(x, o, col, fibparms, slope=False, offset=False):  
 
     

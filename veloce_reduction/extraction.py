@@ -308,65 +308,64 @@ def collapse_extract_from_indices(img, err_img, stripe_indices, tramlines, slit_
 
 
 
-def optimal_extraction(stripes, err_stripes=None, ron_stripes=None, nfib=28, RON=0., slit_height=25, phi_onthefly=False, timit=False, simu=False, 
-                       individual_fibres=False, combined_profiles=False, relints=None, collapse=False, debug_level=0):
-    
-    
-    # if error array is not provided, then RON and gain must be provided (but this is bad because that way we don't know about large errors for cosmic-corrected pixels etc)
-    
+def optimal_extraction(stripes, err_stripes=None, ron_stripes=None, nfib=28, RON=0., slit_height=25, phi_onthefly=False,
+                       timit=False, simu=False, individual_fibres=False, combined_profiles=False, relints=None,
+                       collapse=False, debug_level=0):
+    # if error array is not provided, then RON and gain must be provided (but this is bad because that way we don't
+    # know about large errors for cosmic-corrected pixels etc)
+
     if timit:
         start_time = time.time()
-        
+
     if err_stripes is None:
         print('WARNING: errors not provided! Using sqrt(RON**2 + flux) as an estimate...')
-    
-    #read in polynomial coefficients of best-fit individual-fibre-profile parameters
+
+    # read in polynomial coefficients of best-fit individual-fibre-profile parameters
     if simu:
         fibparms = np.load('/Users/christoph/OneDrive - UNSW/fibre_profiles/sim/fibparms_by_ord.npy').item()
     else:
-        #fibparms = np.load('/Users/christoph/OneDrive - UNSW/fibre_profiles/real/first_real_veloce_test_fps.npy').item()
-        #fibparms = np.load('/Users/christoph/OneDrive - UNSW/fibre_profiles/real/from_master_white_40orders.npy').item()
+        # fibparms = np.load('/Users/christoph/OneDrive - UNSW/fibre_profiles/real/first_real_veloce_test_fps.npy').item()
+        # fibparms = np.load('/Users/christoph/OneDrive - UNSW/fibre_profiles/real/from_master_white_40orders.npy').item()
         fibparms = np.load('/Users/christoph/OneDrive - UNSW/fibre_profiles/fibre_profile_fits_20180925.npy').item()
-    
-    
+
     flux = {}
     err = {}
     pix = {}
-    
-    #loop over all orders
+
+    # loop over all orders
     for ord in sorted(stripes.iterkeys()):
         if debug_level > 0:
             print('OK, now processing order: ' + ordnum)
         if timit:
             order_start_time = time.time()
-        
-        #order number
+
+        # order number
         ordnum = ord[-2:]
-        
-        #fibre profile parameters for that order
+
+        # fibre profile parameters for that order
         fppo = fibparms[ord]
-        
+
         # define stripe
         stripe = stripes[ord]
         ron_stripe = ron_stripes[ord]
-        #indices = stripe_indices[ord]
+        # indices = stripe_indices[ord]
         # find the "order-box"
-        sc,sr = flatten_single_stripe(stripe,slit_height=slit_height,timit=False)
-        ron_sc, ron_sr = flatten_single_stripe(ron_stripe,slit_height=slit_height,timit=False)
-        #sc,sr = flatten_single_stripe_from_indices(img, indices, slit_height=slit_height, timit=False)
+        sc, sr = flatten_single_stripe(stripe, slit_height=slit_height, timit=False)
+        ron_sc, ron_sr = flatten_single_stripe(ron_stripe, slit_height=slit_height, timit=False)
+        # sc,sr = flatten_single_stripe_from_indices(img, indices, slit_height=slit_height, timit=False)
         if err_stripes is not None:
             err_stripe = err_stripes[ord]
-            err_sc,err_sr = flatten_single_stripe(err_stripe,slit_height=slit_height,timit=False)
-        
+            err_sc, err_sr = flatten_single_stripe(err_stripe, slit_height=slit_height, timit=False)
+
         npix = sc.shape[1]
-        
+
         flux[ord] = {}
         err[ord] = {}
         pix[ord] = []
         if not phi_onthefly and not collapse:
             if individual_fibres:
                 for j in range(nfib):
-                    fib = 'fibre_'+str(j+1).zfill(2)
+                    fib = 'fibre_' + str(j + 1).zfill(2)
                     flux[ord][fib] = []
                     err[ord][fib] = []
             else:
@@ -378,55 +377,55 @@ def optimal_extraction(stripes, err_stripes=None, ron_stripes=None, nfib=28, RON
                 err[ord]['stellar'] = []
                 flux[ord]['thxe'] = []
                 err[ord]['thxe'] = []
-                
-#         if individual_fibres:
-#             f_ord = np.zeros((nfib,npix))
-#             e_ord = np.zeros((nfib,npix))
-#         else:
-#             f_ord = np.zeros(npix)
-#             e_ord = np.zeros(npix)
-        
+
+        #         if individual_fibres:
+        #             f_ord = np.zeros((nfib,npix))
+        #             e_ord = np.zeros((nfib,npix))
+        #         else:
+        #             f_ord = np.zeros(npix)
+        #             e_ord = np.zeros(npix)
+
         goodrange = np.arange(npix)
         if simu and ord == 'order_01':
-            #goodrange = goodrange[fibparms[ord]['fibre_21']['onchip']]
-            goodrange = np.arange(1300,4096)
+            # goodrange = goodrange[fibparms[ord]['fibre_21']['onchip']]
+            goodrange = np.arange(1300, 4096)
             for j in range(1300):
-                pix[ord].append(ordnum+str(j+1).zfill(4))
-                    
+                pix[ord].append(ordnum + str(j + 1).zfill(4))
+
         for i in goodrange:
             if debug_level > 0:
-                print('pixel '+str(i+1)+'/'+str(npix))
-            pix[ord].append(ordnum+str(i+1).zfill(4))
-            z = sc[:,i].copy()
+                print('pixel ' + str(i + 1) + '/' + str(npix))
+            pix[ord].append(ordnum + str(i + 1).zfill(4))
+            z = sc[:, i].copy()
             if simu:
-                z -= 1.     #note the minus 1 is because we added 1 artificially at the beginning in order for "extract_stripes" to work properly
-            roncol = ron_sc[:,i].copy()
+                z -= 1.  # note the minus 1 is because we added 1 artificially at the beginning in order for "extract_stripes" to work properly
+            roncol = ron_sc[:, i].copy()
 
-            
-            #if error is not provided, estimate it (NOT RECOMMENDED!!!)
+            # if error is not provided, estimate it (NOT RECOMMENDED!!!)
             if err_stripes is None:
-                pixerr = np.sqrt( ron_sc[:,i]**2 + np.abs(z) )
+                pixerr = np.sqrt(ron_sc[:, i] ** 2 + np.abs(z))
             else:
-                pixerr = err_sc[:,i].copy()
-            
-            #assign weights for flux (and take care of NaNs and INFs)
-            pix_w = 1./(pixerr*pixerr)  
-            
+                pixerr = err_sc[:, i].copy()
+
+            # assign weights for flux (and take care of NaNs and INFs)
+            pix_w = 1. / (pixerr * pixerr)
+
             ###initially I thought this was clearly rubbish as it down-weights the central parts
-            #and that we really want to use the relative errors, ie w_i = 1/(relerr_i)**2
-            #relerr = pixerr / z     ### the pixel err
-            #pix_w = 1. / (relerr)**2
-            #HOWEVER: this is not true, and the optimal extraction linalg routine requires absolute errors!!!
-            
-            #check for NaNs etc
+            # and that we really want to use the relative errors, ie w_i = 1/(relerr_i)**2
+            # relerr = pixerr / z     ### the pixel err
+            # pix_w = 1. / (relerr)**2
+            # HOWEVER: this is not true, and the optimal extraction linalg routine requires absolute errors!!!
+
+            # check for NaNs etc
             pix_w[np.isinf(pix_w)] = 0.
-            
+
             if phi_onthefly:
-                quickfit = fit_single_fibre_profile(sr[:,i],z)
-                bestparms = np.array([quickfit.best_values['mu'], quickfit.best_values['sigma'], quickfit.best_values['amp'], quickfit.best_values['beta']])
-                phi = fibmodel_with_amp(sr[:,i],*bestparms)
-                phi /= np.max([np.sum(phi),0.001])   #we can do this because grid-stepsize = 1; also make sure that we do not divide by zero
-                phi = phi.reshape(len(phi),1)   #stupid python...
+                quickfit = fit_single_fibre_profile(sr[:, i], z)
+                bestparms = np.array([quickfit.best_values['mu'], quickfit.best_values['sigma'],
+                                      quickfit.best_values['amp'], quickfit.best_values['beta']])
+                phi = fibmodel_with_amp(sr[:, i], *bestparms)
+                phi /= np.max([np.sum(phi), 0.001])  # we can do this because grid-stepsize = 1; also make sure that we do not divide by zero
+                phi = phi.reshape(len(phi), 1)  # stupid python...
             else:
                 # get normalized profiles for all fibres for this cutout
                 if combined_profiles:
@@ -446,157 +445,163 @@ def optimal_extraction(stripes, err_stripes=None, ron_stripes=None, nfib=28, RON
                     # phi = make_norm_profiles_temp(sr[:,i], ord, i, fibparms)
                     # phi = make_norm_single_profile_temp(sr[:,i], ord, i, fibparms)
                     phi = make_norm_profiles_3(sr[:, i], i, fppo, fibs='all')
-            
-#             print('WARNING: TEMPORARY offset correction is not commented out!!!')
-#             #subtract the median as the offset if BG is not properly corrected for
-#             z -= np.median(z)
-            
-            #do the optimal extraction
+
+            # print('WARNING: TEMPORARY offset correction is not commented out!!!')
+            # # subtract the median as the offset if BG is not properly corrected for
+            # z -= np.median(z)
+
+            # do the optimal extraction
             if not collapse:
-                if np.sum(phi)==0:
-#                     f,v = (0.,np.sqrt(len(phi)*RON*RON))
-                    f,v = (0., np.sqrt(np.sum(pixerr*pixerr)))
+                if np.sum(phi) == 0:
+                    # f,v = (0.,np.sqrt(len(phi)*RON*RON))
+                    f, v = (0., np.sqrt(np.sum(pixerr * pixerr)))
                 else:
-                    #THIS IS THE NORMAL CASE!!! 
-                    #NOTE: take the read-out noise as the average of the individual-pixel read-out noise values over the cutout, as it can change if we cross a quadrant boundary!
-                    f,v = linalg_extract_column(z, pix_w, phi, RON=np.mean(roncol))
+                    # THIS IS THE NORMAL CASE!!!
+                    # NOTE: take the read-out noise as the average of the individual-pixel read-out noise values over
+                    # the cutout, as it can change if we cross a quadrant boundary!
+                    f, v = linalg_extract_column(z, pix_w, phi, RON=np.mean(roncol))
             else:
-                #f,v = (np.sum(z-np.median(z)), np.sum(z-np.median(z)) + len(phi)*RON*RON)   ### background should already be taken care of here...
-                #f,v = (np.sum(z), np.sum(z) + len(phi)*RON*RON)
-                f,v = (np.sum(z), np.sqrt(np.sum(pixerr*pixerr)))
-            
-            #e = np.sqrt(v)
-            #model = np.sum(f*phi,axis=1)
-        
-            #fill output arrays depending on the selected method
+                # f,v = (np.sum(z-np.median(z)), np.sum(z-np.median(z)) + len(phi)*RON*RON)   ### background should already be taken care of here...
+                # f,v = (np.sum(z), np.sum(z) + len(phi)*RON*RON)
+                f, v = (np.sum(z), np.sqrt(np.sum(pixerr * pixerr)))
+
+            # e = np.sqrt(v)
+            # model = np.sum(f*phi,axis=1)
+
+            # fill output arrays depending on the selected method
             if not phi_onthefly and not collapse:
-                
-                #there should not be negative values!!!
-                f[f<0] = 0.
-                #not sure if this is the proper way to do this, but we can't have negative variance
-#                 v[np.logical_or(v<=0,f<=0)] = RON*RON
-#                 v[v<RON*RON] = np.maximum(RON*RON,1.)   #just a stupid fix so that variance is never below 1
-                v[np.logical_or(v<=0,f<=0)] = np.mean(roncol)**2
+
+                # there should not be negative values!!!
+                f[f < 0] = 0.
+                # not sure if this is the proper way to do this, but we can't have negative variance
+                # v[np.logical_or(v<=0,f<=0)] = RON*RON
+                # v[v<RON*RON] = np.maximum(RON*RON,1.)   #just a stupid fix so that variance is never below 1
+                v[np.logical_or(v <= 0, f <= 0)] = np.mean(roncol) ** 2
                 v[v < np.mean(roncol) ** 2] = np.maximum(np.mean(roncol) ** 2, 1.)  # just a stupid fix so that variance is never below 1
-                    
-                if individual_fibres:   
-                    #fill flux- and error- output arrays for individual fibres
+
+                if individual_fibres:
+                    # fill flux- and error- output arrays for individual fibres
                     for j in range(nfib):
-                        fib = 'fibre_'+str(j+1).zfill(2)
+                        fib = 'fibre_' + str(j + 1).zfill(2)
                         flux[ord][fib].append(f[j])
                         err[ord][fib].append(np.sqrt(v[j]))
-                
+
                 elif combined_profiles:
-                    #fill flux- and error- output arrays for all objects (Laser, Sky, Stellar, ThXe)
-                    #Laser
+                    # fill flux- and error- output arrays for all objects (Laser, Sky, Stellar, ThXe)
+                    # Laser
                     flux[ord]['laser'].append(f[0])
                     err[ord]['laser'].append(np.sqrt(v[0]))
-                    #Sky
+                    # Sky
                     flux[ord]['sky'].append(f[1])
                     err[ord]['sky'].append(np.sqrt(v[1]))
-                    #Stellar
+                    # Stellar
                     flux[ord]['stellar'].append(f[2])
                     err[ord]['stellar'].append(np.sqrt(v[2]))
-                    #ThXe
+                    # ThXe
                     flux[ord]['thxe'].append(f[3])
                     err[ord]['thxe'].append(np.sqrt(v[3]))
-                            
+
                 else:
-                    #Optimal extraction was done for all fibres individually, but now add up the respective "eta's" for the different "objects"                    
-                    #fill flux- and error- output arrays for all objects (Laser, Sky, Stellar, ThXe)
-                    #Laser
+                    # Optimal extraction was done for all fibres individually, but now add up the respective "eta's"
+                    # for the different "objects"
+                    # fill flux- and error- output arrays for all objects (Laser, Sky, Stellar, ThXe)
+                    # Laser
                     flux[ord]['laser'].append(f[0])
                     err[ord]['laser'].append(np.sqrt(v[0]))
-                    #Sky
+                    # Sky
                     flux[ord]['sky'].append(np.sum(f[1:4]) + np.sum(f[25:27]))
                     err[ord]['sky'].append(np.sqrt(np.sum(v[1:4]) + np.sum(v[25:27])))
-                    #Stellar
+                    # Stellar
                     flux[ord]['stellar'].append(np.sum(f[5:24]))
                     err[ord]['stellar'].append(np.sqrt(np.sum(v[5:24])))
-                    #ThXe
+                    # ThXe
                     flux[ord]['thxe'].append(f[27])
                     err[ord]['thxe'].append(np.sqrt(v[27]))
-                    
+
             else:
-                flux[ord].append(np.max([f,0.]))
+                flux[ord].append(np.max([f, 0.]))
                 if f <= 0 or v <= 0:
-                    #err[ord].append(np.sqrt(len(phi)*RON*RON))
-                    err[ord].append(np.sqrt(np.sum(pixerr*pixerr)))
+                    # err[ord].append(np.sqrt(len(phi)*RON*RON))
+                    err[ord].append(np.sqrt(np.sum(pixerr * pixerr)))
                 else:
                     err[ord].append(np.sqrt(v))
-         
-        
+
+
+        # fix for order_01
+        if ord == 'order_01':
+            for fib in sorted(pix[ord].keys()):
+                flux['order_01'][fib] = np.r_[np.repeat(0., 900), flux['order_01'][fib]]
+                err['order_01'][fib] = np.r_[np.repeat(0., 900), err['order_01'][fib]]
+
         if timit:
-            print('Time taken for extraction of '+ord+': '+str(time.time() - order_start_time)+' seconds')
-                
-                
+            print('Time taken for extraction of ' + ord + ': ' + str(time.time() - order_start_time) + ' seconds')
+
     if timit:
-        print('Time elapsed for optimal extraction of entire spectrum: '+str(time.time() - start_time)+' seconds...')  
+        print('Time elapsed for optimal extraction of entire spectrum: ' + str(
+            time.time() - start_time) + ' seconds...')
 
-    return pix,flux,err
-
-
-
+    return pix, flux, err
 
 
-def optimal_extraction_from_indices(img, stripe_indices, err_img=None, nfib=28, RON=0., slit_height=25, phi_onthefly=False, timit=False, simu=False, 
-                       individual_fibres=False, combined_profiles=False, relints=None, collapse=False, debug_level=0):
-    
-    # if error array is not provided, then RON and gain must be provided (but this is bad because that way we don't know about large errors for cosmic-correctdd pixels etc)
-    
+
+
+
+def optimal_extraction_from_indices(img, stripe_indices, err_img=None, nfib=28, RON=0., slit_height=25,
+                                    phi_onthefly=False, timit=False, simu=False, individual_fibres=False,
+                                    combined_profiles=False, relints=None, collapse=False, debug_level=0):
+    # if error array is not provided, then RON and gain must be provided (but this is bad because that way we don't
+    # know about large errors for cosmic-correctdd pixels etc)
+
     if timit:
         start_time = time.time()
-        
+
     if err_img is None:
         print('WARNING: errors not provided! Using sqrt(flux + RON**2) as an estimate...')
-    
-    #read in polynomial coefficients of best-fit individual-fibre-profile parameters
+
+    # read in polynomial coefficients of best-fit individual-fibre-profile parameters
     if simu:
         fibparms = np.load('/Users/christoph/OneDrive - UNSW/fibre_profiles/sim/fibparms_by_ord.npy').item()
     else:
-        #fibparms = np.load('/Users/christoph/OneDrive - UNSW/fibre_profiles/real/first_real_veloce_test_fps.npy').item()
-        #fibparms = np.load('/Users/christoph/OneDrive - UNSW/fibre_profiles/real/from_master_white_40orders.npy').item()
+        # fibparms = np.load('/Users/christoph/OneDrive - UNSW/fibre_profiles/real/first_real_veloce_test_fps.npy').item()
+        # fibparms = np.load('/Users/christoph/OneDrive - UNSW/fibre_profiles/real/from_master_white_40orders.npy').item()
         fibparms = np.load('/Users/christoph/OneDrive - UNSW/fibre_profiles/fibre_profile_fits_20180925.npy').item()
-    
-    
+
     flux = {}
     err = {}
     pix = {}
-    
-    #loop over all orders
+
+    # loop over all orders
     for ord in sorted(stripe_indices.iterkeys()):
         if debug_level > 0:
             print('OK, now processing order: ' + ordnum)
         if timit:
             order_start_time = time.time()
-        
-        #order number
+
+        # order number
         ordnum = ord[-2:]
-        
-        #fibre profile parameters for that order
+
+        # fibre profile parameters for that order
         fppo = fibparms[ord]
-        
+
         # define stripe
-        #stripe = stripes[ord]
+        # stripe = stripes[ord]
         indices = stripe_indices[ord]
         # find the "order-box"
-        #sc,sr = flatten_single_stripe(stripe,slit_height=slit_height,timit=False)
-        sc,sr = flatten_single_stripe_from_indices(img, indices, slit_height=slit_height, timit=False)
-        ron_sc,ron_sr = flatten_single_stripe_from_indices(RON, indices, slit_height=slit_height, timit=False)
+        # sc,sr = flatten_single_stripe(stripe,slit_height=slit_height,timit=False)
+        sc, sr = flatten_single_stripe_from_indices(img, indices, slit_height=slit_height, timit=False)
+        ron_sc, ron_sr = flatten_single_stripe_from_indices(RON, indices, slit_height=slit_height, timit=False)
         if err_img is not None:
-            err_sc,err_sr = flatten_single_stripe_from_indices(err_img, indices, slit_height=slit_height, timit=False)
-        
+            err_sc, err_sr = flatten_single_stripe_from_indices(err_img, indices, slit_height=slit_height, timit=False)
+
         npix = sc.shape[1]
 
-        print('harharhar3')
-        
         flux[ord] = {}
         err[ord] = {}
         pix[ord] = []
         if not phi_onthefly and not collapse:
             if individual_fibres:
                 for j in range(nfib):
-                    fib = 'fibre_'+str(j+1).zfill(2)
+                    fib = 'fibre_' + str(j + 1).zfill(2)
                     flux[ord][fib] = []
                     err[ord][fib] = []
             else:
@@ -608,167 +613,177 @@ def optimal_extraction_from_indices(img, stripe_indices, err_img=None, nfib=28, 
                 err[ord]['stellar'] = []
                 flux[ord]['thxe'] = []
                 err[ord]['thxe'] = []
-                
-#         if individual_fibres:
-#             f_ord = np.zeros((nfib,npix))
-#             e_ord = np.zeros((nfib,npix))
-#         else:
-#             f_ord = np.zeros(npix)
-#             e_ord = np.zeros(npix)
+
+        #         if individual_fibres:
+        #             f_ord = np.zeros((nfib,npix))
+        #             e_ord = np.zeros((nfib,npix))
+        #         else:
+        #             f_ord = np.zeros(npix)
+        #             e_ord = np.zeros(npix)
 
         # exclude the range of order_01 (m = 65) that does fall off the chip!
         goodrange = np.arange(npix)
         if simu and ord == 'order_01':
-            #goodrange = goodrange[fibparms[ord]['fibre_21']['onchip']]
-            goodrange = np.arange(1301,4096)
+            # goodrange = goodrange[fibparms[ord]['fibre_21']['onchip']]
+            goodrange = np.arange(1301, 4096)
             for j in range(1301):
-                pix[ord].append(ordnum+str(j+1).zfill(4))
+                pix[ord].append(ordnum + str(j + 1).zfill(4))
         if not simu and ord == 'order_01':
-            #goodrange = goodrange[fibparms[ord]['fibre_21']['onchip']]
-            goodrange = np.arange(901,4096)
-            for j in range(901):
-                pix[ord].append(ordnum+str(j+1).zfill(4))
-                    
+            # goodrange = goodrange[fibparms[ord]['fibre_21']['onchip']]
+            goodrange = np.arange(900, 4112)
+            for j in range(900):
+                pix[ord].append(ordnum + str(j + 1).zfill(4))
+
+
         for i in goodrange:
             if debug_level > 0:
-                print('pixel '+str(i+1)+'/'+str(npix))
-            pix[ord].append(ordnum+str(i+1).zfill(4))
-            z = sc[:,i].copy()
+                print('pixel ' + str(i + 1) + '/' + str(npix))
+            pix[ord].append(ordnum + str(i + 1).zfill(4))
+            z = sc[:, i].copy()
             if simu:
-                z -= 1.     #note the minus 1 is because we added 1 artificially at the beginning in order for "extract_stripes" to work properly
-            roncol = ron_sc[:,i].copy()
+                z -= 1.  # note the minus 1 is because we added 1 artificially at the beginning in order for "extract_stripes" to work properly
+            roncol = ron_sc[:, i].copy()
 
             # if error is not provided, estimate it here (NOT RECOMMENDED!!!)
             if err_img is None:
-                pixerr = np.sqrt( ron_sc[:,i]**2 + np.abs(z) )
+                pixerr = np.sqrt(ron_sc[:, i] ** 2 + np.abs(z))
             else:
-                pixerr = err_sc[:,i].copy()
-            
+                pixerr = err_sc[:, i].copy()
+
             # assign weights for flux (and take care of NaNs and INFs)
-            pix_w = 1./(pixerr*pixerr)  
-            
+            pix_w = 1. / (pixerr * pixerr)
+
             # Initially I thought this was clearly rubbish as it down-weights the central parts
             # and that we really want to use the relative errors, ie w_i = 1/(relerr_i)**2
             # relerr = pixerr / z     ### the pixel err
             # pix_w = 1. / (relerr)**2
             # HOWEVER: this is not true, and the optimal extraction linalg routine requires absolute errors!!!
-            
-            #check for NaNs etc
+
+            # check for NaNs etc
             pix_w[np.isinf(pix_w)] = 0.
-            
+
             if phi_onthefly:
-                quickfit = fit_single_fibre_profile(sr[:,i],z)
-                bestparms = np.array([quickfit.best_values['mu'], quickfit.best_values['sigma'], quickfit.best_values['amp'], quickfit.best_values['beta']])
-                phi = fibmodel_with_amp(sr[:,i],*bestparms)
-                phi /= np.max([np.sum(phi),0.001])   #we can do this because grid-stepsize = 1; also make sure that we do not divide by zero
-                phi = phi.reshape(len(phi),1)   #stupid python...
+                quickfit = fit_single_fibre_profile(sr[:, i], z)
+                bestparms = np.array([quickfit.best_values['mu'], quickfit.best_values['sigma'],
+                                      quickfit.best_values['amp'], quickfit.best_values['beta']])
+                phi = fibmodel_with_amp(sr[:, i], *bestparms)
+                phi /= np.max([np.sum(phi), 0.001])  # we can do this because grid-stepsize = 1; also make sure that we do not divide by zero
+                phi = phi.reshape(len(phi), 1)  # stupid python...
             else:
-                #get normalized profiles for all fibres for this cutout
+                # get normalized profiles for all fibres for this cutout
                 if combined_profiles:
                     print('WARNING: we currently do not have a profile estimate for the calibration fibres!!!')
-                    phi_laser = np.sum(make_norm_profiles_3(sr[:,i], i, fppo, fibs='laser'), axis=1)
-                    phi_thxe = np.sum(make_norm_profiles_3(sr[:,i], i, fppo, fibs='thxe'), axis=1)
-                    phis_sky3 = make_norm_profiles_3(sr[:,i], i, fppo, fibs='sky3')
-                    phi_sky3 = np.sum(phis_sky3, axis=1)/3.
-                    phis_stellar = make_norm_profiles_3(sr[:,i], i, fppo, fibs='stellar')
-                    phi_stellar = np.sum(phis_stellar * relints, axis=1) 
-                    phis_sky2 = make_norm_profiles_3(sr[:,i], i, fppo, fibs='sky2')
-                    phi_sky2 = np.sum(phis_sky2, axis=1)/2.    
-                    phi_sky = (phi_sky3 + phi_sky2)/2.
+                    phi_laser = np.sum(make_norm_profiles_3(sr[:, i], i, fppo, fibs='laser'), axis=1)
+                    phi_thxe = np.sum(make_norm_profiles_3(sr[:, i], i, fppo, fibs='thxe'), axis=1)
+                    phis_sky3 = make_norm_profiles_3(sr[:, i], i, fppo, fibs='sky3')
+                    phi_sky3 = np.sum(phis_sky3, axis=1) / 3.
+                    phis_stellar = make_norm_profiles_3(sr[:, i], i, fppo, fibs='stellar')
+                    phi_stellar = np.sum(phis_stellar * relints, axis=1)
+                    phis_sky2 = make_norm_profiles_3(sr[:, i], i, fppo, fibs='sky2')
+                    phi_sky2 = np.sum(phis_sky2, axis=1) / 2.
+                    phi_sky = (phi_sky3 + phi_sky2) / 2.
                     phi = np.vstack((phi_laser, phi_sky, phi_stellar, phi_thxe)).T
                 else:
-                    #phi = make_norm_profiles(sr[:,i], ord, i, fibparms)
-                    #phi = make_norm_profiles_temp(sr[:,i], ord, i, fibparms)
-                    #phi = make_norm_single_profile_temp(sr[:,i], ord, i, fibparms)
-                    phi = make_norm_profiles_3(sr[:,i], i, fppo, fibs='all')
-            
-#             print('WARNING: TEMPORARY offset correction is not commented out!!!')
-#             #subtract the median as the offset if BG is not properly corrected for
-#             z -= np.median(z)
-            
-            #do the optimal extraction
+                    # phi = make_norm_profiles(sr[:,i], ord, i, fibparms)
+                    # phi = make_norm_profiles_temp(sr[:,i], ord, i, fibparms)
+                    # phi = make_norm_single_profile_temp(sr[:,i], ord, i, fibparms)
+                    phi = make_norm_profiles_3(sr[:, i], i, fppo, fibs='all')
+
+            # print('WARNING: TEMPORARY offset correction is not commented out!!!')
+            # # subtract the median as the offset if BG is not properly corrected for
+            # z -= np.median(z)
+
+            # do the optimal extraction
             if not collapse:
-                if np.sum(phi)==0:
-#                     f,v = (0.,np.sqrt(len(phi)*RON*RON))
-                    f,v = (0., np.sqrt(np.sum(pixerr*pixerr)))
+                if np.sum(phi) == 0:
+                    # f,v = (0.,np.sqrt(len(phi)*RON*RON))
+                    f, v = (0., np.sqrt(np.sum(pixerr * pixerr)))
                 else:
-                    #THIS IS THE NORMAL CASE!!! 
-                    #NOTE: take the read-out noise as the average of the individual-pixel read-out noise values over the cutout, as it can change if we cross a quadrant boundary!
-                    f,v = linalg_extract_column(z, pix_w, phi, RON=np.mean(roncol))
+                    # THIS IS THE NORMAL CASE!!!
+                    # NOTE: take the read-out noise as the average of the individual-pixel read-out noise values over
+                    # the cutout, as it can change if we cross a quadrant boundary!
+                    f, v = linalg_extract_column(z, pix_w, phi, RON=np.mean(roncol))
             else:
-                #f,v = (np.sum(z-np.median(z)), np.sum(z-np.median(z)) + len(phi)*RON*RON)   ### background should already be taken care of here...
-                #f,v = (np.sum(z), np.sum(z) + len(phi)*RON*RON)
-                f,v = (np.sum(z), np.sqrt(np.sum(pixerr*pixerr)))
-            
-            #e = np.sqrt(v)
-            #model = np.sum(f*phi,axis=1)
-        
-            #fill output arrays depending on the selected method
+                # f,v = (np.sum(z-np.median(z)), np.sum(z-np.median(z)) + len(phi)*RON*RON)   ### background should already be taken care of here...
+                # f,v = (np.sum(z), np.sum(z) + len(phi)*RON*RON)
+                f, v = (np.sum(z), np.sqrt(np.sum(pixerr * pixerr)))
+
+            # e = np.sqrt(v)
+            # model = np.sum(f*phi,axis=1)
+
+            # fill output arrays depending on the selected method
             if not phi_onthefly and not collapse:
-                
-                #there should not be negative values!!!
-                f[f<0] = 0.
-                #not sure if this is the proper way to do this, but we can't have negative variance
-#                 v[np.logical_or(v<=0,f<=0)] = RON*RON
-#                 v[v<RON*RON] = np.maximum(RON*RON,1.)   #just a stupid fix so that variance is never below 1
-                v[np.logical_or(v<=0,f<=0)] = np.mean(roncol)**2
-                v[v<np.mean(roncol)**2] = np.maximum(np.mean(roncol)**2,1.)   #just a stupid fix so that variance is never below 1
-                    
-                if individual_fibres:   
-                    #fill flux- and error- output arrays for individual fibres
+
+                # there should not be negative values!!!
+                f[f < 0] = 0.
+                # not sure if this is the proper way to do this, but we can't have negative variance
+                # v[np.logical_or(v<=0,f<=0)] = RON*RON
+                # v[v<RON*RON] = np.maximum(RON*RON,1.)   # just a stupid fix so that variance is never below 1
+                v[np.logical_or(v <= 0, f <= 0)] = np.mean(roncol) ** 2
+                v[v < np.mean(roncol) ** 2] = np.maximum(np.mean(roncol) ** 2, 1.)  # just a stupid fix so that variance is never below 1
+
+                if individual_fibres:
+                    # fill flux- and error- output arrays for individual fibres
                     for j in range(nfib):
-                        fib = 'fibre_'+str(j+1).zfill(2)
+                        fib = 'fibre_' + str(j + 1).zfill(2)
                         flux[ord][fib].append(f[j])
                         err[ord][fib].append(np.sqrt(v[j]))
-                
+
                 elif combined_profiles:
-                    #fill flux- and error- output arrays for all objects (Laser, Sky, Stellar, ThXe)
-                    #Laser
+                    # fill flux- and error- output arrays for all objects (Laser, Sky, Stellar, ThXe)
+                    # Laser
                     flux[ord]['laser'].append(f[0])
                     err[ord]['laser'].append(np.sqrt(v[0]))
-                    #Sky
+                    # Sky
                     flux[ord]['sky'].append(f[1])
                     err[ord]['sky'].append(np.sqrt(v[1]))
-                    #Stellar
+                    # Stellar
                     flux[ord]['stellar'].append(f[2])
                     err[ord]['stellar'].append(np.sqrt(v[2]))
-                    #ThXe
+                    # ThXe
                     flux[ord]['thxe'].append(f[3])
                     err[ord]['thxe'].append(np.sqrt(v[3]))
-                            
+
                 else:
-                    #Optimal extraction was done for all fibres individually, but now add up the respective "eta's" for the different "objects"                    
-                    #fill flux- and error- output arrays for all objects (Laser, Sky, Stellar, ThXe)
-                    #Laser
+                    # Optimal extraction was done for all fibres individually, but now add up the respective "eta's"
+                    # for the different "objects"
+                    # fill flux- and error- output arrays for all objects (Laser, Sky, Stellar, ThXe)
+                    # Laser
                     flux[ord]['laser'].append(f[0])
                     err[ord]['laser'].append(np.sqrt(v[0]))
-                    #Sky
+                    # Sky
                     flux[ord]['sky'].append(np.sum(f[1:4]) + np.sum(f[25:27]))
                     err[ord]['sky'].append(np.sqrt(np.sum(v[1:4]) + np.sum(v[25:27])))
-                    #Stellar
+                    # Stellar
                     flux[ord]['stellar'].append(np.sum(f[5:24]))
                     err[ord]['stellar'].append(np.sqrt(np.sum(v[5:24])))
-                    #ThXe
+                    # ThXe
                     flux[ord]['thxe'].append(f[27])
                     err[ord]['thxe'].append(np.sqrt(v[27]))
-                    
+
             else:
-                flux[ord].append(np.max([f,0.]))
+                flux[ord].append(np.max([f, 0.]))
                 if f <= 0 or v <= 0:
-                    #err[ord].append(np.sqrt(len(phi)*RON*RON))
-                    err[ord].append(np.sqrt(np.sum(pixerr*pixerr)))
+                    # err[ord].append(np.sqrt(len(phi)*RON*RON))
+                    err[ord].append(np.sqrt(np.sum(pixerr * pixerr)))
                 else:
                     err[ord].append(np.sqrt(v))
-         
-        
-        if timit:
-            print('Time taken for extraction of '+ord+': '+str(time.time() - order_start_time)+' seconds')
-                
-                
-    if timit:
-        print('Time elapsed for optimal extraction of entire spectrum: '+str(time.time() - start_time)+' seconds...')  
 
-    return pix,flux,err
+
+        # fix for order_01
+        if ord == 'order_01':
+            for fib in sorted(pix[ord].keys()):
+                flux['order_01'][fib] = np.r_[np.repeat(0., 900), flux['order_01'][fib]]
+                err['order_01'][fib] = np.r_[np.repeat(0., 900), err['order_01'][fib]]
+
+        if timit:
+            print('Time taken for extraction of ' + ord + ': ' + str(time.time() - order_start_time) + ' seconds')
+
+    if timit:
+        print('Time elapsed for optimal extraction of entire spectrum: ' + str(
+            time.time() - start_time) + ' seconds...')
+
+    return pix, flux, err
 
 
 
@@ -1062,7 +1077,7 @@ def extract_spectrum_from_indices(img, err_img, stripe_indices, method='optimal'
                 extracted['pix'] = pix
                 extracted['flux'] = flux
                 extracted['err'] = err
-                np.save(path + obsname + '_extracted.npy', extracted)    
+                np.save(path + obsname + '_extracted.npy', extracted)
         
     return pix,flux,err
 
