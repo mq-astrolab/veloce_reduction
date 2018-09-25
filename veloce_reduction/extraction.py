@@ -477,7 +477,7 @@ def optimal_extraction(stripes, err_stripes=None, ron_stripes=None, nfib=28, RON
 #                 v[np.logical_or(v<=0,f<=0)] = RON*RON
 #                 v[v<RON*RON] = np.maximum(RON*RON,1.)   #just a stupid fix so that variance is never below 1
                 v[np.logical_or(v<=0,f<=0)] = np.mean(roncol)**2
-                v[v<RON*RON] = np.maximum(np.mean(roncol)**2,1.)   #just a stupid fix so that variance is never below 1
+                v[v < np.mean(roncol) ** 2] = np.maximum(np.mean(roncol) ** 2, 1.)  # just a stupid fix so that variance is never below 1
                     
                 if individual_fibres:   
                     #fill flux- and error- output arrays for individual fibres
@@ -574,9 +574,7 @@ def optimal_extraction_from_indices(img, stripe_indices, err_img=None, nfib=28, 
         ordnum = ord[-2:]
         
         #fibre profile parameters for that order
-        print('harharhar')
         fppo = fibparms[ord]
-
         
         # define stripe
         #stripe = stripes[ord]
@@ -589,6 +587,8 @@ def optimal_extraction_from_indices(img, stripe_indices, err_img=None, nfib=28, 
             err_sc,err_sr = flatten_single_stripe_from_indices(err_img, indices, slit_height=slit_height, timit=False)
         
         npix = sc.shape[1]
+
+        print('harharhar3')
         
         flux[ord] = {}
         err[ord] = {}
@@ -615,12 +615,18 @@ def optimal_extraction_from_indices(img, stripe_indices, err_img=None, nfib=28, 
 #         else:
 #             f_ord = np.zeros(npix)
 #             e_ord = np.zeros(npix)
-        
+
+        # exclude the range of order_01 (m = 65) that does fall off the chip!
         goodrange = np.arange(npix)
         if simu and ord == 'order_01':
             #goodrange = goodrange[fibparms[ord]['fibre_21']['onchip']]
-            goodrange = np.arange(1300,4096)
-            for j in range(1300):
+            goodrange = np.arange(1301,4096)
+            for j in range(1301):
+                pix[ord].append(ordnum+str(j+1).zfill(4))
+        if not simu and ord == 'order_01':
+            #goodrange = goodrange[fibparms[ord]['fibre_21']['onchip']]
+            goodrange = np.arange(901,4096)
+            for j in range(901):
                 pix[ord].append(ordnum+str(j+1).zfill(4))
                     
         for i in goodrange:
@@ -632,21 +638,20 @@ def optimal_extraction_from_indices(img, stripe_indices, err_img=None, nfib=28, 
                 z -= 1.     #note the minus 1 is because we added 1 artificially at the beginning in order for "extract_stripes" to work properly
             roncol = ron_sc[:,i].copy()
 
-            
-            #if error is not provided, estimate it (NOT RECOMMENDED!!!)
+            # if error is not provided, estimate it here (NOT RECOMMENDED!!!)
             if err_img is None:
                 pixerr = np.sqrt( ron_sc[:,i]**2 + np.abs(z) )
             else:
                 pixerr = err_sc[:,i].copy()
             
-            #assign weights for flux (and take care of NaNs and INFs)
+            # assign weights for flux (and take care of NaNs and INFs)
             pix_w = 1./(pixerr*pixerr)  
             
-            ###initially I thought this was clearly rubbish as it down-weights the central parts
-            #and that we really want to use the relative errors, ie w_i = 1/(relerr_i)**2
-            #relerr = pixerr / z     ### the pixel err
-            #pix_w = 1. / (relerr)**2
-            #HOWEVER: this is not true, and the optimal extraction linalg routine requires absolute errors!!!
+            # Initially I thought this was clearly rubbish as it down-weights the central parts
+            # and that we really want to use the relative errors, ie w_i = 1/(relerr_i)**2
+            # relerr = pixerr / z     ### the pixel err
+            # pix_w = 1. / (relerr)**2
+            # HOWEVER: this is not true, and the optimal extraction linalg routine requires absolute errors!!!
             
             #check for NaNs etc
             pix_w[np.isinf(pix_w)] = 0.
@@ -707,7 +712,7 @@ def optimal_extraction_from_indices(img, stripe_indices, err_img=None, nfib=28, 
 #                 v[np.logical_or(v<=0,f<=0)] = RON*RON
 #                 v[v<RON*RON] = np.maximum(RON*RON,1.)   #just a stupid fix so that variance is never below 1
                 v[np.logical_or(v<=0,f<=0)] = np.mean(roncol)**2
-                v[v<RON*RON] = np.maximum(np.mean(roncol)**2,1.)   #just a stupid fix so that variance is never below 1
+                v[v<np.mean(roncol)**2] = np.maximum(np.mean(roncol)**2,1.)   #just a stupid fix so that variance is never below 1
                     
                 if individual_fibres:   
                     #fill flux- and error- output arrays for individual fibres
@@ -975,8 +980,6 @@ def extract_spectrum_from_indices(img, err_img, stripe_indices, method='optimal'
     MODHIST:
     17/07/18 - CMB create
     """
-
-    print('haasssss')
 
     while method not in ["quick", "tramline", "optimal"]:
         print('ERROR: extraction method not recognized!')
