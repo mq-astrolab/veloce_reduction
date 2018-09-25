@@ -975,7 +975,9 @@ def extract_spectrum_from_indices(img, err_img, stripe_indices, method='optimal'
     MODHIST:
     17/07/18 - CMB create
     """
-    
+
+    print('haasssss')
+
     while method not in ["quick", "tramline", "optimal"]:
         print('ERROR: extraction method not recognized!')
         method = raw_input('Which method do you want to use (valid options are ["quick" / "tramline" / "optimal"] )?')
