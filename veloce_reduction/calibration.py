@@ -857,7 +857,6 @@ def make_master_dark(dark_list, MB, gain=None, scalable=False, savefile=True, pa
             #get header from master BIAS frame
             h = pyfits.getheader(path+'master_bias.fits')
             h['HISTORY'][0] = '   MASTER DARK frame - created '+time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())+' (GMT)'
-            h['EXPTIME'] = (texp, 'exposure time [s]')
             h['UNITS'] = 'ELECTRONS'
             h['COMMENT'] = 're-normalized to texp=1s to make it scalable'
             h['TOTALEXP'] = (1., 'exposure time [s]')

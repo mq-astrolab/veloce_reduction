@@ -881,7 +881,10 @@ def extract_spectrum(stripes, err_stripes, ron_stripes, method='optimal', indivi
                     submethod = '3b'
             
         # name of object
-        starname = pyfits.getval(path+obsname+'.fits', 'OBJECT')
+        try:
+            starname = pyfits.getval(path+obsname+'.fits', 'OBJECT')
+        except:
+            starname = ''
                      
         if path is None:
             print('ERROR: path to output directory not provided!!!')
@@ -1036,7 +1039,10 @@ def extract_spectrum_from_indices(img, err_img, stripe_indices, method='optimal'
                     submethod = '3b'
         
         # name of object
-        starname = pyfits.getval(path+obsname+'.fits', 'OBJECT')
+        try:
+            starname = pyfits.getval(path+obsname+'.fits', 'OBJECT')
+        except:
+            starname = ''
                     
         if path is None:
             print('ERROR: path to output directory not provided!!!')
