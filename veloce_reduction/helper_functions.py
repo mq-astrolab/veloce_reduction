@@ -760,14 +760,21 @@ def short_filenames(file_list):
 
 
 
-def correct_orientation(img, orient=1):
+def correct_orientation(img, verbose=False):
     """
-    (1) = same orientation as the simulated spectra, ie wavelength decreases from left to right and bottom to top
+    bring image to same orientation as the simulated spectra, ie wavelength decreases from left to right and bottom to top
     """
-    if orient == 1:
+    
+    ny, nx = img.shape
+    
+    if (ny,nx) == (4112,4202):
         img = np.fliplr(img.T)
+    elif (ny,nx) == (4202,4112):
+        # this means the image is already in the correct orientation
+        if verbose:
+            print('The image is already in the correct orientation!')
     else:
-        print('ERROR: selected orientation not defined!!!')
+        print('ERROR: file shape not correct!!!')
     
     return img
 

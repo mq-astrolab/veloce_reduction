@@ -17,13 +17,14 @@ from veloce_reduction.veloce_reduction.helper_functions import correct_orientati
 
 
 
-def make_median_image(imglist, MB=None, raw=False):
+def make_median_image(imglist, MB=None, scalable=False, raw=False):
     """
     Make a median image from a given list of images.
 
     INPUT:
     'imglist'  : list of files (incl. directories)
     'MB'       : master bias frame - if provided, it will be subtracted from every image before median image is computed
+    'scalable' : boolean - do you want to scale this to an exposure time of 1s (AFTER the bias is subtracted!!!!!)
     'raw'      : boolean - set to TRUE if you want to retain the original size and orientation;
                  otherwise the image will be brought to the 'correct' orientation and the overscan regions will be cropped
 
@@ -38,6 +39,7 @@ def make_median_image(imglist, MB=None, raw=False):
 
     # loop over all files in "dark_list"
     for file in imglist:
+        
         # read in dark image
         img = pyfits.getdata(file)
         if not raw:
@@ -48,6 +50,9 @@ def make_median_image(imglist, MB=None, raw=False):
         if MB is not None:
             # subtract master bias (if provided)
             img = img - MB
+        if scalable:
+            texp = pyfits.getval(file, 'TOTALEXP')
+            img /= texp
 
         # add image to list
         allimg.append(img)
@@ -380,7 +385,7 @@ def get_bias_and_readnoise_from_overscan(img, timit=False):
 
 
 
-def get_bias_and_readnoise_from_bias_frames(bias_list, degpol=5, clip=5, gain=None, debug_level=0, timit=False):
+def get_bias_and_readnoise_from_bias_frames(bias_list, degpol=5, clip=5, gain=None, save_medimg=True, debug_level=0, timit=False):
     """
     Calculate the median bias frame, the offsets in the four different quadrants (assuming bias frames are flat within a quadrant),
     and the read-out noise per quadrant (ie the STDEV of the signal, but from difference images).
@@ -390,6 +395,7 @@ def get_bias_and_readnoise_from_bias_frames(bias_list, degpol=5, clip=5, gain=No
     'degpol'       : order of the polynomial (in each direction) to be used in the 2-dim polynomial surface fits to each quadrant's median bais frame
     'clip'         : number of 'sigmas' used to identify outliers when 'cleaning' each quadrant's median bais frame before the surface fitting
     'gain'         : array of gains for each quadrant (in units of e-/ADU)
+    'save_medimg'  : boolean - do you want to save the median image to a FITS file?
     'debug_level'  : for debugging...
     'timit'        : boolean - do you want to measure execution run time?
     
@@ -437,25 +443,22 @@ def get_bias_and_readnoise_from_bias_frames(bias_list, degpol=5, clip=5, gain=No
     sigs_q4 = []
     allimg = []
 
-    # for name in bias_list:
-    #
-    #     img = pyfits.getdata(name)
-    #     print(img.shape)
+    if debug_level >= 1:
+        print('Determining bias levels and read-out noise from '+str(len(bias_list))+' bias frames...')
 
     #first get mean / median for all bias images (per quadrant)
     for name in bias_list:
-
+        
+        if debug_level >= 1:
+            print('OK, reading ',name)
+        
         img = pyfits.getdata(name)
+        
         #bring to "correct" orientation
         img = correct_orientation(img)
-
-        # ny,nx = img.shape
-        #
-        # #define four quadrants via masks
-        # q1,q2,q3,q4 = make_quadrant_masks(nx,ny)
-
         #remove the overscan region, which looks crap for actual bias images
         img = crop_overscan_region(img)
+        
         #means_q1.append(np.nanmean(img[q1]))
         medians_q1.append(np.nanmedian(img[q1]))
         #means_q2.append(np.nanmean(img[q2]))
@@ -470,6 +473,7 @@ def get_bias_and_readnoise_from_bias_frames(bias_list, degpol=5, clip=5, gain=No
     # by using the difference images we are less susceptible to funny pixels (hot, warm, cosmics, etc.)
     list_of_combinations = list(combinations(bias_list, 2))
     for (name1,name2) in list_of_combinations:
+        
         # read in observations and bring to right format
         img1 = pyfits.getdata(name1)
         img2 = pyfits.getdata(name2)
@@ -535,7 +539,7 @@ def get_bias_and_readnoise_from_bias_frames(bias_list, degpol=5, clip=5, gain=No
     #return all coefficients as 4-element array
     coeffs = np.array([coeffs_q1, coeffs_q2, coeffs_q3, coeffs_q4])            
 
-    #convert read-out noise (but NOT offsets!!!) to units of electrons rather than ADUs by muliplying with the gain (which has units of e-/ADU)
+    #convert read-out noise (but NOT offsets!!!) to units of electrons rather than ADUs by multiplying with the gain (which has units of e-/ADU)
     if gain is None:
         print('ERROR: gain(s) not set!!!')
         return
@@ -550,19 +554,14 @@ def get_bias_and_readnoise_from_bias_frames(bias_list, degpol=5, clip=5, gain=No
     if timit:
         print('Time elapsed: '+str(np.round(time.time() - start_time,1))+' seconds')
 
-    if savefile:
+    if save_medimg:
         #save median bias image
         dum = bias_list[0].split('/')
         path = bias_list[0][0:-len(dum[-1])]
-        #get header from the read-noise mask file
-        h = pyfits.getheader(path+'read_noise_mask.fits')
-        #change a few things
-        for i in range(1,5):
-            del h['offset_'+str(i)]
-        h['UNITS'] = 'ADU'
-        h['HISTORY'][0] = ('   median BIAS frame - created '+time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())+' (GMT)')
-        #write master bias to file
-        pyfits.writeto(path+'median_bias.fits', medimg, h, clobber=True)
+        #write median bias image to file
+        pyfits.writeto(path+'median_bias.fits', medimg, clobber=True)
+        pyfits.setval(path+'median_bias.fits', 'UNITS', value='ADU')
+        pyfits.setval(path+'median_bias.fits', 'HISTORY', value='   master BIAS frame - created '+time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())+' (GMT)')
 
     return medimg,coeffs,offsets,rons
 
@@ -620,10 +619,10 @@ def make_offmask_and_ronmask(offsets, rons, nx, ny, gain=None, savefiles=False, 
             print('ERROR: output file directory not provided!!!')
             return
         else:
-            #write master bias to file
+            #write offmask to file
             pyfits.writeto(path+'offmask.fits', offmask, clobber=True)
             pyfits.setval(path+'offmask.fits', 'UNITS', value='ADU')
-            pyfits.setval(path+'offmask.fits', 'HISTORY', value='   master BIAS frame - created '+time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())+' (GMT)')
+            pyfits.setval(path+'offmask.fits', 'HISTORY', value='   offset mask - created '+time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())+' (GMT)')
             if nq == 1:
                 pyfits.setval(path+'offmask.fits', 'OFFSET', value=offsets, comment='in ADU')
                 pyfits.setval(path+'offmask.fits', 'RNOISE', value=rons, comment='in ELECTRONS')
@@ -741,20 +740,21 @@ def make_master_bias_from_coeffs(coeffs, nx, ny, savefile=False, path=None, timi
 
 
 
-def make_master_dark(dark_list, MB, gain=None, scalable=False, savefile=True, path=None, timit=False):
+def make_master_dark(dark_list, MB, gain=None, scalable=False, savefile=True, path=None, debug_level=0, timit=False):
     """
     This routine creates a "MASTER DARK" frame from a given list of dark frames. It also subtracts the MASTER BIAS from each dark frame before 
     combining them into the master dark frame.
     NOTE: the output is in units of ELECTRONS!!!
     
     INPUT:
-    'dark_list'  : list of raw dark image files (incl. directories)
-    'MB'         : the master bias frame [ADU]
-    'gain'       : the gains for each quadrant [e-/ADU]
-    'scalable'   : boolean - do you want to normalize the dark current to an exposure time of 1s? (ie do you want to make it "scalable"?)
-    'savefile'   : boolean - do you want to save the master dark frame to a fits file?
-    'path'       : path to the output file directory (only needed if savefile is set to TRUE)
-    'timit'      : boolean - do you want to measure execution run time?
+    'dark_list'    : list of raw dark image files (incl. directories)
+    'MB'           : the master bias frame [ADU]
+    'gain'         : the gains for each quadrant [e-/ADU]
+    'scalable'     : boolean - do you want to normalize the dark current to an exposure time of 1s? (ie do you want to make it "scalable"?)
+    'savefile'     : boolean - do you want to save the master dark frame to a fits file?
+    'path'         : path to the output file directory (only needed if savefile is set to TRUE)
+    'debug_level'  : for debugging...
+    'timit'        : boolean - do you want to measure execution run time?
     
     OUTPUT:
     'MD'  : the master dark frame [e-]
@@ -795,28 +795,56 @@ def make_master_dark(dark_list, MB, gain=None, scalable=False, savefile=True, pa
 # #     err_summed = np.sqrt(np.sum((np.array(allerr)**2),axis=0))
 # #     err_MD = err_summed / len(dark_list)
 
-    #get median image (including subtraction of master bias)
-    MD = make_median_image(dark_list, MB=MB, raw=False)
+    if debug_level >= 1:
+        print('Creating master dark frame from '+str(len(dark_list))+' dark frames...')       
 
-    #now convert to units of electrons
-    if gain is None:
-        print('ERROR: gain(s) not given!!!')
-        return
-    else:
-        ny,nx = MD.shape
-        q1,q2,q3,q4 = make_quadrant_masks(nx,ny)
-        MD[q1] = gain[0] * MD[q1]
-        MD[q2] = gain[1] * MD[q2]
-        MD[q3] = gain[2] * MD[q3]
-        MD[q4] = gain[3] * MD[q4]
-    
+    # get a list of all the exposure times first
+    exp_times = np.array([])
+    for file in sorted(dark_list):
+        exp_times =  np.append(exp_times, np.round(pyfits.getval(file,'TOTALEXP'),0))
 
-    #re-normalize to texp=1s to make it "scalable"
-    texp = pyfits.getval(dark_list[0], 'exptime')
+    # list of unique exposure times
+    unique_exp_times = np.array(list(sorted(set(exp_times))))
+    if debug_level >= 1 and len(unique_exp_times) > 1:
+        print('WARNING: not all dark frames have the same exposure times! Found '+str(len(unique_exp_times))+' unique exposure times!!!')
+
+
+    # create median dark files
     if scalable:
-        MD = MD / texp
-#         #but can't have that smaller than the RON!?!?!? this is taken care of in "correct_for_bias_and_dark(_from_filename)"
-#         err_MD = err_MD / texp
+        #get median image (including subtraction of master bias) and scale to texp=1s
+        MD = make_median_image(dark_list, MB=MB, scalable=scalable, raw=False)
+        if gain is None:
+            print('ERROR: gain(s) not given!!!')
+            return
+        else:
+            ny,nx = MD.shape
+            q1,q2,q3,q4 = make_quadrant_masks(nx,ny)
+            MD[q1] = gain[0] * MD[q1]
+            MD[q2] = gain[1] * MD[q2]
+            MD[q3] = gain[2] * MD[q3]
+            MD[q4] = gain[3] * MD[q4]
+    else:
+        # make dark "sublists" for all unique exposure times
+        all_dark_lists = []
+        for i in range(len(unique_exp_times)):
+            all_dark_lists.append( np.array(dark_list)[np.argwhere(exp_times == unique_exp_times[i]).flatten()] )
+        #get median image (including subtraction of master bias) for each "sub-list"
+        MD = []
+        for sublist in all_dark_lists:
+            sub_MD = make_median_image(sublist, MB=MB, scalable=scalable, raw=False)
+            #now convert to units of electrons
+            if gain is None:
+                print('ERROR: gain(s) not given!!!')
+                return
+            else:
+                ny,nx = sub_MD.shape
+                q1,q2,q3,q4 = make_quadrant_masks(nx,ny)
+                sub_MD[q1] = gain[0] * sub_MD[q1]
+                sub_MD[q2] = gain[1] * sub_MD[q2]
+                sub_MD[q3] = gain[2] * sub_MD[q3]
+                sub_MD[q4] = gain[3] * sub_MD[q4]
+            MD.append(sub_MD)
+
 
     if savefile:
         if path is None:
@@ -826,17 +854,23 @@ def make_master_dark(dark_list, MB, gain=None, scalable=False, savefile=True, pa
             path = dark_list[0][0:-len(dum[-1])]
         if scalable:
             outfn = path+'master_dark_scalable.fits'
-        else:
-            outfn = path+'master_dark_t'+str(int(np.round(texp,0)))+'.fits'
-        #get header from master BIAS frame
-        h = pyfits.getheader(path+'master_bias.fits')
-        h['HISTORY'][0] = '   MASTER DARK frame - created '+time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())+' (GMT)'
-        h['EXPTIME'] = (texp, 'exposure time [s]')
-        h['UNITS'] = 'ELECTRONS'
-        if scalable:
+            #get header from master BIAS frame
+            h = pyfits.getheader(path+'master_bias.fits')
+            h['HISTORY'][0] = '   MASTER DARK frame - created '+time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())+' (GMT)'
+            h['EXPTIME'] = (texp, 'exposure time [s]')
+            h['UNITS'] = 'ELECTRONS'
             h['COMMENT'] = 're-normalized to texp=1s to make it scalable'
-            h['EXPTIME'] = (1., 'exposure time [s]; originally '+str(np.round(texp,2))+'s')
-        pyfits.writeto(outfn, MD, h, clobber=True)
+            h['TOTALEXP'] = (1., 'exposure time [s]')
+            pyfits.writeto(outfn, MD, h, clobber=True)
+        else:
+            for i,submd in enumerate(MD):
+                outfn = path+'master_dark_t'+str(int(unique_exp_times[i]))+'.fits'
+                #get header from master BIAS frame
+                h = pyfits.getheader(path+'master_bias.fits')
+                h['HISTORY'][0] = '   MASTER DARK frame - created '+time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())+' (GMT)'
+                h['TOTALEXP'] = (unique_exp_times[i], 'exposure time [s]')
+                h['UNITS'] = 'ELECTRONS'
+                pyfits.writeto(outfn, submd, h, clobber=True)
 #         if return_errors:
 #             h_err = h.copy()
 #             h_err['HISTORY'] = 'estimated uncertainty in MASTER DARK frame - created '+time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())+' (GMT)'
@@ -914,6 +948,10 @@ def correct_for_bias_and_dark_from_filename(imgname, MB, MD, gain=None, scalable
     'MD'        : the master dark frame [e-]
     'gain'      : the gains for each quadrant [e-/ADU]
     'scalable'  : boolean - do you want to normalize the dark current to an exposure time of 1s? (ie do you want to make it "scalable"?)
+    'savefile'  : boolean - do you want to save the bias- & dark-corrected image (and corresponding error array) to a FITS file?
+    'path'      : output file directory
+    'simu'      : boolean - are you using Echelle++ simulated observations?
+    'timit'     : boolean - do you want to measure the execution run time?
     
     OUTPUT:
     'dc_bc_img'  : the bias- & dark-corrected image [e-] (also has been brought to 'correct' orientation and overscan regions cropped) 
@@ -939,9 +977,10 @@ def correct_for_bias_and_dark_from_filename(imgname, MB, MD, gain=None, scalable
 
 
     #(2) conversion to ELECTRONS and DARK SUBTRACTION [e-]
-    #if the darks have a different exposure time then the images you are trying to correct, we need to re-scale the master dark
+    #if the darks have a different exposure time than the images you are trying to correct, we need to re-scale the master dark
     if scalable:
-        texp = pyfits.getval(imgname, 'exptime')
+        # texp = pyfits.getval(imgname, 'exptime')
+        texp = pyfits.getval(imgname, 'TOTALEXP')
         if texp is not None:
             MD = MD * texp
 #             #cannot have an error estimate lower than the read-out noise; this is dodgy but don't know what else to do

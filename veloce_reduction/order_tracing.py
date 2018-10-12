@@ -173,6 +173,174 @@ def find_stripes(flat, deg_polynomial=2, gauss_filter_sigma=3., min_peak=0.05, m
 
 
 
+
+def find_gaps(flat, deg_polynomial=2, gauss_filter_sigma=3., min_peak=0.05, maskthresh=100., weighted_fits=True, slowmask=False, simu=False, timit=False, debug_level=0):
+    """
+    BASED ON JULIAN STUERMER'S MAROON_X PIPELINE:
+    
+    Locates and fits stripes (ie orders) in a flat field echelle spectrum.
+    
+    Starting in the central column, the algorithm identifies peaks and traces each stripe to the edge of the detector
+    by following the brightest pixels along each order. It then fits a polynomial to each stripe.
+    To improve algorithm stability, the image is first smoothed with a Gaussian filter. It not only eliminates noise, but
+    also ensures that the cross-section profile of the flat becomes peaked in the middle, which helps to identify the
+    center of each stripe. Choose gauss_filter accordingly.
+    To avoid false positives, only peaks above a certain (relative) intensity threshold are used.
+      
+    :param flat: dark-corrected flat field spectrum
+    :type flat: np.ndarray
+    :param deg_polynomial: degree of the polynomial fit
+    :type deg_polynomial: int
+    :param gauss_filter_sigma: sigma of the gaussian filter used to smooth the image.
+    :type gauss_filter_sigma: float
+    :param min_peak: minimum relative peak height 
+    :type min_peak: float
+    :param debug_level: debug level flag
+    :type debug_level: int
+    :return: list of polynomial fits (np.poly1d)
+    :rtype: list
+    """
+    
+    if timit:
+        start_time = time.time()
+    
+    #logging.info('Finding stripes...')
+    print("Finding stripes...")
+    ny, nx = flat.shape
+
+    # smooth image slightly for noise reduction
+    filtered_flat = ndimage.gaussian_filter(flat.astype(np.float), gauss_filter_sigma)
+    
+    # find peaks in center column
+    data = filtered_flat[:, int(nx / 2)]
+    #peaks = np.r_[True, data[1:] > data[:-1]] & np.r_[data[:-1] > data[1:], True]
+    troughs = np.r_[True, data[1:] < data[:-1]] & np.r_[data[:-1] < data[1:], True]
+
+    if debug_level > 1:
+        plt.figure()
+        plt.title('Local maxima')
+        plt.plot(data)
+        plt.scatter(np.arange(ny)[troughs], data[troughs],s=25)
+        plt.show()
+
+    # fiddly fix, so we only find the troughs between stellar and sky fibres
+    idx = np.logical_and(np.logical_and(troughs, data > 50), data < 2000.)
+    idx[:40] = False
+    idx[4016:] = False
+    
+    minima = np.arange(ny)[idx]
+
+    # filter out maxima too close to the boundary to avoid problems
+    minima = minima[minima > 3]
+    minima = minima[minima < ny - 3]
+
+    if debug_level > 1:
+        #labels, n_labels = ndimage.measurements.label(data > min_peak * np.max(data))
+        plt.figure()
+        plt.title('Order gaps (stellar / sky)')
+        plt.plot(data)
+        plt.scatter(np.arange(ny)[minima], data[minima],s=25, c='red')
+        #plt.plot((labels[0] > 0) * np.max(data))   #what does this do???
+        plt.show()
+
+    n_gaps = len(minima)
+    #logging.info('Number of stripes found: %d' % n_order)
+    print('Number of gaps found: %d' % n_gaps)
+
+    gaps = np.zeros((n_gaps, nx))
+    # because we only want to use good pixels in the fit later on
+    mask = np.ones((n_gaps, nx), dtype=bool)
+
+    # walk through to the left and right along the maximum of the order
+    # loop over all orders:
+    for m, row in enumerate(minima):
+        column = int(nx / 2)
+        gaps[m, column] = row
+        start_row = row
+        # walk right
+        while (column + 1 < nx):
+            column += 1
+            args = np.array(np.linspace(max(1, start_row - 1), min(start_row + 1, ny - 1), 3), dtype=int)
+            args = args[np.logical_and(args < ny, args > 0)]     #deal with potential edge effects
+            p = filtered_flat[args, column]
+            # new maximum (apply only when there are actually flux values in p, ie not when eg p=[0,0,0]), otherwise leave start_row unchanged
+            if ~(p[0]==p[1] and p[0]==p[2]):
+                start_row = args[np.argmin(p)]
+            gaps[m, column] = start_row
+            #build mask - exclude pixels at upper/lower end of chip; also exclude peaks that do not lie at least 5 sigmas above rms of 3-sigma clipped background (+/- cliprange pixels from peak location)
+            #if ((p < 10).all()) or ((column > 3500) and (mask[m,column-1]==False)) or (start_row in (0,nx-1)) or (m==42 and (p < 100).all()):
+            if slowmask:
+                cliprange = 25
+                bg = filtered_flat[start_row-cliprange:start_row+cliprange+1, column]
+                clipped = sigma_clip(bg,3.)
+                if (filtered_flat[start_row,column] - np.median(clipped) < 5.*np.std(clipped)) or (start_row in (0,nx-1)):
+                    mask[m,column] = False
+            else:
+                if ((p < maskthresh).all()) or (start_row in (0,ny-1)):
+                    mask[m,column] = False
+        # walk left
+        column = int(nx / 2)
+        start_row = row
+        while (column > 0):
+            column -= 1
+            args = np.array(np.linspace(max(1, start_row - 1), min(start_row + 1, ny - 1), 3), dtype=int)
+            args = args[np.logical_and(args < ny, args > 0)]     #deal with potential edge effects
+            p = filtered_flat[args, column]
+            # new maximum (apply only when there are actually flux values in p, ie not when eg p=[0,0,0]), otherwise leave start_row unchanged
+            if ~(p[0]==p[1] and p[0]==p[2]):
+                start_row = args[np.argmin(p)]
+            gaps[m, column] = start_row
+            #build mask - exclude pixels at upper/lower end of chip; also exclude peaks that do not lie at least 5 sigmas above rms of 3-sigma clipped bcakground (+/- cliprange pixels from peak location)
+            #if ((p < 10).all()) or ((column < 500) and (mask[m,column+1]==False)) or (start_row in (0,nx-1)) or (m==42 and (p < 100).all()):
+            if slowmask:
+                cliprange = 25
+                bg = filtered_flat[start_row-cliprange:start_row+cliprange+1, column]
+                clipped = sigma_clip(bg,3.)
+                if (filtered_flat[start_row,column] - np.median(clipped) < 5.*np.std(clipped)) or (start_row in (0,nx-1)):
+                    mask[m,column] = False
+            else:
+                if ((p < maskthresh).all()) or (start_row in (0,ny-1)) or (simu==True and m==0 and column < 1300) or (simu==False and m==0 and column < 900):
+                    mask[m,column] = False
+    
+    # do Polynomial fit for each order
+    #logging.info('Fit polynomial of order %d to each stripe' % deg_polynomial)
+    print('Fit polynomial of order %d to each stripe...' % deg_polynomial)
+    P = []
+    xx = np.arange(nx)
+    for i in range(len(gaps)):
+        if not weighted_fits:
+            #unweighted
+            p = np.poly1d(np.polyfit(xx[mask[i,:]], gaps[i,mask[i,:]], deg_polynomial))
+        else:
+            #weighted
+            filtered_flux_along_order = np.zeros(nx)
+            for j in range(nx):
+                #filtered_flux_along_order[j] = filtered_flat[o[j].astype(int),j]    #that was when the loop reas: "for o in orders:"
+                filtered_flux_along_order[j] = filtered_flat[gaps[i,j].astype(int),j]
+            filtered_flux_along_order[filtered_flux_along_order < 1] = 1   
+            #w = 1. / np.sqrt(filtered_flux_along_order)   this would weight the order centres less!!!
+            w = np.sqrt(filtered_flux_along_order)
+            p = np.poly1d(np.polyfit(xx[mask[i,:]], gaps[i,mask[i,:]], deg_polynomial, w=w[mask[i,:]]))
+        P.append(p)
+
+    if debug_level > 0:
+        plt.figure()
+        plt.imshow(filtered_flat, interpolation='none', vmin=np.min(flat), vmax=0.9 * np.max(flat), cmap=plt.get_cmap('gray'))
+        for p in P:
+            plt.plot(xx, p(xx), 'g', alpha=1)
+        plt.ylim((0, ny))
+        plt.xlim((0, nx))
+        plt.show()    
+        
+    if timit:
+        print('Elapsed time: '+str(time.time() - start_time)+' seconds')
+
+    return P,mask
+
+
+
+
+
 def make_P_id_old(P):
     Ptemp = {}
     ordernames = []

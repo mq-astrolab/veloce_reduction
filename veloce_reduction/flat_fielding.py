@@ -78,6 +78,48 @@ def onedim_pixtopix_variations(f_flat, filt='gaussian', filter_width=25):
     
     
     
+def onedim_pixtopix_variations_single_order(f_flat, filt='gaussian', filter_width=25):
+    """
+    This routine applies a filter ('gaussian' / 'savgol' / 'median') to an observed flat field in order to determine the pixel-to-pixel sensitivity variations
+    as well as the fringing pattern in the red orders. This is done in 1D, ie for the already extracted spectrum.
+    
+    INPUT:
+    'f_flat'        : 1-dim array containing the extracted flux from the flat field (master white) for one order
+    'filt'          : method of filtering ('gaussian' / 'savgol' / 'median') - WARNING: ONLY GAUSSIAN FILTER HAS BEEN IMPLEMENTED SO FAR!!!
+    'filter_width'  : the width of the kernel for the filtering in pixels; defined differently for the different types of filters (see description of scipy.ndimage....)
+    
+    OUTPUT:
+    'pix_sens'      : dictionary of the pixel-to-pixel sensitivities (keys = orders)
+    'smoothed_flat' : dictionary of the smoothed (ie filtered) whites (keys = orders)
+    
+    MODHIST:
+    05/10/2018 - CMB create   (clone of "onedim_pixtopix_variations")
+    """
+    
+    while filt.lower() not in ['g','gaussian','s','savgol','m','median']:
+        print("ERROR: filter choice not recognised!")
+        filt = raw_input("Please try again: ['(G)aussian','(S)avgol','(M)edian']")
+    
+    if filt.lower() in ['g','gaussian']:
+        #Gaussian filter
+        smoothed_flat = ndimage.gaussian_filter(f_flat, filter_width)    
+        pix_sens = f_flat / smoothed_flat
+    elif filt.lower() in ['s','savgol']:
+        print('WARNING: SavGol filter not implemented yet!!!')
+        return
+    elif filt.lower() in ['m','median']:
+        print('WARNING: Median filter not implemented yet!!!')
+        return
+    else:
+        #This should never happen!!!
+        print("ERROR: filter choice still not recognised!")
+        return
+        
+    return smoothed_flat, pix_sens    
+    
+    
+    
+    
     
 def deblaze_orders(f, wl, smoothed_flat, mask, err=None, degpol=1, gauss_filter_sigma=3., maxfilter_size=100):
     

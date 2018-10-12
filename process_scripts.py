@@ -10,14 +10,14 @@ import time
 import os
 import barycorrpy
 
-from veloce_reduction.helper_functions import binary_indices
-from veloce_reduction.calibration import correct_for_bias_and_dark_from_filename
-from veloce_reduction.cosmic_ray_removal import remove_cosmics
-from veloce_reduction.background import remove_background
-from veloce_reduction.order_tracing import extract_stripes
-from veloce_reduction.extraction import extract_spectrum, extract_spectrum_from_indices
-from veloce_reduction.relative_intensities import get_relints, get_relints_from_indices, append_relints_to_FITS
-from veloce_reduction.get_info_from_headers import get_obs_coords_from_header
+from veloce_reduction.veloce_reduction.helper_functions import binary_indices
+from veloce_reduction.veloce_reduction.calibration import correct_for_bias_and_dark_from_filename
+from veloce_reduction.veloce_reduction.cosmic_ray_removal import remove_cosmics
+from veloce_reduction.veloce_reduction.background import remove_background
+from veloce_reduction.veloce_reduction.order_tracing import extract_stripes
+from veloce_reduction.veloce_reduction.extraction import extract_spectrum, extract_spectrum_from_indices
+from veloce_reduction.veloce_reduction.relative_intensities import get_relints, get_relints_from_indices, append_relints_to_FITS
+from veloce_reduction.veloce_reduction.get_info_from_headers import get_obs_coords_from_header
 
 
 
@@ -53,11 +53,14 @@ def process_whites(white_list, MB=None, ronmask=None, MD=None, gain=None, scalab
     if timit:
         start_time = time.time()
 
+    if debug_level >= 1:
+        print('Creating master white frame from '+str(len(white_list))+' fibre flats...')       
+
     #if the darks have a different exposure time than the whites, then we need to re-scale the master dark
     try:
         texp = pyfits.getval(white_list[0], 'exptime')
     except:
-        texp = pyfits.getval(white_list[0], 'EXPOSED')
+        texp = pyfits.getval(white_list[0], 'TOTALEXP')
 
     #if INPUT arrays are not given, read them from default files
     if path is None:
@@ -92,7 +95,7 @@ def process_whites(white_list, MB=None, ronmask=None, MD=None, gain=None, scalab
             print('Now processing file: '+str(fn))
         #call routine that does all the bias and dark correction stuff and converts from ADU to e-
         img = correct_for_bias_and_dark_from_filename(fn, MB, MD, gain=gain, scalable=scalable, savefile=saveall, path=path, timit=timit)     #these are now bias- & dark-corrected images; units are e-
-        if debug_level >=1:
+        if debug_level >=2:
             print('min(img) = '+str(np.min(img)))
         allimg.append(img)
 #         allerr.append(err)
@@ -208,9 +211,6 @@ def process_science_images(imglist, P_id, mask=None, sampling_size=25, slit_heig
     ### (1) bias and dark subtraction ###
     #####################################
     
-    #if the darks have a different exposure time than the science images, then we need to re-scale the master dark
-    texp = pyfits.getval(imglist[0], 'exptime')
-    
     #if INPUT arrays are not given, read them from default files
     if path is None:
         print('WARNING: output file directory not provided!!!')
@@ -241,26 +241,29 @@ def process_science_images(imglist, P_id, mask=None, sampling_size=25, slit_heig
         dum = filename.split('/')
         dum2 = dum[-1].split('.')
         obsname = dum2[0]
-        
+              
         # (1) call routine that does all the bias and dark correction stuff and proper error treatment
-        img = correct_for_bias_and_dark_from_filename(filename, MB, MD, gain=gain, scalable=False, savefile=saveall, path=path, timit=True)   #[e-]
+        img = correct_for_bias_and_dark_from_filename(filename, MB, MD, gain=gain, scalable=scalable, savefile=saveall, path=path, timit=True)   #[e-]
         #err = np.sqrt(img + ronmask*ronmask)   # [e-]
         #TEMPFIX:
         err_img = np.sqrt(np.clip(img,0,None) + ronmask*ronmask)   # [e-]
         
         # (2) remove cosmic rays (ERRORS REMAIN UNCHANGED)
-        cosmic_cleaned_img = remove_cosmics(img, ronmask, obsname, path, Flim=3.0, siglim=5.0, maxiter=1, savemask=True, savefile=True, save_err=False, verbose=True, timit=True)   # [e-]
+        # cosmic_cleaned_img = remove_cosmics(img, ronmask, obsname, path, Flim=3.0, siglim=5.0, maxiter=1, savemask=True, savefile=True, save_err=False, verbose=True, timit=True)   # [e-]
         #adjust errors?
         
         # (3) fit and remove background (ERRORS REMAIN UNCHANGED)
-        bg_corrected_img = remove_background(cosmic_cleaned_img, P_id, obsname, path, degpol=5, slit_height=slit_height, save_bg=True, savefile=True, save_err=False,
-                                             exclude_top_and_bottom=True, verbose=True, timit=True)   # [e-]
+        # bg_corrected_img = remove_background(cosmic_cleaned_img, P_id, obsname, path, degpol=5, slit_height=slit_height, save_bg=True, savefile=True, save_err=False,
+        #                                      exclude_top_and_bottom=True, verbose=True, timit=True)   # [e-]
+        # bg_corrected_img = remove_background(img, P_id, obsname, path, degpol=5, slit_height=slit_height, save_bg=False, savefile=True, save_err=False,
+        #                                      exclude_top_and_bottom=True, verbose=True, timit=True)   # [e-]
         #adjust errors?
 
         # (4) remove pixel-to-pixel sensitivity variations (2-dim)
         #XXXXXXXXXXXXXXXXXXXXXXXXXXX
         #TEMPFIX
-        final_img = bg_corrected_img.copy()   # [e-]
+        # final_img = bg_corrected_img.copy()   # [e-]
+        final_img = img.copy()   # [e-]
         #adjust errors?
 
         # (5) extract stripes
@@ -270,38 +273,40 @@ def process_science_images(imglist, P_id, mask=None, sampling_size=25, slit_heig
 
         # (6) perform extraction of 1-dim spectrum
         if from_indices:
+            pix,flux,err = extract_spectrum_from_indices(final_img, err_img, stripe_indices, method='quick', slit_height=slit_height, RON=ronmask, savefile=True, 
+                                                         filetype='fits', obsname=obsname, path=path, timit=True)
             pix,flux,err = extract_spectrum_from_indices(final_img, err_img, stripe_indices, method=ext_method, slit_height=slit_height, RON=ronmask, savefile=True, 
                                                          filetype='fits', obsname=obsname, path=path, timit=True)
         else:
             pix2,flux2,err2 = extract_spectrum(stripes, err_stripes=err_stripes, ron_stripes=ron_stripes, method=ext_method, slit_height=slit_height, RON=ronmask, savefile=False, 
                                             filetype='fits', obsname=obsname, path=path, timit=True)
     
-        # (7) get relative intensities of different fibres
-        if from_indices:
-            relints = get_relints_from_indices(P_id, final_img, err_img, stripe_indices, mask=mask, sampling_size=sampling_size, slit_height=slit_height, return_full=False, timit=True) 
-        else:
-            relints = get_relints(P_id, stripes, err_stripes, mask=mask, sampling_size=sampling_size, slit_height=slit_height, return_full=False, timit=True)
-
-    
-        # (8) get wavelength solution
-        #XXXXX
-
-
-        # (9) get barycentric correction
-        lat, long, alt = get_obs_coords_from_header(fn)
-        bc = barycorrpy.get_BC_vel(JDUTC=JDUTC, hip_id=8102, lat=lat, longi=long, alt=float(alt), ephemeris='de430', zmeas=0.0)
-        #bc = barycorrpy.get_BC_vel(JDUTC=JDUTC, hip_id=8102, lat=-31.2755, longi=149.0673, alt=1165.0, ephemeris='de430', zmeas=0.0)
-        #bc = barycorrpy.get_BC_vel(JDUTC=JDUTC, hip_id=8102, obsname='AAO', ephemeris='de430')
-
-        #now append relints, wl-solution, and barycorr to extracted FITS file header
-        outfn = path + obsname + '_extracted.fits'
-        if os.path.isfile(outfn):
-            #relative fibre intensities
-            dum = append_relints_to_FITS(relints, outfn, nfib=19)
-            #wavelength solution
-            #pyfits.setval(fn, 'RELINT' + str(i + 1).zfill(2), value=relints[i], comment='fibre #' + str(fibnums[i]) + ' - ' + fibinfo[i] + ' fibre')
-            #barycentric correction
-            pyfits.setval(outfn, 'BARYCORR', value=np.array(bc[0])[0], comment='barycentric correction [m/s]')
+#         # (7) get relative intensities of different fibres
+#         if from_indices:
+#             relints = get_relints_from_indices(P_id, final_img, err_img, stripe_indices, mask=mask, sampling_size=sampling_size, slit_height=slit_height, return_full=False, timit=True) 
+#         else:
+#             relints = get_relints(P_id, stripes, err_stripes, mask=mask, sampling_size=sampling_size, slit_height=slit_height, return_full=False, timit=True)
+# 
+#     
+#         # (8) get wavelength solution
+#         #XXXXX
+# 
+# 
+#         # (9) get barycentric correction
+#         lat, long, alt = get_obs_coords_from_header(fn)
+#         bc = barycorrpy.get_BC_vel(JDUTC=JDUTC, hip_id=8102, lat=lat, longi=long, alt=float(alt), ephemeris='de430', zmeas=0.0)
+#         #bc = barycorrpy.get_BC_vel(JDUTC=JDUTC, hip_id=8102, lat=-31.2755, longi=149.0673, alt=1165.0, ephemeris='de430', zmeas=0.0)
+#         #bc = barycorrpy.get_BC_vel(JDUTC=JDUTC, hip_id=8102, obsname='AAO', ephemeris='de430')
+# 
+#         #now append relints, wl-solution, and barycorr to extracted FITS file header
+#         outfn = path + obsname + '_extracted.fits'
+#         if os.path.isfile(outfn):
+#             #relative fibre intensities
+#             dum = append_relints_to_FITS(relints, outfn, nfib=19)
+#             #wavelength solution
+#             #pyfits.setval(fn, 'RELINT' + str(i + 1).zfill(2), value=relints[i], comment='fibre #' + str(fibnums[i]) + ' - ' + fibinfo[i] + ' fibre')
+#             #barycentric correction
+#             pyfits.setval(outfn, 'BARYCORR', value=np.array(bc[0])[0], comment='barycentric correction [m/s]')
 
 
     if timit:

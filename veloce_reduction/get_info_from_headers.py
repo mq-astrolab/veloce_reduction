@@ -39,23 +39,23 @@ def identify_obstypes(path):
     for file in file_list:
         h = pyfits.getheader(file)
         # type = h['exptype']
-        type = h['NDFCLASS']
+        obstype = h['NDFCLASS']
         
-        if type.upper() == 'BIAS':
+        if obstype.upper() == 'BIAS':
             bias_list.append(file)
-        elif type.upper() == 'DARK':
+        elif obstype.upper() == 'DARK':
             dark_list.append(file)
-        elif type.upper() == 'MFSKY':
+        elif obstype.upper() == 'MFSKY':
             sky_list.append(file)
-        # elif type.upper() == 'LFLAT':
+        # elif obstype.upper() == 'LFLAT':
         #     lflat_list.append(file)
-        elif type.upper() == 'SFLAT':
+        elif obstype.upper() == 'SFLAT':
             skyflat_list.append(file)
-        # elif type.upper() == 'MFARC':
+        # elif obstype.upper() == 'MFARC':
         #     arc_list.append(file)
-        elif type.upper() == 'MFFFF':
+        elif obstype.upper() == 'MFFFF':
             fibre_flat_list.append(file)
-        elif type.upper() == 'MFOBJECT':
+        elif obstype.upper() == 'MFOBJECT':
             if h['OBJECT'].lower() == 'thar':
                 thar_list.append(file)
             elif h['OBJECT'].lower() == 'thxe':
@@ -64,15 +64,15 @@ def identify_obstypes(path):
                 laser_list.append(file)
             else:
                 stellar_list.append(file)
-        # elif type.upper() in ('FLAT', 'WHITE'):
+        # elif obstype.upper() in ('FLAT', 'WHITE'):
         #     white_list.append(file)
-        # elif type.upper() == 'THAR':
+        # elif obstype.upper() == 'THAR':
         #     thar_list.append(file)
-        # elif type.upper() == 'THXE':
+        # elif obstype.upper() == 'THXE':
         #     thxe_list.append(file)
-        # elif type.upper() == 'LASER':
+        # elif obstype.upper() == 'LASER':
         #     laser_list.append(file)
-        # elif type.upper() == 'STELLAR':
+        # elif obstype.upper() == 'STELLAR':
         #     stellar_list.append(file)
         else:
             print('WARNING: unknown exposure type encountered for',file)
@@ -83,37 +83,70 @@ def identify_obstypes(path):
 
 
 
-def get_obstype_lists_temp(path, pattern=None):
+def get_obstype_lists_temp(path, pattern=None, weeding=True):
 
     if pattern is None:
         file_list = glob.glob(path + "*.fits")
     else:
         file_list = glob.glob(path + '*' + pattern + '*.fits')
+    
+    
+    # first weed out binned observations
+    if weeding:
+        unbinned = []
+        binned = []
+        for file in file_list:
+            xdim = pyfits.getval(file, 'NAXIS2')
+            if xdim == 4112:
+                unbinned.append(file)
+            else:
+                binned.append(file)
+    else:
+        unbinned = file_list
 
+    # prepare output lists
+    acq_list = []
     bias_list = []
     dark_list = []
     flat_list = []
-    thar_list = []
+    skyflat_list = []
+    domeflat_list = []
+    arc_list = []
     thxe_list = []
+    laser_list = []
+    laser_and_thxe_list = []
     stellar_list = []
+    unknown_list = []
 
-    for file in file_list:
-        type = pyfits.getval(file, 'OBJECT')
+    for file in unbinned:
+        obj_type = pyfits.getval(file, 'OBJECT')
 
-        if type.lower() == 'bias':
+        if obj_type.lower() == 'acquire':
+            acq_list.append(file)
+        elif obj_type.lower().startswith('bias'):
             bias_list.append(file)
-        elif type.lower() == 'dark':
+        elif obj_type.lower().startswith('dark'):
             dark_list.append(file)
-        elif type.lower() == 'flat':
+        elif obj_type.lower().startswith('flat'):
             flat_list.append(file)
-        elif type.lower() == 'thar':
-            thar_list.append(file)
-        elif type.lower() == 'thxe':
+        elif obj_type.lower().startswith('skyflat'):
+            skyflat_list.append(file)
+        elif obj_type.lower().startswith('domeflat'):
+            domeflat_list.append(file)
+        elif obj_type.lower().startswith('arc'):
+            arc_list.append(file)
+        elif obj_type.lower() in ["thxe","thxe-only"]:
             thxe_list.append(file)
-        else:
+        elif obj_type.lower() in ["lc","lc-only","lfc","lfc-only"]:
+            laser_list.append(file)
+        elif obj_type.lower() in ["thxe+lfc","lfc+thxe","lc+simthxe","lc+thxe"]:
+            laser_and_thxe_list.append(file)
+        elif obj_type.lower().startswith(("toi","tic","hd","gj","gl","ast","alpha","beta","gamma","delta","tau","ach")):
             stellar_list.append(file)
+        else:
+            unknown_list.append(file)
 
-    return bias_list,dark_list,flat_list,thar_list,thxe_list,stellar_list
+    return acq_list, bias_list, dark_list, flat_list, skyflat_list, domeflat_list, arc_list, thxe_list, laser_list, laser_and_thxe_list, stellar_list, unknown_list
 
 
 

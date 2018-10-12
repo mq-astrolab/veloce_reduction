@@ -10,7 +10,7 @@ import datetime
 import astropy.io.fits as pyfits
 import os
 
-from veloce_reduction.veloce_reduction.helper_functions import fibmodel_with_amp, make_norm_profiles_2, short_filenames
+from veloce_reduction.veloce_reduction.helper_functions import fibmodel_with_amp, make_norm_profiles_2, make_norm_profiles_3, short_filenames
 from veloce_reduction.veloce_reduction.spatial_profiles import fit_single_fibre_profile
 from veloce_reduction.veloce_reduction.linalg import linalg_extract_column
 from veloce_reduction.veloce_reduction.order_tracing import flatten_single_stripe, flatten_single_stripe_from_indices, extract_stripes
@@ -96,7 +96,7 @@ def quick_extract_from_indices(img, err_img, stripe_indices, slit_height=25, ver
     'stripe_indices' : dictionary (keys = orders) containing the indices of the pixels that are identified as the "stripes" (ie the to-be-extracted regions centred on the orders)
     'slit_height'    : height of the extraction slit (ie the pixel columns are 2*slit_height pixels long)
     'verbose'        : boolean - for debugging...
-    'timit'          : boolean - do youi want to measure execution run time?
+    'timit'          : boolean - do you want to measure execution run time?
     
     OUTPUT:
     'pixnum'  : dictionary (keys = orders) containing the pixel numbers (in dispersion direction)
@@ -529,7 +529,7 @@ def optimal_extraction(stripes, err_stripes=None, ron_stripes=None, nfib=28, RON
 
         # fix for order_01
         if ord == 'order_01':
-            for fib in sorted(pix[ord].keys()):
+            for fib in sorted(flux[ord].keys()):
                 flux['order_01'][fib] = np.r_[np.repeat(0., 900), flux['order_01'][fib]]
                 err['order_01'][fib] = np.r_[np.repeat(0., 900), err['order_01'][fib]]
 
@@ -772,7 +772,7 @@ def optimal_extraction_from_indices(img, stripe_indices, err_img=None, nfib=28, 
 
         # fix for order_01
         if ord == 'order_01':
-            for fib in sorted(pix[ord].keys()):
+            for fib in sorted(flux[ord].keys()):
                 flux['order_01'][fib] = np.r_[np.repeat(0., 900), flux['order_01'][fib]]
                 err['order_01'][fib] = np.r_[np.repeat(0., 900), err['order_01'][fib]]
 
@@ -868,6 +868,21 @@ def extract_spectrum(stripes, err_stripes, ron_stripes, method='optimal', indivi
     
     #now save to FITS file or PYTHON DICTIONARY if desired
     if savefile:
+        
+        # which extraction method was used exactly?
+        submethod = ''
+        if method.lower() == 'optimal':
+            if individual_fibres:
+                submethod = '3a'
+            else:
+                if combined_profiles:
+                    submethod = '3c'
+                else:
+                    submethod = '3b'
+            
+        # name of object
+        starname = pyfits.getval(path+obsname+'.fits', 'OBJECT')
+                     
         if path is None:
             print('ERROR: path to output directory not provided!!!')
             return
@@ -877,16 +892,14 @@ def extract_spectrum(stripes, err_stripes, ron_stripes, method='optimal', indivi
         else:
             while filetype not in ["fits", "dict", "both"]:
                 print('ERROR: file type for output file not recognized!')
-                filetype = raw_input('Which method do you want to use (valid options are ["fits" / "dict" / "both"] )?') 
+                filetype = raw_input('Which file type do you want to use (valid options are ["fits" / "dict" / "both"] )?') 
             if filetype in ['fits', 'both']:
-                #OK, save as FITS file
-                outfn = path+obsname+'_extracted.fits'
                 fluxarr = np.zeros((len(pix), len(pix['order_01'])))
                 errarr = np.zeros((len(pix), len(pix['order_01'])))
                 for i,o in enumerate(sorted(pix.keys())):
                     fluxarr[i,:] = flux[o]
                     errarr[i,:] = err[o]
-                #try and get header from previously saved files
+                # try and get header from previously saved files
                 if os.path.exists(path+obsname+'_BD_CR_BG_FF.fits'):
                     h = pyfits.getheader(path+obsname+'_BD_CR_BG_FF.fits')
                 elif os.path.exists(path+obsname+'_BD_CR_BG.fits'):
@@ -896,7 +909,7 @@ def extract_spectrum(stripes, err_stripes, ron_stripes, method='optimal', indivi
                 elif os.path.exists(path+obsname+'_BD.fits'):
                     h = pyfits.getheader(path+obsname+'_BD.fits')
                 else:
-                    h = pyfits.getheader(path+obsname+'.fits')
+                    h = pyfits.getheader(path+obsname+'.fits')   
                 #update the header and write to file
                 h['HISTORY'] = '   EXTRACTED SPECTRUM - created '+time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())+' (GMT)'
                 h['METHOD'] = (method, 'extraction method used')
@@ -907,15 +920,9 @@ def extract_spectrum(stripes, err_stripes, ron_stripes, method='optimal', indivi
                 h['FIRSTORD'] = (topordnum, 'order number of first (top) order')
                 h['LASTORD'] = (botordnum, 'order number of last (bottom) order')
                 if method.lower() == 'optimal':
-                    if individual_fibres:
-                        submethod = '3a'
-                    else:
-                        if combined_profiles:
-                            submethod = '3c'
-                        else:
-                            submethod = '3b'
                     h['METHOD2'] = (submethod, 'exact optimal extraction method used')
                 #write to FITS file    
+                outfn = path + starname + '_' + obsname + '_' + method.lower() + submethod + '_extracted.fits'
                 pyfits.writeto(outfn, fluxarr, h, clobber=True)    
                 #now append the corresponding error array
                 h_err = h.copy()
@@ -929,7 +936,7 @@ def extract_spectrum(stripes, err_stripes, ron_stripes, method='optimal', indivi
                 extracted['pix'] = pix
                 extracted['flux'] = flux
                 extracted['err'] = err
-                np.save(path + obsname + '_extracted.npy', extracted)
+                np.save(path + starname + '_' + obsname + '_' + method.lower() + submethod + '_extracted.npy', extracted)
         
     return pix,flux,err
 
@@ -1016,6 +1023,21 @@ def extract_spectrum_from_indices(img, err_img, stripe_indices, method='optimal'
         
     #now save to FITS file or PYTHON DICTIONARY if desired
     if savefile:
+        
+        # which extraction method was used exactly?
+        submethod = ''
+        if method.lower() == 'optimal':
+            if individual_fibres:
+                submethod = '3a'
+            else:
+                if combined_profiles:
+                    submethod = '3c'
+                else:
+                    submethod = '3b'
+        
+        # name of object
+        starname = pyfits.getval(path+obsname+'.fits', 'OBJECT')
+                    
         if path is None:
             print('ERROR: path to output directory not provided!!!')
             return
@@ -1025,16 +1047,22 @@ def extract_spectrum_from_indices(img, err_img, stripe_indices, method='optimal'
         else:
             while filetype not in ["fits", "dict", "both"]:
                 print('ERROR: file type for output file not recognized!')
-                filetype = raw_input('Which method do you want to use (valid options are ["fits" / "dict" / "both"] )?') 
+                filetype = raw_input('Which file type do you want to use (valid options are ["fits" / "dict" / "both"] )?') 
             if filetype in ['fits', 'both']:
-                #OK, save as FITS file
-                outfn = path+obsname+'_extracted.fits'
-                fluxarr = np.zeros((len(pix), len(pix['order_01'])))
-                errarr = np.zeros((len(pix), len(pix['order_01'])))
-                for i,o in enumerate(sorted(pix.keys())):
-                    fluxarr[i,:] = flux[o]
-                    errarr[i,:] = err[o]
-                #try and get header from previously saved files
+                if method.lower() == 'optimal' and submethod == '3a':      # ie for individual-fibre extraction
+                    fluxarr = np.zeros((len(pix), len(flux['order_01']), len(pix['order_01'])))
+                    errarr = np.zeros((len(pix), len(flux['order_01']), len(pix['order_01'])))
+                    for i,o in enumerate(sorted(pix.keys())):
+                        for j,fib in enumerate(sorted(flux[o].keys())):
+                            fluxarr[i,j,:] = flux[o][fib]
+                            errarr[i,j,:] = err[o][fib]
+                else:
+                    fluxarr = np.zeros((len(pix), len(pix['order_01'])))
+                    errarr = np.zeros((len(pix), len(pix['order_01'])))
+                    for i,o in enumerate(sorted(pix.keys())):
+                        fluxarr[i,:] = flux[o]
+                        errarr[i,:] = err[o]
+                # try and get header from previously saved files
                 if os.path.exists(path+obsname+'_BD_CR_BG_FF.fits'):
                     h = pyfits.getheader(path+obsname+'_BD_CR_BG_FF.fits')
                 elif os.path.exists(path+obsname+'_BD_CR_BG.fits'):
@@ -1044,7 +1072,7 @@ def extract_spectrum_from_indices(img, err_img, stripe_indices, method='optimal'
                 elif os.path.exists(path+obsname+'_BD.fits'):
                     h = pyfits.getheader(path+obsname+'_BD.fits')
                 else:
-                    h = pyfits.getheader(path+obsname+'.fits')
+                    h = pyfits.getheader(path+obsname+'.fits')   
                 #update the header and write to file
                 h['HISTORY'] = '   EXTRACTED SPECTRUM - created '+time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())+' (GMT)'
                 h['METHOD'] = (method, 'extraction method used')
@@ -1055,15 +1083,9 @@ def extract_spectrum_from_indices(img, err_img, stripe_indices, method='optimal'
                 h['FIRSTORD'] = (topordnum, 'order number of first (top) order')
                 h['LASTORD'] = (botordnum, 'order number of last (bottom) order')
                 if method.lower() == 'optimal':
-                    if individual_fibres:
-                        submethod = '3a'
-                    else:
-                        if combined_profiles:
-                            submethod = '3c'
-                        else:
-                            submethod = '3b'
                     h['METHOD2'] = (submethod, 'exact optimal extraction method used')
                 #write to FITS file    
+                outfn = path + starname + '_' + obsname + '_' + method.lower() + submethod + '_extracted.fits'
                 pyfits.writeto(outfn, fluxarr, h, clobber=True)    
                 #now append the corresponding error array
                 h_err = h.copy()
@@ -1077,7 +1099,7 @@ def extract_spectrum_from_indices(img, err_img, stripe_indices, method='optimal'
                 extracted['pix'] = pix
                 extracted['flux'] = flux
                 extracted['err'] = err
-                np.save(path + obsname + '_extracted.npy', extracted)
+                np.save(path + starname + '_' + obsname + '_' + method.lower() + submethod + '_extracted.npy', extracted)
         
     return pix,flux,err
 

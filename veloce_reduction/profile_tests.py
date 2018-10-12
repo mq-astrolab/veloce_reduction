@@ -14,7 +14,7 @@ from veloce_reduction.veloce_reduction.order_tracing import flatten_single_strip
 
 
 def get_multiple_fibre_profiles_single_order(sc, sr, err_sc, ordpol, ordmask=None, nfib=24, sampling_size=25, step_size=None,
-                                    varbeta=True, offset=True, return_snr=True, debug_level=0, timit=False):
+                                             varbeta=True, offset=True, return_snr=True, debug_level=0, timit=False):
     """
     INPUT:
     'sc'             : the flux in the extracted, flattened stripe
