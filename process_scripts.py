@@ -54,13 +54,7 @@ def process_whites(white_list, MB=None, ronmask=None, MD=None, gain=None, scalab
         start_time = time.time()
 
     if debug_level >= 1:
-        print('Creating master white frame from '+str(len(white_list))+' fibre flats...')       
-
-    #if the darks have a different exposure time than the whites, then we need to re-scale the master dark
-    try:
-        texp = pyfits.getval(white_list[0], 'exptime')
-    except:
-        texp = pyfits.getval(white_list[0], 'TOTALEXP')
+        print('Creating master white frame from '+str(len(white_list))+' fibre flats...')
 
     #if INPUT arrays are not given, read them from default files
     if path is None:
@@ -90,11 +84,21 @@ def process_whites(white_list, MB=None, ronmask=None, MD=None, gain=None, scalab
     allerr = []
 
     #loop over all files in "white_list"; correct for bias and darks on the fly
-    for n,fn in enumerate(white_list):
+    for n,fn in enumerate(sorted(white_list)):
         if debug_level >=1:
             print('Now processing file: '+str(fn))
+
+        # if the darks have a different exposure time than the whites, then we need to re-scale the master dark
+        texp = pyfits.getval(white_list[0], 'TOTALEXP')
+
         #call routine that does all the bias and dark correction stuff and converts from ADU to e-
-        img = correct_for_bias_and_dark_from_filename(fn, MB, MD, gain=gain, scalable=scalable, savefile=saveall, path=path, timit=timit)     #these are now bias- & dark-corrected images; units are e-
+        if scalable:
+            img = correct_for_bias_and_dark_from_filename(fn, MB, MD*texp, gain=gain, scalable=scalable, savefile=saveall,
+                                                          path=path, timit=timit)     #these are now bias- & dark-corrected images; units are e-
+        else:
+            img = correct_for_bias_and_dark_from_filename(fn, MB, MD, gain=gain, scalable=scalable, savefile=saveall,
+                                                          path=path, timit=timit)  # these are now bias- & dark-corrected images; units are e-
+
         if debug_level >=2:
             print('min(img) = '+str(np.min(img)))
         allimg.append(img)
@@ -161,7 +165,7 @@ def process_whites(white_list, MB=None, ronmask=None, MD=None, gain=None, scalab
         outfn = path+'master_white.fits'
         pyfits.writeto(outfn, master, clobber=True)
         pyfits.setval(outfn, 'HISTORY', value='   MASTER WHITE frame - created '+time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())+' (GMT)')
-        pyfits.setval(outfn, 'EXPTIME', value=texp, comment='exposure time [s]')
+        # pyfits.setval(outfn, 'EXPTIME', value=texp, comment='exposure time [s]')
         pyfits.setval(outfn, 'UNITS', value='ELECTRONS')
         if fancy:
             pyfits.setval(outfn, 'METHOD', value='fancy', comment='method to create master white and remove outliers')
@@ -236,7 +240,10 @@ def process_science_images(imglist, P_id, mask=None, sampling_size=25, slit_heig
     if not from_indices:
         ron_stripes = extract_stripes(ronmask, P_id, return_indices=False, slit_height=slit_height, savefiles=False, timit=True)
     
-    for filename in imglist:
+    for i,filename in enumerate(sorted(imglist)):
+
+        print('Extracting stellar spectrum '+str(i+1)+'/'+str(len(imglist)))
+
         #do some housekeeping with filenames
         dum = filename.split('/')
         dum2 = dum[-1].split('.')
@@ -273,8 +280,8 @@ def process_science_images(imglist, P_id, mask=None, sampling_size=25, slit_heig
 
         # (6) perform extraction of 1-dim spectrum
         if from_indices:
-            pix,flux,err = extract_spectrum_from_indices(final_img, err_img, stripe_indices, method='quick', slit_height=25, RON=ronmask, savefile=True, 
-                                                         filetype='fits', obsname=obsname, path=path, timit=True)
+            # pix,flux,err = extract_spectrum_from_indices(final_img, err_img, stripe_indices, method='quick', slit_height=25, RON=ronmask, savefile=True, 
+            #                                              filetype='fits', obsname=obsname, path=path, timit=True)
             pix,flux,err = extract_spectrum_from_indices(final_img, err_img, stripe_indices, method=ext_method, slit_height=slit_height, RON=ronmask, savefile=True, 
                                                          filetype='fits', obsname=obsname, path=path, timit=True)
         else:
