@@ -6,22 +6,25 @@ import scipy.ndimage as nd
 import glob
 import os
 
-def quadrant_medians(infile, overscan=53, median_filter=True):
-    """Find the quadrante medians, excluding overscan"""
-    dd = pyfits.getdata(infile)
+def split_to_quadrants(dd, overscan=53):
+    """Split a frame into quadrants according to Ian Price's convention"""
     newshape = (dd.shape[0], dd.shape[1]-2*overscan)
     quadshape = (4,newshape[0]//2, newshape[1]//2)
     quads = np.zeros(quadshape)
-    corrected = np.zeros(newshape)
     
     y0 = 0
     for i in range(quadshape[1]):
-        quads[0,i,:]= dd[y0+i,overscan:overscan+newshape[1]//2]
+        quads[0,i,:] = dd[y0+i,overscan:overscan+newshape[1]//2]
         quads[1,i,:] = dd[y0+i,dd.shape[1]//2:dd.shape[1]-overscan]
     y0 = dd.shape[0]//2
     for i in range(quadshape[1]):
-        quads[3,i,:]= dd[y0+i,overscan:overscan+newshape[1]//2]
+        quads[3,i,:] = dd[y0+i,overscan:overscan+newshape[1]//2]
         quads[2,i,:] = dd[y0+i,dd.shape[1]//2:dd.shape[1]-overscan]
+    return quads
+
+def quadrant_medians(infile, median_filter=True):
+    """Find the quadrant medians, excluding overscan"""
+    quads = split_to_quadrants(pyfits.getdata(infile))
     
     qmeds = np.empty( (4), dtype='int')
     rnoise = np.empty( (4) )
@@ -48,9 +51,9 @@ if __name__=="__main__":
         fnames = glob.glob(dir + 'gain_bright/*.fits')
         fnames = glob.glob(dir + 'gain_biases/*.fits')
         fnames = glob.glob(dir + 'offset_checks9/*.fits')
-        fnames = glob.glob(dir + 'gain_bright2/*.fits')
-        fnames = glob.glob(dir + 'gain_biases2/*.fits')
-        fnames = glob.glob(dir + '180917/*.fits')
+        #fnames = glob.glob(dir + 'gain_bright2/*.fits')
+        #fnames = glob.glob(dir + 'gain_biases2/*.fits')
+        #fnames = glob.glob(dir + '180917/*.fits')
         fnames.sort(key=os.path.getmtime)
         for f in fnames:
             print(f)
@@ -65,9 +68,9 @@ if __name__=="__main__":
         print("Quadrant offset checks:")
         for speed in ['0', '1', '2', '3']:
             for g in ['1','2','5']:
-                qmeds, rnoise = quadrant_medians(dir + '180917/s' + speed + 'g' + g + '_init.fits')
-                print(speed + ', ' + g + ', {:d}, {:d}, {:d}, {:d}'.format(qmeds[0], qmeds[1], qmeds[2], qmeds[3]))
-                #print(speed + ', ' + g + ', {:5.1f}, {:5.1f}, {:5.1f}, {:5.1f}'.format(rnoise[0], rnoise[1], rnoise[2], rnoise[3]))
+                qmeds, rnoise = quadrant_medians(dir + '180917/offset_checks10/s' + speed + 'g' + g + '_init.fits')
+                #print(speed + ', ' + g + ', {:d}, {:d}, {:d}, {:d}'.format(qmeds[0], qmeds[1], qmeds[2], qmeds[3]))
+                print(speed + ', ' + g + ', {:5.2f}, {:5.2f}, {:5.2f}, {:5.2f}'.format(rnoise[0], rnoise[1], rnoise[2], rnoise[3]))
     if False:
         print("First pass offset checks")
         for speed in ['0', '1', '2', '3']:

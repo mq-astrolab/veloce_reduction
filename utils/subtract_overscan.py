@@ -7,7 +7,8 @@ import matplotlib.pyplot as plt
 #Change this to run on the veloce commissioning run test data in your directory.
 rootdir = '/Users/Brendan/Dropbox/Brendan/Veloce/Data/veloce/'
 
-def read_and_overscan_correct(infile, overscan=53, discard_ramp=17, savefile=False):
+def read_and_overscan_correct(infile, overscan=53, discard_ramp=17, 
+    savefile=False, return_overscan=False, ian_price_convention=True):
     """Read in fits file and overscan correct. Assume that
     the overscan region is indepedent of binning."""
     dd = pyfits.getdata(infile)
@@ -15,25 +16,29 @@ def read_and_overscan_correct(infile, overscan=53, discard_ramp=17, savefile=Fal
     quadshape = (4,newshape[0]//2, newshape[1]//2)
     quads = np.zeros(quadshape)
     corrected = np.zeros(newshape)
+    overscans = np.zeros( (4,dd.shape[0]//2, overscan))
     
     #Split the y axis in 2
     for y0, y1, qix in zip([0, dd.shape[0]//2], [dd.shape[0]//2, dd.shape[0]], [0,2]):
-        loverscan = dd[y0:y1,:overscan]
-        overscan_ramp = np.median(loverscan + \
-            np.random.random(size=loverscan.shape) - 0.5, axis=0)
+        #Deal with left quadrant
+        overscans[qix] = dd[y0:y1,:overscan]
+        overscan_ramp = np.median(overscans[qix] + \
+            np.random.random(size=overscans[qix].shape) - 0.5, axis=0)
         overscan_ramp -= overscan_ramp[-1] 
-        for i in range(len(loverscan)):
-            loverscan[i] = loverscan[i] - overscan_ramp
+        for i in range(len(overscans[qix])):
+            overscans[qix,i] = overscans[qix, i] - overscan_ramp
             quads[qix,i,:]= dd[y0+i,overscan:overscan+newshape[1]//2] - \
-                np.median(loverscan[i] + np.random.random(size=loverscan[i].shape) - 0.5)
-        roverscan = dd[y0:y1,-overscan:]
-        overscan_ramp = np.median(roverscan + \
-            np.random.random(size=loverscan.shape) - 0.5, axis=0)
+                np.median(overscans[qix,i] + np.random.random(size=overscans[qix,i].shape) - 0.5)
+                
+        #Now deal with right quadrant.
+        overscans[qix+1] = dd[y0:y1,-overscan:]
+        overscan_ramp = np.median(overscans[qix+1] + \
+            np.random.random(size=overscans[qix+1].shape) - 0.5, axis=0)
         overscan_ramp -= overscan_ramp[0]  
-        for i in range(len(roverscan)):
-            roverscan[i] = roverscan[i] - overscan_ramp
+        for i in range(len(overscans[qix+1])):
+            overscans[qix+1,i] = overscans[qix+1,i] - overscan_ramp
             quads[qix+1,i,:] = dd[y0+i,dd.shape[1]//2:dd.shape[1]-overscan] - \
-                np.median(roverscan[i] + np.random.random(size=loverscan[i].shape) - 0.5)
+                np.median(overscans[qix+1,i] + np.random.random(size=overscans[qix+1,i].shape) - 0.5)
     qsum = quads[0] + quads[1,:,::-1] + quads[2,::-1,:] + quads[3,::-1,::-1]
     mask = quads > 4e3
     #q2 = quads[2] - quads[0,::-1,:]*2e-3 - quads[3,:,::-1]*0.8e-3
@@ -62,7 +67,13 @@ def read_and_overscan_correct(infile, overscan=53, discard_ramp=17, savefile=Fal
 
         return outfile
     else:
-        return corrected    
+        if return_overscan:
+            if ian_price_convention:
+                overscans[1],overscans[3] = overscans[3], overscans[1].copy()
+            return corrected, overscans
+        else:
+            return corrected    
+        
 def find_arcs(dir, normal_exptime_only=True):
     all_fn = np.sort(glob.glob(dir + '/?????30???.fits'))
     arc_fn = []
