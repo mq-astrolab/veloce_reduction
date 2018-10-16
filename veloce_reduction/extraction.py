@@ -10,7 +10,7 @@ import datetime
 import astropy.io.fits as pyfits
 import os
 
-from veloce_reduction.veloce_reduction.helper_functions import fibmodel_with_amp, make_norm_profiles_2, make_norm_profiles_3, short_filenames
+from veloce_reduction.veloce_reduction.helper_functions import fibmodel_with_amp, make_norm_profiles_4, short_filenames
 from veloce_reduction.veloce_reduction.spatial_profiles import fit_single_fibre_profile
 from veloce_reduction.veloce_reduction.linalg import linalg_extract_column
 from veloce_reduction.veloce_reduction.order_tracing import flatten_single_stripe, flatten_single_stripe_from_indices, extract_stripes
@@ -309,8 +309,8 @@ def collapse_extract_from_indices(img, err_img, stripe_indices, tramlines, slit_
 
 
 def optimal_extraction(stripes, err_stripes=None, ron_stripes=None, nfib=28, RON=0., slit_height=25, phi_onthefly=False,
-                       timit=False, simu=False, individual_fibres=False, combined_profiles=False, relints=None,
-                       collapse=False, debug_level=0):
+                       timit=False, simu=False, individual_fibres=False, combined_profiles=False, integrate_profiles=False, 
+                       relints=None, collapse=False, debug_level=0):
     # if error array is not provided, then RON and gain must be provided (but this is bad because that way we don't
     # know about large errors for cosmic-corrected pixels etc)
 
@@ -430,13 +430,13 @@ def optimal_extraction(stripes, err_stripes=None, ron_stripes=None, nfib=28, RON
                 # get normalized profiles for all fibres for this cutout
                 if combined_profiles:
                     print('WARNING: we currently do not have a profile estimate for the calibration fibres!!!')
-                    phi_laser = np.sum(make_norm_profiles_3(sr[:, i], i, fppo, fibs='laser'), axis=1)
-                    phi_thxe = np.sum(make_norm_profiles_3(sr[:, i], i, fppo, fibs='thxe'), axis=1)
-                    phis_sky3 = make_norm_profiles_3(sr[:, i], i, fppo, fibs='sky3')
+                    phi_laser = np.sum(make_norm_profiles_4(sr[:, i], i, fppo, integrate=integrate_profiles, fibs='laser'), axis=1)
+                    phi_thxe = np.sum(make_norm_profiles_4(sr[:, i], i, fppo, integrate=integrate_profiles, fibs='thxe'), axis=1)
+                    phis_sky3 = make_norm_profiles_4(sr[:, i], i, fppo, integrate=integrate_profiles, fibs='sky3')
                     phi_sky3 = np.sum(phis_sky3, axis=1) / 3.
-                    phis_stellar = make_norm_profiles_3(sr[:, i], i, fppo, fibs='stellar')
+                    phis_stellar = make_norm_profiles_4(sr[:, i], i, fppo, integrate=integrate_profiles, fibs='stellar')
                     phi_stellar = np.sum(phis_stellar * relints, axis=1)
-                    phis_sky2 = make_norm_profiles_3(sr[:, i], i, fppo, fibs='sky2')
+                    phis_sky2 = make_norm_profiles_4(sr[:, i], i, fppo, integrate=integrate_profiles, fibs='sky2')
                     phi_sky2 = np.sum(phis_sky2, axis=1) / 2.
                     phi_sky = (phi_sky3 + phi_sky2) / 2.
                     phi = np.vstack((phi_laser, phi_sky, phi_stellar, phi_thxe)).T
@@ -444,7 +444,7 @@ def optimal_extraction(stripes, err_stripes=None, ron_stripes=None, nfib=28, RON
                     # phi = make_norm_profiles(sr[:,i], ord, i, fibparms)
                     # phi = make_norm_profiles_temp(sr[:,i], ord, i, fibparms)
                     # phi = make_norm_single_profile_temp(sr[:,i], ord, i, fibparms)
-                    phi = make_norm_profiles_3(sr[:, i], i, fppo, fibs='all')
+                    phi = make_norm_profiles_4(sr[:, i], i, fppo, integrate=integrate_profiles, fibs='all')
 
             # print('WARNING: TEMPORARY offset correction is not commented out!!!')
             # # subtract the median as the offset if BG is not properly corrected for
@@ -548,7 +548,7 @@ def optimal_extraction(stripes, err_stripes=None, ron_stripes=None, nfib=28, RON
 
 def optimal_extraction_from_indices(img, stripe_indices, err_img=None, nfib=28, RON=0., slit_height=25,
                                     phi_onthefly=False, timit=False, simu=False, individual_fibres=False,
-                                    combined_profiles=False, relints=None, collapse=False, debug_level=0):
+                                    combined_profiles=False, integrate_profiles=False, relints=None, collapse=False, debug_level=0):
     # if error array is not provided, then RON and gain must be provided (but this is bad because that way we don't
     # know about large errors for cosmic-correctdd pixels etc)
 
@@ -673,13 +673,13 @@ def optimal_extraction_from_indices(img, stripe_indices, err_img=None, nfib=28, 
                 # get normalized profiles for all fibres for this cutout
                 if combined_profiles:
                     print('WARNING: we currently do not have a profile estimate for the calibration fibres!!!')
-                    phi_laser = np.sum(make_norm_profiles_3(sr[:, i], i, fppo, fibs='laser'), axis=1)
-                    phi_thxe = np.sum(make_norm_profiles_3(sr[:, i], i, fppo, fibs='thxe'), axis=1)
-                    phis_sky3 = make_norm_profiles_3(sr[:, i], i, fppo, fibs='sky3')
+                    phi_laser = np.sum(make_norm_profiles_4(sr[:, i], i, fppo, integrate=integrate_profiles, fibs='laser'), axis=1)
+                    phi_thxe = np.sum(make_norm_profiles_4(sr[:, i], i, fppo, integrate=integrate_profiles, fibs='thxe'), axis=1)
+                    phis_sky3 = make_norm_profiles_4(sr[:, i], i, fppo, integrate=integrate_profiles, fibs='sky3')
                     phi_sky3 = np.sum(phis_sky3, axis=1) / 3.
-                    phis_stellar = make_norm_profiles_3(sr[:, i], i, fppo, fibs='stellar')
+                    phis_stellar = make_norm_profiles_4(sr[:, i], i, fppo, integrate=integrate_profiles, fibs='stellar')
                     phi_stellar = np.sum(phis_stellar * relints, axis=1)
-                    phis_sky2 = make_norm_profiles_3(sr[:, i], i, fppo, fibs='sky2')
+                    phis_sky2 = make_norm_profiles_4(sr[:, i], i, fppo, integrate=integrate_profiles, fibs='sky2')
                     phi_sky2 = np.sum(phis_sky2, axis=1) / 2.
                     phi_sky = (phi_sky3 + phi_sky2) / 2.
                     phi = np.vstack((phi_laser, phi_sky, phi_stellar, phi_thxe)).T
@@ -687,7 +687,7 @@ def optimal_extraction_from_indices(img, stripe_indices, err_img=None, nfib=28, 
                     # phi = make_norm_profiles(sr[:,i], ord, i, fibparms)
                     # phi = make_norm_profiles_temp(sr[:,i], ord, i, fibparms)
                     # phi = make_norm_single_profile_temp(sr[:,i], ord, i, fibparms)
-                    phi = make_norm_profiles_3(sr[:, i], i, fppo, fibs='all')
+                    phi = make_norm_profiles_4(sr[:, i], i, fppo, integrate=integrate_profiles, fibs='all')
 
             # print('WARNING: TEMPORARY offset correction is not commented out!!!')
             # # subtract the median as the offset if BG is not properly corrected for
@@ -789,7 +789,7 @@ def optimal_extraction_from_indices(img, stripe_indices, err_img=None, nfib=28, 
 
 
 
-def extract_spectrum(stripes, err_stripes, ron_stripes, method='optimal', individual_fibres=True, combined_profiles=False, slit_height=25, RON=0.,
+def extract_spectrum(stripes, err_stripes, ron_stripes, method='optimal', individual_fibres=True, combined_profiles=False, integrate_profiles=False, slit_height=25, RON=0.,
                      savefile=False, filetype='fits', obsname=None, path=None, simu=False, verbose=False, timit=False, debug_level=0):
     """
     This routine is simply a wrapper code for the different extraction methods. There are a total FIVE (1,2,3a,3b,3c) different extraction methods implemented, 
@@ -821,20 +821,22 @@ def extract_spectrum(stripes, err_stripes, ron_stripes, method='optimal', indivi
     'ron_stripes'  : dictionary (keys = orders) containing the read-out noise stripes (from "extract_stripes")
     
     OPTIONAL INPUT / KEYWORDS:
-    'method'            : method for extraction - valid options are ["quick" / "tramline" / "optimal"]
-    'individual_fibres' : boolean - set to TRUE for method (3a); set to FALSE for methods (3b) or (3c) ; ignored if method is not set to 'optimal'
-    'combined_profiles' : boolean - set to TRUE for method (3c); set to FALSE for method (3b) ; only takes effect if 'individual_fibres' is set to FALSE; ignored if method is not set to 'optimal'
-    'slit_height'       : height of the extraction slit is 2*slit_height pixels
-    'RON'               : read-out noise per pixel
-    'gain'              : gain
-    'savefile'          : boolean - do you want to save the extracted spectrum to a file? 
-    'filetype'          : if 'savefile' is set to TRUE: do you want to save it as a 'fits' file, or as a 'dict' (python disctionary), or 'both'
-    'obsname'           : (short) name of observation file
-    'path'              : directory to the destination of the output file
-    'simu'              : boolean - are you using ES-simulated spectra???
-    'verbose'           : boolean - for debugging...
-    'timit'             : boolean - do you want to measure execution run time?
-    'debug_level'       : for debugging...
+    'method'             : method for extraction - valid options are ["quick" / "tramline" / "optimal"]
+    'individual_fibres'  : boolean - set to TRUE for method (3a); set to FALSE for methods (3b) or (3c) ; ignored if method is not set to 'optimal'
+    'combined_profiles'  : boolean - set to TRUE for method (3c); set to FALSE for method (3b) ; only takes effect if 'individual_fibres' is set to FALSE; ignored if method is not set to 'optimal'
+    'integrate_profiles' : boolean - set to TRUE if you want to (CORRECTLY but SLOWER) integrate over the (highly non-linear) functional form describing the profiles, rather than evaluating
+                           the function at the discrete values corresponding to the pixel centres (which is only a good approximation if the function varies slowly)
+    'slit_height'        : height of the extraction slit is 2*slit_height pixels
+    'RON'                : read-out noise per pixel
+    'gain'               : gain
+    'savefile'           : boolean - do you want to save the extracted spectrum to a file? 
+    'filetype'           : if 'savefile' is set to TRUE: do you want to save it as a 'fits' file, or as a 'dict' (python disctionary), or 'both'
+    'obsname'            : (short) name of observation file
+    'path'               : directory to the destination of the output file
+    'simu'               : boolean - are you using ES-simulated spectra???
+    'verbose'            : boolean - for debugging...
+    'timit'              : boolean - do you want to measure execution run time?
+    'debug_level'        : for debugging...
     
     OUTPUT:
     'pix'     : dictionary (keys = orders) containing the pixel numbers (in dispersion direction)
@@ -861,7 +863,7 @@ def extract_spectrum(stripes, err_stripes, ron_stripes, method='optimal', indivi
         #pix,flux,err = collapse_extract(stripes, err_stripes, tramlines, slit_height=slit_height, verbose=verbose, timit=timit, debug_level=debug_level)
     elif method.lower() == 'optimal':
         pix,flux,err = optimal_extraction(stripes, err_stripes=err_stripes, ron_stripes=ron_stripes, nfib=24, RON=RON, slit_height=slit_height, individual_fibres=individual_fibres,
-                                          combined_profiles=combined_profiles, simu=simu, timit=timit, debug_level=debug_level) 
+                                          combined_profiles=combined_profiles, integrate_profiles=integrate_profiles, simu=simu, timit=timit, debug_level=debug_level) 
     else:
         print('ERROR: Nightmare! That should never happen  --  must be an error in the Matrix...')
         return    
@@ -947,8 +949,8 @@ def extract_spectrum(stripes, err_stripes, ron_stripes, method='optimal', indivi
 
 
 
-def extract_spectrum_from_indices(img, err_img, stripe_indices, method='optimal', individual_fibres=True, combined_profiles=False, slit_height=25, RON=0.,
-                                  savefile=False, filetype='fits', obsname=None, path=None, simu=False, verbose=False, timit=False, debug_level=0):
+def extract_spectrum_from_indices(img, err_img, stripe_indices, method='optimal', individual_fibres=True, combined_profiles=False, integrate_profiles=False,
+                                  slit_height=25, RON=0., savefile=False, filetype='fits', obsname=None, path=None, simu=False, verbose=False, timit=False, debug_level=0):
     """
     CLONE OF 'extract_spectrum'!
     This routine is simply a wrapper code for the different extraction methods. There are a total FIVE (1,2,3a,3b,3c) different extraction methods implemented, 
@@ -980,20 +982,22 @@ def extract_spectrum_from_indices(img, err_img, stripe_indices, method='optimal'
     'stripe_indices' : dictionary (keys = orders) containing the indices of the pixels that are identified as the "stripes" (ie the to-be-extracted regions centred on the orders)
     
     OPTIONAL INPUT / KEYWORDS:
-    'method'            : method for extraction - valid options are ["quick" / "tramline" / "optimal"]
-    'individual_fibres' : boolean - set to TRUE for method (3a); set to FALSE for methods (3b) or (3c) ; ignored if method is not set to 'optimal'
-    'combined_profiles' : boolean - set to TRUE for method (3c); set to FALSE for method (3b) ; only takes effect if 'individual_fibres' is set to FALSE; ignored if method is not set to 'optimal'
-    'slit_height'       : height of the extraction slit is 2*slit_height pixels
-    'RON'               : read-out noise per pixel
-    'gain'              : gain
-    'savefile'          : boolean - do you want to save the extracted spectrum to a file? 
-    'filetype'          : if 'savefile' is set to TRUE: do you want to save it as a 'fits' file, or as a 'dict' (python disctionary)
-    'obsname'           : (short) name of observation file
-    'path'              : directory to the destination of the output file
-    'simu'              : boolean - are you using ES-simulated spectra???
-    'verbose'           : boolean - for debugging...
-    'timit'             : boolean - do you want to measure execution run time?
-    'debug_level'       : for debugging...
+    'method'             : method for extraction - valid options are ["quick" / "tramline" / "optimal"]
+    'individual_fibres'  : boolean - set to TRUE for method (3a); set to FALSE for methods (3b) or (3c) ; ignored if method is not set to 'optimal'
+    'combined_profiles'  : boolean - set to TRUE for method (3c); set to FALSE for method (3b) ; only takes effect if 'individual_fibres' is set to FALSE; ignored if method is not set to 'optimal'
+    'integrate_profiles' : boolean - set to TRUE if you want to (CORRECTLY but SLOWER) integrate over the (highly non-linear) functional form describing the profiles, rather than evaluating
+                           the function at the discrete values corresponding to the pixel centres (which is only a good approximation if the function varies slowly)
+    'slit_height'        : height of the extraction slit is 2*slit_height pixels
+    'RON'                : read-out noise per pixel
+    'gain'               : gain
+    'savefile'           : boolean - do you want to save the extracted spectrum to a file? 
+    'filetype'           : if 'savefile' is set to TRUE: do you want to save it as a 'fits' file, or as a 'dict' (python disctionary)
+    'obsname'            : (short) name of observation file
+    'path'               : directory to the destination of the output file
+    'simu'               : boolean - are you using ES-simulated spectra???
+    'verbose'            : boolean - for debugging...
+    'timit'              : boolean - do you want to measure execution run time?
+    'debug_level'        : for debugging...
     
     OUTPUT:
     'pix'     : dictionary (keys = orders) containing the pixel numbers (in dispersion direction)
@@ -1019,7 +1023,7 @@ def extract_spectrum_from_indices(img, err_img, stripe_indices, method='optimal'
         #pix,flux,err = collapse_extract_from_indices(img, err_img, stripe_indices, tramlines, slit_height=slit_height, verbose=verbose, timit=timit, debug_level=debug_level)
     elif method.lower() == 'optimal':
         pix,flux,err = optimal_extraction_from_indices(img, stripe_indices, err_img=err_img, nfib=24, RON=RON, slit_height=slit_height, individual_fibres=individual_fibres,
-                                                       combined_profiles=combined_profiles, simu=simu, timit=timit, debug_level=debug_level) 
+                                                       combined_profiles=combined_profiles, integrate_profiles=integrate_profiles, simu=simu, timit=timit, debug_level=debug_level) 
     else:
         print('ERROR: Nightmare! That should never happen  --  must be an error in the Matrix...')
         return    

@@ -241,7 +241,7 @@ def process_science_images(imglist, P_id, mask=None, sampling_size=25, slit_heig
         ron_stripes = extract_stripes(ronmask, P_id, return_indices=False, slit_height=slit_height, savefiles=False, timit=True)
     
     for i,filename in enumerate(sorted(imglist)):
-        
+
         print('Extracting stellar spectrum '+str(i+1)+'/'+str(len(imglist)))
 
         #do some housekeeping with filenames

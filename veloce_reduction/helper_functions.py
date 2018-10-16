@@ -16,7 +16,7 @@ import collections
 from scipy import ndimage
 from scipy import special, signal
 from numpy.polynomial import polynomial
-
+from scipy.integrate import quad
 
 
 
@@ -275,9 +275,7 @@ def make_norm_profiles_3(x, col, fppo, fibs='stellar', slope=False, offset=False
     clone of "make_norm_profiles", but takes as "fppo" (= fibparms per order) as input, rather
     than "ord" and the entire "fibparms" dictionary
     """
-
-
-
+    
     # same number of fibres for every order, of course
     if fibs == 'all':
         nfib = 24
@@ -322,6 +320,84 @@ def make_norm_profiles_3(x, col, fppo, fibs='stellar', slope=False, offset=False
         sigma = fppo[fib]['sigma_fit'](col)
         beta = fppo[fib]['beta_fit'](col)
         phi[:, k] = fibmodel(x, mu, sigma, beta=beta, alpha=0, norm=0)
+
+    if offset and not slope:
+        phi[:, -1] = 1.
+        userange = np.append(userange, 24)
+    if slope and not offset:
+        phi[:, -1] = x - x[0]
+        userange = np.append(userange, 24)
+    if offset and slope:
+        phi[:, -2] = 1.
+        phi[:, -1] = x - x[0]
+        userange = np.append(userange, np.array([24,25]))
+
+    # deprecate phi-array to only use wanted fibres
+    phi = phi[:, userange]
+
+    # return normalized profiles
+    phinorm = phi / np.sum(phi, axis=0)
+
+    return phinorm
+
+def make_norm_profiles_4(x, col, fppo, integrate=False, fibs='stellar', slope=False, offset=False):
+    """
+    THAT's the latest version to be used with fibre profiles from real fibre flats!!!
+    In this version we have 24 fibres (19 stellasr + 5 sky)!
+    clone of "make_norm_profiles", but takes as "fppo" (= fibparms per order) as input, rather
+    than "ord" and the entire "fibparms" dictionary
+    """
+
+    # same number of fibres for every order, of course
+    if fibs == 'all':
+        nfib = 24
+        userange = np.arange(nfib)
+    elif fibs == 'stellar':
+        nfib = 19
+        userange = np.arange(2, 21, 1)
+    # elif fibs == 'laser':
+    #     nfib = 1
+    #     userange = np.arange(0, 1, 2)
+    # elif fibs == 'thxe':
+    #     nfib = 1
+    #     userange = np.arange(27, 28, 2)
+    elif fibs == 'sky3':
+        nfib = 3
+        userange = np.arange(21, 24, 1)
+    elif fibs == 'sky2':
+        nfib = 2
+        userange = np.arange(2)
+    elif fibs == 'allsky':
+        nfib = 5
+        userange = np.r_[np.arange(2),np.arange(21, 24, 1)]
+    else:
+        print('ERROR: fibre selection not recognised!!!')
+        return
+
+    # Do we want to include extra "fibres" to take care of slope and/or offset?
+    # Default is NO for both (as this should probably be already taken care of globally)
+    addfibs = 0
+    if offset:
+        # nfib += 1
+        addfibs += 1
+    if slope:
+        # nfib += 1
+        addfibs += 1
+
+    phi = np.zeros((len(x), 24+addfibs))
+
+    # NOTE: need to turn fibre numbers around here to be correct
+    for k, fib in enumerate(sorted(fppo.keys())[::-1]):
+        mu = fppo[fib]['mu_fit'](col)
+        sigma = fppo[fib]['sigma_fit'](col)
+        beta = fppo[fib]['beta_fit'](col)
+        # now, I think we actually don't want to evaluate the functional form of the profiles  as declared by "fibmodel" at the respective locations,
+        # but rather we want to integrate the (highly non-linear) function from the left edge to the right edge of the pixels (co-ordinates are pixel centres!!!)
+        if integrate:
+            for i in np.arange(len(x)):
+                phi[i,k] = quad(fibmodel, x[i]-0.5, x[i]+0.5, args=(mu, sigma, beta))[0]
+        else:
+            phi[:, k] = fibmodel(x, mu, sigma, beta=beta, alpha=0, norm=0)
 
     if offset and not slope:
         phi[:, -1] = 1.
