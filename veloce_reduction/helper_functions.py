@@ -17,6 +17,7 @@ from scipy import ndimage
 from scipy import special, signal
 from numpy.polynomial import polynomial
 from scipy.integrate import quad, fixed_quad
+from scipy import ndimage
 
 
 
@@ -931,5 +932,17 @@ def affine_transformation(xytuple, scale_x=1, scale_y=1, theta=0, dx=0, dy=0, sh
 #     
 #     return np.dot(m,x)
     return
+
+
+
+def quick_bg_fix(raw_data, npix=4112):
+    left_xx = np.arange(npix/2)
+    right_xx = np.arange(npix/2, npix)
+    left_bg = ndimage.minimum_filter(ndimage.gaussian_filter(raw_data[:npix/2],3), size=100)
+    right_bg = ndimage.minimum_filter(ndimage.gaussian_filter(raw_data[npix/2:],3), size=100)
+    data = raw_data.copy()
+    data[left_xx] = raw_data[left_xx] - left_bg
+    data[right_xx] = raw_data[right_xx] - right_bg
+    return data
 
 

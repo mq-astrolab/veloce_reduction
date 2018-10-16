@@ -310,7 +310,7 @@ def collapse_extract_from_indices(img, err_img, stripe_indices, tramlines, slit_
 
 def optimal_extraction(stripes, err_stripes=None, ron_stripes=None, nfib=28, RON=0., slit_height=25, phi_onthefly=False,
                        timit=False, simu=False, individual_fibres=False, combined_profiles=False, integrate_profiles=False, 
-                       relints=None, collapse=False, debug_level=0):
+                       slope=False, offset=False, relints=None, collapse=False, debug_level=0):
     # if error array is not provided, then RON and gain must be provided (but this is bad because that way we don't
     # know about large errors for cosmic-corrected pixels etc)
 
@@ -444,7 +444,7 @@ def optimal_extraction(stripes, err_stripes=None, ron_stripes=None, nfib=28, RON
                     # phi = make_norm_profiles(sr[:,i], ord, i, fibparms)
                     # phi = make_norm_profiles_temp(sr[:,i], ord, i, fibparms)
                     # phi = make_norm_single_profile_temp(sr[:,i], ord, i, fibparms)
-                    phi = make_norm_profiles_4(sr[:, i], i, fppo, integrate=integrate_profiles, fibs='all')
+                    phi = make_norm_profiles_4(sr[:, i], i, fppo, integrate=integrate_profiles, slope=slope, offset=offset, fibs='all')
 
             # print('WARNING: TEMPORARY offset correction is not commented out!!!')
             # # subtract the median as the offset if BG is not properly corrected for
@@ -548,7 +548,8 @@ def optimal_extraction(stripes, err_stripes=None, ron_stripes=None, nfib=28, RON
 
 def optimal_extraction_from_indices(img, stripe_indices, err_img=None, nfib=28, RON=0., slit_height=25,
                                     phi_onthefly=False, timit=False, simu=False, individual_fibres=False,
-                                    combined_profiles=False, integrate_profiles=False, relints=None, collapse=False, debug_level=0):
+                                    combined_profiles=False, integrate_profiles=False, slope=False, offset=False,
+                                    relints=None, collapse=False, debug_level=0):
     # if error array is not provided, then RON and gain must be provided (but this is bad because that way we don't
     # know about large errors for cosmic-correctdd pixels etc)
 
@@ -687,7 +688,7 @@ def optimal_extraction_from_indices(img, stripe_indices, err_img=None, nfib=28, 
                     # phi = make_norm_profiles(sr[:,i], ord, i, fibparms)
                     # phi = make_norm_profiles_temp(sr[:,i], ord, i, fibparms)
                     # phi = make_norm_single_profile_temp(sr[:,i], ord, i, fibparms)
-                    phi = make_norm_profiles_4(sr[:, i], i, fppo, integrate=integrate_profiles, fibs='all')
+                    phi = make_norm_profiles_4(sr[:, i], i, fppo, integrate=integrate_profiles, slope=slope, offset=offset, fibs='all')
 
             # print('WARNING: TEMPORARY offset correction is not commented out!!!')
             # # subtract the median as the offset if BG is not properly corrected for
@@ -789,8 +790,8 @@ def optimal_extraction_from_indices(img, stripe_indices, err_img=None, nfib=28, 
 
 
 
-def extract_spectrum(stripes, err_stripes, ron_stripes, method='optimal', individual_fibres=True, combined_profiles=False, integrate_profiles=False, slit_height=25, RON=0.,
-                     savefile=False, filetype='fits', obsname=None, path=None, simu=False, verbose=False, timit=False, debug_level=0):
+def extract_spectrum(stripes, err_stripes, ron_stripes, method='optimal', individual_fibres=True, combined_profiles=False, integrate_profiles=False, slope=False,
+                     offset=False, slit_height=25, RON=0., savefile=False, filetype='fits', obsname=None, path=None, simu=False, verbose=False, timit=False, debug_level=0):
     """
     This routine is simply a wrapper code for the different extraction methods. There are a total FIVE (1,2,3a,3b,3c) different extraction methods implemented, 
     which can be selected by a combination of the 'method', individual_fibres', and 'combined_profile' keyword arguments.
@@ -826,6 +827,8 @@ def extract_spectrum(stripes, err_stripes, ron_stripes, method='optimal', indivi
     'combined_profiles'  : boolean - set to TRUE for method (3c); set to FALSE for method (3b) ; only takes effect if 'individual_fibres' is set to FALSE; ignored if method is not set to 'optimal'
     'integrate_profiles' : boolean - set to TRUE if you want to (CORRECTLY but SLOWER) integrate over the (highly non-linear) functional form describing the profiles, rather than evaluating
                            the function at the discrete values corresponding to the pixel centres (which is only a good approximation if the function varies slowly)
+    'slope'              : boolean - do you want to include a slope (along the slit) as an extra 'fibre' in the optimal extraction?
+    'offset'             : boolean - do you want to include an offset as an extra 'fibre' in the optimal extraction?
     'slit_height'        : height of the extraction slit is 2*slit_height pixels
     'RON'                : read-out noise per pixel
     'gain'               : gain
@@ -863,7 +866,7 @@ def extract_spectrum(stripes, err_stripes, ron_stripes, method='optimal', indivi
         #pix,flux,err = collapse_extract(stripes, err_stripes, tramlines, slit_height=slit_height, verbose=verbose, timit=timit, debug_level=debug_level)
     elif method.lower() == 'optimal':
         pix,flux,err = optimal_extraction(stripes, err_stripes=err_stripes, ron_stripes=ron_stripes, nfib=24, RON=RON, slit_height=slit_height, individual_fibres=individual_fibres,
-                                          combined_profiles=combined_profiles, integrate_profiles=integrate_profiles, simu=simu, timit=timit, debug_level=debug_level) 
+                                          combined_profiles=combined_profiles, integrate_profiles=integrate_profiles, slope=slope, offset=offset, simu=simu, timit=timit, debug_level=debug_level) 
     else:
         print('ERROR: Nightmare! That should never happen  --  must be an error in the Matrix...')
         return    
@@ -926,6 +929,8 @@ def extract_spectrum(stripes, err_stripes, ron_stripes, method='optimal', indivi
                 h['LASTORD'] = (botordnum, 'order number of last (bottom) order')
                 if method.lower() == 'optimal':
                     h['METHOD2'] = (submethod, 'exact optimal extraction method used')
+                    h['SLOPE'] = (slope,)
+                    h['OFFSET'] = (offset,)
                 #write to FITS file    
                 outfn = path + starname + '_' + obsname + '_' + method.lower() + submethod + '_extracted.fits'
                 pyfits.writeto(outfn, fluxarr, h, clobber=True)    
@@ -949,8 +954,8 @@ def extract_spectrum(stripes, err_stripes, ron_stripes, method='optimal', indivi
 
 
 
-def extract_spectrum_from_indices(img, err_img, stripe_indices, method='optimal', individual_fibres=True, combined_profiles=False, integrate_profiles=False,
-                                  slit_height=25, RON=0., savefile=False, filetype='fits', obsname=None, path=None, simu=False, verbose=False, timit=False, debug_level=0):
+def extract_spectrum_from_indices(img, err_img, stripe_indices, method='optimal', individual_fibres=True, combined_profiles=False, integrate_profiles=False, slope=False,
+                                  offset=False, slit_height=25, RON=0., savefile=False, filetype='fits', obsname=None, path=None, simu=False, verbose=False, timit=False, debug_level=0):
     """
     CLONE OF 'extract_spectrum'!
     This routine is simply a wrapper code for the different extraction methods. There are a total FIVE (1,2,3a,3b,3c) different extraction methods implemented, 
@@ -987,6 +992,8 @@ def extract_spectrum_from_indices(img, err_img, stripe_indices, method='optimal'
     'combined_profiles'  : boolean - set to TRUE for method (3c); set to FALSE for method (3b) ; only takes effect if 'individual_fibres' is set to FALSE; ignored if method is not set to 'optimal'
     'integrate_profiles' : boolean - set to TRUE if you want to (CORRECTLY but SLOWER) integrate over the (highly non-linear) functional form describing the profiles, rather than evaluating
                            the function at the discrete values corresponding to the pixel centres (which is only a good approximation if the function varies slowly)
+    'slope'              : boolean - do you want to include a slope (along the slit) as an extra 'fibre' in the optimal extraction?
+    'offset'             : boolean - do you want to include an offset as an extra 'fibre' in the optimal extraction?
     'slit_height'        : height of the extraction slit is 2*slit_height pixels
     'RON'                : read-out noise per pixel
     'gain'               : gain
@@ -1023,7 +1030,8 @@ def extract_spectrum_from_indices(img, err_img, stripe_indices, method='optimal'
         #pix,flux,err = collapse_extract_from_indices(img, err_img, stripe_indices, tramlines, slit_height=slit_height, verbose=verbose, timit=timit, debug_level=debug_level)
     elif method.lower() == 'optimal':
         pix,flux,err = optimal_extraction_from_indices(img, stripe_indices, err_img=err_img, nfib=24, RON=RON, slit_height=slit_height, individual_fibres=individual_fibres,
-                                                       combined_profiles=combined_profiles, integrate_profiles=integrate_profiles, simu=simu, timit=timit, debug_level=debug_level) 
+                                                       combined_profiles=combined_profiles, integrate_profiles=integrate_profiles, slope=slope, offset=offset, simu=simu, 
+                                                       timit=timit, debug_level=debug_level) 
     else:
         print('ERROR: Nightmare! That should never happen  --  must be an error in the Matrix...')
         return    
@@ -1094,6 +1102,8 @@ def extract_spectrum_from_indices(img, err_img, stripe_indices, method='optimal'
                 h['LASTORD'] = (botordnum, 'order number of last (bottom) order')
                 if method.lower() == 'optimal':
                     h['METHOD2'] = (submethod, 'exact optimal extraction method used')
+                    h['SLOPE'] = (slope,)
+                    h['OFFSET'] = (offset,)
                 #write to FITS file    
                 outfn = path + starname + '_' + obsname + '_' + method.lower() + submethod + '_extracted.fits'
                 pyfits.writeto(outfn, fluxarr, h, clobber=True)    
