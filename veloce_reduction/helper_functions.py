@@ -16,7 +16,7 @@ import collections
 from scipy import ndimage
 from scipy import special, signal
 from numpy.polynomial import polynomial
-from scipy.integrate import quad
+from scipy.integrate import quad, fixed_quad
 
 
 
@@ -395,7 +395,8 @@ def make_norm_profiles_4(x, col, fppo, integrate=False, fibs='stellar', slope=Fa
         # but rather we want to integrate the (highly non-linear) function from the left edge to the right edge of the pixels (co-ordinates are pixel centres!!!)
         if integrate:
             for i in np.arange(len(x)):
-                phi[i,k] = quad(fibmodel, x[i]-0.5, x[i]+0.5, args=(mu, sigma, beta))[0]
+                phi[i,k] = fixed_quad(fibmodel, x[i]-0.5, x[i]+0.5, args=(mu, sigma, beta))[0]
+                # phi[i, k] = quad(fibmodel, x[i] - 0.5, x[i] + 0.5, args=(mu, sigma, beta))[0]
         else:
             phi[:, k] = fibmodel(x, mu, sigma, beta=beta, alpha=0, norm=0)
 
