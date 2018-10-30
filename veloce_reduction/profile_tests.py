@@ -240,8 +240,8 @@ def get_multiple_fibre_profiles_single_order(sc, sr, err_sc, ordpol, ordmask=Non
                         popt_arr = np.reshape(popt, (24, 3))
 
                 # fibre numbers here increase from red to blue, ie from ThXe side to LFC side, as in:
-                # pseudo-slit layout:   S5 S2 X 7 18 17 6 16 15 5 14 13  1 12 11  4 10  9  3  8 19  2 X S4 S3 S1
-                # array indices     :    0  1   2  3  4 5  6  7 8  9 10 .................................. 22 23
+                # pseudo-slit layout:   ThXe S5  S2   X   7  18  17   6  16  15   5  14  13   1  12  11   4  10   9   3   8  19   2   X  S4  S3  S1 LFC
+                # array indices     :         0   1       2   3   4   5   6   7   8   9  10  11  12  13  14  15  16  17  18  19  20      21  22  23
 
                 fibre_profiles_ord['mu'][i, :] = popt_arr[:,0]
                 fibre_profiles_ord['sigma'][i, :] = popt_arr[:, 1]

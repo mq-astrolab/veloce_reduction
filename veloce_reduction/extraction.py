@@ -308,7 +308,7 @@ def collapse_extract_from_indices(img, err_img, stripe_indices, tramlines, slit_
 
 
 
-def optimal_extraction(stripes, err_stripes=None, ron_stripes=None, nfib=28, RON=0., slit_height=25, phi_onthefly=False,
+def optimal_extraction(stripes, err_stripes=None, ron_stripes=None, nfib=24, RON=0., slit_height=25, phi_onthefly=False,
                        timit=False, simu=False, individual_fibres=False, combined_profiles=False, integrate_profiles=False, 
                        slope=False, offset=False, relints=None, collapse=False, debug_level=0):
     # if error array is not provided, then RON and gain must be provided (but this is bad because that way we don't
@@ -546,7 +546,7 @@ def optimal_extraction(stripes, err_stripes=None, ron_stripes=None, nfib=28, RON
 
 
 
-def optimal_extraction_from_indices(img, stripe_indices, err_img=None, nfib=28, RON=0., slit_height=25,
+def optimal_extraction_from_indices(img, stripe_indices, err_img=None, nfib=24, RON=0., slit_height=25,
                                     phi_onthefly=False, timit=False, simu=False, individual_fibres=False,
                                     combined_profiles=False, integrate_profiles=False, slope=False, offset=False,
                                     relints=None, collapse=False, debug_level=0):

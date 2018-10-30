@@ -1,9 +1,11 @@
+from lmfit.models import LorentzianModel
 
 
 
 thflux = pyfits.getdata('/Users/christoph/data/commissioning/20180814/14aug30044_extracted.fits',0)
 #thflux2 = pyfits.getdata('/Users/christoph/data/commissioning/20180814/14aug30064_extracted.fits',0)
 thflux2 = pyfits.getdata('/Users/christoph/data/commissioning/20180916/working/16sep30009_extracted.fits',0)
+# thflux = pyfits.getdata('/Volumes/BERGRAID/data/veloce/second_commissioning/180916/working/16sep30009_extracted.fits',0)
 
 
 now = datetime.datetime.now()
@@ -44,6 +46,8 @@ for new_ordnum in np.arange(2,40):
 
     #fit Gaussian to central part of CCF
     mod = GaussianModel()
+    mod2 = LorentzianModel()
+    #mod2 = Model(fibmodel_with_amp)
     parms = mod.guess(xc[xrange],x=xrange)
     result = mod.fit(xc[xrange],parms,x=xrange,weights=None)
     wparms = mod.guess(wxc[xrange], x=xrange)
@@ -54,6 +58,8 @@ for new_ordnum in np.arange(2,40):
     # plot_os_grid = np.linspace(xrange[0],xrange[-1],plot_osf * (len(xrange)-1) + 1)
     # guessmodel = mod.eval(result.init_params,x=plot_os_grid)
     # bestmodel = mod.eval(result.params,x=plot_os_grid)
+    # wguessmodel = mod.eval(wresult.init_params,x=plot_os_grid)
+    # wbestmodel = mod.eval(wresult.params,x=plot_os_grid)
     # plt.legend()
 
     mu = result.best_values['center']
@@ -186,8 +192,8 @@ for new_ordnum in np.arange(2,40):
     fitted_line_pos2 = fit_emission_lines(data2, return_all_pars=False, varbeta=False, timit=False, verbose=False,
                                           thresh=thresh, bgthresh=bgthresh)
 
-    for i,checkval in enumerate(fitted_line_pos2):
-        print(i)
+    for j,checkval in enumerate(fitted_line_pos2):
+        print(j, checkval)
         q = np.logical_and(ord_pix > checkval - search_region_size, ord_pix < checkval + search_region_size)
         found = np.sum(q)
         if found > 0:
@@ -425,3 +431,142 @@ for new_ordnum in np.arange(2,40):
 
 
     outfile.close()
+    
+    
+    
+    
+####################################################################################################################################
+    
+    
+
+# ordix = np.argwhere(m==66).T[0]
+
+type = 'gaussian_offset_slope'
+
+plot_osf = 10
+plot_os_grid = np.linspace(xrange[0],xrange[-1],plot_osf * (len(xrange)-1) + 1)
+plt.plot(data,'b.-')
+plt.plot(xx[xrange],data[xrange],'y.-')
+plt.xlim(int(np.round(xguess, 0)) - 7, int(np.round(xguess, 0)) + 7)
+plt.ylim(-50,200)
+plt.plot(plot_os_grid, gaussian_with_offset_and_slope(plot_os_grid, *guess),'r--', label='initial guess')
+plt.plot(plot_os_grid, gaussian_with_offset_and_slope(plot_os_grid, *popt),'g-', label='best fit')
+plt.axvline(popt[0], color='g', linestyle=':')
+plt.legend()
+plt.title(type)
+plt.xlabel('pixel')
+plt.ylabel('counts')
+plt.text(3292, 130, 'mu = '+str(np.round(popt[0],4)))
+plt.savefig(path + 'linefit_'+type+'.eps')
+
+
+
+
+
+
+####################################################################################################################################
+path = '/Volumes/BERGRAID/data/veloce/dispsol_tests/20180917/'
+indfib_thflux_so = pyfits.getdata(path + 'ARC_ThAr_17sep30080_optimal3a_extracted_with_slope_and_offset.fits')
+fibname = ['S5', 'S2', '07', '18', '17', '06', '16', '15', '05', '14', '13', '01', '12', '11', '04', '10', '09', '03', '08', '19', '02', 'S4', 'S3', 'S1']
+for i in range(24):
+    print('fibre i=',i)
+    thflux = indfib_thflux_so[:,i,:]
+    p_air_wl, p_vac_wl = get_dispsol_from_known_lines(thflux, fibre=fibname[i], fitwidth=4, satmask=None, lamptype='thar', return_all_pars=False, 
+                                                      deg_spectral=7, deg_spatial=7, polytype='chebyshev', return_full=True, savetable=True, outpath=path, debug_level=1, timit=False)
+    pyfits.writeto(path + 'veloce_thar_dispsol_from_17sep30080_fib'+fibname[i]+'_air.fits', p_air_wl)
+    pyfits.writeto(path + 'veloce_thar_dispsol_from_17sep30080_fib'+fibname[i]+'_vac.fits', p_vac_wl)
+####################################################################################################################################
+
+####################################################################################################################################
+# difference between 2-dim wl-solutions of individual fibres
+central_wl = pyfits.getdata(path + 'veloce_thar_dispsol_from_17sep30080_fib'+fibname[11]+'_air.fits')     
+wl_near_LFC = pyfits.getdata(path + 'veloce_thar_dispsol_from_17sep30080_fib'+fibname[23]+'_air.fits')         
+        
+for i in range(24):
+    filename = path + 'veloce_thar_dispsol_from_17sep30080_fib'+fibname[i]+'_air.fits'
+    wl = pyfits.getdata(filename)
+    if i !=11:
+        plt.plot(wl[38,:] - wl_near_LFC[38,:], label='fibre '+fibname[i])
+    else:
+        plt.plot(wl[38,:] - wl_near_LFC[38,:], 'k', label='fibre '+fibname[i])
+####################################################################################################################################
+    
+####################################################################################################################################
+# difference between 1-dim wl-solutions of individual fibres
+xx = np.arange(4112)
+ref_filename = path + 'thar_lines_fibre_' + fibname[0] + '_as_of_2018-10-30.dat'
+linenum, order, m, pix, wlref, vac_wlref = readcol(ref_filename, twod=False, skipline=2)
+ix = np.argwhere(order == 21).flatten()
+x = pix[ix]
+lam = wlref[ix]
+order_fit = np.poly1d(np.polyfit(x, lam, 2))
+ref_fit = order_fit(xx)
+for i in range(24):
+    filename = path + 'thar_lines_fibre_' + fibname[i] + '_as_of_2018-10-30.dat'
+    linenum, order, m, pix, wlref, vac_wlref = readcol(filename, twod=False, skipline=2)
+    ix = np.argwhere(order == 21).flatten()
+    x = pix[ix]
+    lam = wlref[ix]
+    order_fit = np.poly1d(np.polyfit(x, lam, 2))
+    plt.plot(xx, order_fit(xx) - ref_fit, label='fibre '+fibname[i])
+####################################################################################################################################
+
+####################################################################################################################################
+# difference in pixel space (ie peak locations)
+xx = np.arange(4112)
+ref_filename = path + 'thar_lines_fibre_' + fibname[0] + '_as_of_2018-10-30.dat'
+linenum, order, m, pix, wlref, vac_wlref = readcol(ref_filename, twod=False, skipline=2)
+ix = np.argwhere(order == 3).flatten()
+ref_x = pix[ix]
+ref_wlref = wlref[ix]
+order_fit = np.poly1d(np.polyfit(ref_x, ref_wlref, 3))
+ref_fit = order_fit(xx)
+
+pixfit_coeffs = []
+
+for i in range(24):
+    filename = path + 'thar_lines_fibre_' + fibname[i] + '_as_of_2018-10-30.dat'
+    linenum, order, m, pix, wlref, vac_wlref = readcol(filename, twod=False, skipline=2)
+    ix = np.argwhere(order == 3).flatten()
+    x = pix[ix]
+    lam = wlref[ix]
+    matched_ref_x = ref_x[np.in1d(ref_wlref, lam)]
+    delta_x = x - matched_ref_x
+#     plt.plot(matched_ref_x, x - matched_ref_x, 'x-', label='fibre '+fibname[i])
+    # perform sanity-check 1D fit (remove only very obvious outliers, as there is quite a bit of scatter)
+    test_fit = np.poly1d(np.polyfit(matched_ref_x, delta_x, 1))
+    if debug_level >= 2:
+        plt.figure()
+        plt.plot(matched_ref_x, delta_x, 'x-')
+        plt.title('fibre '+fibname[i])
+        plt.plot(xx, test_fit(xx))
+        plt.xlim(0,4111)
+    # remove obvious outliers
+    fitres = delta_x - test_fit(matched_ref_x)
+    # do single sigma clipping
+    goodres,goodix,badix = single_sigma_clip(fitres, 2, return_indices=True)
+    #fit again
+    pix_fit = np.poly1d(np.polyfit(matched_ref_x[goodix], delta_x[goodix], 1))
+    pixfit_coeffs.append(pix_fit)
+    #now fit new dispsol to the model-shifted lines
+    order_fit = np.poly1d(np.polyfit(ref_x + pix_fit(ref_x), ref_wlref, 3))
+    plt.plot(xx, order_fit(xx) - ref_fit, label='fibre '+fibname[i])
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    

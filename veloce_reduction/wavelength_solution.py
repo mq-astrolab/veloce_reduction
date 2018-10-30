@@ -16,8 +16,11 @@ from lmfit.models import GaussianModel, LorentzianModel, VoigtModel, PseudoVoigt
 from lmfit.models import DampedOscillatorModel, DampedHarmonicOscillatorModel, ExponentialGaussianModel, SkewedGaussianModel, DonaichModel
 from readcol import readcol 
 import datetime
+import astropy.io.fits as pyfits
 
-from .helper_functions import fibmodel_with_amp, CMB_pure_gaussian, multi_fibmodel_with_amp, CMB_multi_gaussian, offset_pseudo_gausslike, fit_poly_surface_2D
+from veloce_reduction.veloce_reduction.helper_functions import fibmodel_with_amp, CMB_pure_gaussian, multi_fibmodel_with_amp, CMB_multi_gaussian, offset_pseudo_gausslike
+from veloce_reduction.veloce_reduction.helper_functions import fit_poly_surface_2D, single_sigma_clip, find_nearest, gaussian_with_offset_and_slope
+from veloce_reduction.utils.linelists import make_gaussmask_from_linelist 
 
 
 
@@ -136,7 +139,7 @@ def find_suitable_peaks(rawdata, thresh = 5000., bgthresh = 2000., maxthresh = N
 
 
 def fit_emission_lines(data, fitwidth=4, thresh = 5000., bgthresh = 2000., maxthresh = None, slope=1e-4, laser=False,
-                       varbeta=True, offset=False, minsigma=0., maxsigma=np.inf, sigma_0=1., minamp=0., maxamp=np.inf,
+                       varbeta=True, offset=False, minsigma=0.2, maxsigma=np.inf, sigma_0=1., minamp=0., maxamp=np.inf,
                        minbeta=1., maxbeta=4., beta_0=2., return_all_pars=False, return_qualflag=False, verbose=False, timit=False):
     """
     This routine identifies and fits emission lines in a 1-dim spectrum (ie generally speaking it finds and fits peaks in a 1dim array), using "scipy.optimize.curve_fit".
@@ -240,11 +243,11 @@ def fit_emission_lines(data, fitwidth=4, thresh = 5000., bgthresh = 2000., maxth
         if npeaks == 1:
             if offset:
                 if varbeta:
-                    guess = np.array([xguess, sigma_0, data[xguess], beta_0, 0])
-                    popt, pcov = op.curve_fit(fibmodel_with_amp_and_offset, xrange, data[xrange], p0=guess, bounds=([xguess-2,minsigma,minamp,minbeta,0],[xguess+2,maxsigma,maxamp,maxbeta,thresh]))
+                    guess = np.array([xguess, sigma_0, data[xguess], beta_0, np.min(data[xrange])])
+                    popt, pcov = op.curve_fit(fibmodel_with_amp_and_offset, xrange, data[xrange], p0=guess, bounds=([xguess-2,minsigma,minamp,minbeta,-np.inf],[xguess+2,maxsigma,maxamp,maxbeta,np.inf]))
                 else:
-                    guess = np.array([xguess, sigma_0, data[xguess], 0])
-                    popt, pcov = op.curve_fit(gaussian_with_offset, xrange, data[xrange], p0=guess, bounds=([xguess-2,minsigma,minamp,0],[xguess+2,maxsigma,maxamp,]))
+                    guess = np.array([xguess, sigma_0, data[xguess], np.min(data[xrange])])
+                    popt, pcov = op.curve_fit(gaussian_with_offset, xrange, data[xrange], p0=guess, bounds=([xguess-2,minsigma,minamp,-np.inf],[xguess+2,maxsigma,maxamp,np.inf]))
             else:
                 if varbeta:
                     guess = np.array([xguess, sigma_0, data[xguess], beta_0])
@@ -294,7 +297,6 @@ def fit_emission_lines(data, fitwidth=4, thresh = 5000., bgthresh = 2000., maxth
                     fitted_amp = popt[q*3+2]
 
 
-        print('haehaehae')
         #make sure we actually found a good peak
         if abs(fitted_pos - xguess) >= 2.:
             line_pos_fitted.append(xguess)
@@ -1417,6 +1419,710 @@ def get_simu_dispsol(fibre=None, path='/Users/christoph/OneDrive - UNSW/dispsol/
 # # laser_dispsol5,stats5 = get_dispsol_from_laser(laserdata, laser_ref_wl, verbose=True, timit=True, return_stats=True, deg_polynomial=5)
 # # laser_dispsol11,stats11 = get_dispsol_from_laser(laserdata, laser_ref_wl, verbose=True, timit=True, return_stats=True, deg_polynomial=11)
 # ###########################################################################################################
+
+
+
+
+
+def quick_bg_fix(raw_data, npix=4112):
+    left_xx = np.arange(npix/2)
+    right_xx = np.arange(npix/2, npix)
+    left_bg = ndimage.minimum_filter(ndimage.gaussian_filter(raw_data[:npix/2],3), size=100)
+    right_bg = ndimage.minimum_filter(ndimage.gaussian_filter(raw_data[npix/2:],3), size=100)
+    data = raw_data.copy()
+    data[left_xx] = raw_data[left_xx] - left_bg
+    data[right_xx] = raw_data[right_xx] - right_bg
+    return data
+
+
+
+
+
+def get_arc_dispsol(thflux, satmask=None, polytype='chebyshev', lamptype=None, deg_spectral=5, deg_spatial=3, return_full=True, savetables=True, debug_level=0, timit=False):
+
+    if lamptype.lower() not in ['thar', 'thxe']:
+        lamptype = raw_input('Please enter valid lamp type ["thar" / "thxe"]: ')
+
+    # read the sacred Michael Murphy ThAr line list 
+    wn, wlair, relint, species1, species2, reference = readcol('/Users/christoph/OneDrive - UNSW/linelists/thar_mm_new.txt', twod=False, skipline=1)
+    wlvac = 1.e8 / wn
+    
+    if debug_level >= 1:
+        # mm_grid, mm_spec_air = make_gaussmask_from_linelist(wlair, relint=10.**relint)
+        mm_grid, mm_spec_unit_air = make_gaussmask_from_linelist(wlair, relint=None)
+        # mm_grid, mm_spec_vac = make_gaussmask_from_linelist(wlvac, relint=10.**relint)
+        # mm_grid, mm_spec_unit_vac = make_gaussmask_from_linelist(wlvac, relint=None)
+    
+    # read best existing wavelength solution
+    # p = np.load('/Users/christoph/OneDrive - UNSW/dispsol/veloce_thar_dispsol_coeffs_20180921.npy').item()
+    # thar_dispsol = pyfits.getdata('/Users/christoph/OneDrive - UNSW/dispsol/veloce_thar_dispsol_20180916.fits')
+    p = np.load('/Users/christoph/OneDrive - UNSW/dispsol/veloce_thar_dispsol_coeffs_air_as_of_20180923.npy').item()
+    thar_dispsol = pyfits.getdata('/Users/christoph/OneDrive - UNSW/dispsol/veloce_thar_dispsol_17sep30080_7x7_air.fits')
+    ref_linenum, ref_ordnum, ref_m, ref_pix, ref_wl, _, _, _, _, _ = readcol('/Users/christoph/OneDrive - UNSW/linelists/thar_lines_used_in_7x7_fit_as_of_2018-10-19.dat', twod=False, skipline=2)
+    
+    # prepare output file
+    if savetables:
+        now = datetime.datetime.now()
+        #model_wl = p(x_norm, order_norm)
+        #resid = wl - model_wl
+        outfn = '/Users/christoph/OneDrive - UNSW/linelists/'+lamptype+'_lines_found_as_of_'+str(now)[:10]+'.dat'
+        outfile = open(outfn, 'w')
+        outfile.write('line number   order_number   physical_order_number     pixel       air_ref_wl[A]   vac_ref_wl[A] \n')
+        outfile.write('=================================================================================================\n')
+        outfile.close()
+    
+    # prepare global output arrays
+    x = np.array([])
+    nlines = np.array([])
+    order = np.array([])
+    ref_wl_air = np.array([])
+    ref_wl_vac = np.array([])
+    
+    # if not passed into the routine, define a mask that masks out saturated arc lines and some other crap
+    if satmask is None:
+        n_ord = thflux.shape[0]
+        satmask = define_arc_mask(lamptype, n_ord)
+    
+    # search region size in Angstroms
+    # search_region_size = 0.7
+    search_region_size = 0.5
+        
+    #######################################################################################################################################
+    #loop over orders
+    for ord in range(thflux.shape[0]):
+    
+        # order numbers for output file
+        ordnum = str(ord+1).zfill(2)
+        mord = (ord+1) + 64
+    
+        # prepare output arrays for this order
+        ord_x = np.array([])
+        ord_ref_wl_air = np.array([])
+        ord_ref_wl_vac = np.array([])
+        
+        # normalized co-ordinates
+        ord_norm = (ord / ((40-1)/2.)) - 1.
+        
+        #define raw 1-dim data
+        raw_data = thflux[ord,:]
+        
+        # clean up data
+        data = quick_bg_fix(raw_data)
+        
+        # mask out saturated lines
+        ordmask = satmask[ord,:]
+        data[ordmask] = 0.
+        
+        # find peaks
+        ####### TODO: automate this!!!
+        thresh = 1500
+        bgthresh = 1000
+        fitted_line_pos = fit_emission_lines(data, return_all_pars=False, varbeta=False, timit=False, verbose=False, thresh=thresh, bgthresh=bgthresh)
+        
+        if debug_level >= 1:
+            print(str(len(fitted_line_pos)) + ' lines found in order ' + ordnum)
+            
+        # select appropriate region in master line list
+        testrange = np.logical_and(mm_grid > np.min(thar_dispsol[ord,:]) - 20, mm_grid < np.max(thar_dispsol[ord,:]) + 20)
+        
+        # PLOT
+        if debug_level >= 1:
+            xx = np.arange(len(data))
+            plt.plot(mm_grid[testrange], mm_spec_unit_air[testrange])
+            plt.plot(thar_dispsol[ord,:],data/np.max(data),'.-')
+            plt.title('Order '+str(ord+1).zfill(2)) 
+        
+        # loop over all lines found - search for possible matches in the ThAr master line list
+        for i,checkval in enumerate(fitted_line_pos):
+            
+            # normalized co-ordinates
+            x_norm = (checkval / ((len(data)-1)/2.)) - 1.
+            
+            if debug_level >= 1:
+                print('Trying to identify line in order ' + ordnum + ', at pixel ' + str(checkval) + '  -  rough wl estimate: ' + str(p(x_norm, ord_norm)) + ' A')
+            
+            if debug_level >= 3:
+                # print(i,checkval)
+                # print(i, checkval, thar_dispsol[order, np.round(checkval,0).astype(int)])
+                # print(i, checkval, thar_dispsol[order, np.round(checkval,0).astype(int)], p(x_norm, ord_norm))
+                print(i, checkval, p(x_norm, ord_norm))
+            
+            # select match(es)
+            # q = np.logical_and(ord_pix > checkval + wshift - search_region_size, ord_pix < checkval + wshift + search_region_size)
+            # q = np.logical_and(wlair > thar_dispsol[order, np.round(checkval,0).astype(int)] - search_region_size, wlair < thar_dispsol[order, np.round(checkval,0).astype(int)] + search_region_size)
+            q = np.logical_and(wlair > p(x_norm, ord_norm) - search_region_size, wlair < p(x_norm, ord_norm) + search_region_size)
+            
+            found = np.sum(q)
+            if found > 0:
+                if debug_level >= 1:
+                    print(str(found) + ' possible match(es) found!')
+                if found == 1:
+                    ord_x = np.append(ord_x, checkval)
+                    #ord_order = np.append(ord_order, ord)
+                    ord_ref_wl_air = np.append(ord_ref_wl_air, wlair[q])
+                    ord_ref_wl_vac = np.append(ord_ref_wl_vac, wlvac[q])
+                else:
+                    if debug_level >= 1:
+                        print('Selecting closest match...')
+                    qq = find_nearest(wlair, p(x_norm, ord_norm), return_index=True)
+                    ord_x = np.append(ord_x, checkval)
+                    #ord_order = np.append(ord_order, ord)
+                    ord_ref_wl_air = np.append(ord_ref_wl_air, wlair[qq])
+                    ord_ref_wl_vac = np.append(ord_ref_wl_vac, wlvac[qq])
+            else:
+                if debug_level >= 1:
+                    print('NO LINE FOUND in MASTERTABLE!!!')
+        
+        
+        if debug_level >= 1:
+            print(str(len(ord_x)) + ' lines could initially be matched to known lines from MM line list')
+        
+        
+        # perform sanity-check 1D fit
+        order_fit = np.poly1d(np.polyfit(ord_x, ord_ref_wl_air, 3))
+        if debug_level >= 2:
+            plt.figure()
+            plt.title('Order '+str(ord+1).zfill(2))
+            plt.scatter(ord_x, ord_ref_wl_air, color='r')
+            plt.plot(xx, order_fit(xx))
+            plt.xlim(0,4111)
+        # remove obvious outliers
+        fitres = ord_ref_wl_air - order_fit(ord_x)
+        # do sigma clipping
+        goodres,goodix,badix = single_sigma_clip(fitres, 2, return_indices=True)
+        if debug_level >= 2:
+            plt.figure()
+            plt.title('Order '+str(ord+1).zfill(2)+'  -  residuals')
+            plt.plot(ord_x, fitres,'x-')
+            plt.scatter(ord_x[badix], fitres[badix], marker='o', color='red')
+            plt.xlim(0,4111)
+        # this does not work properly yet, do it manually for now
+#         while len(badix) > 0:
+#             ord_x = ord_x[goodix]
+#             ord_ref_wl_air = ord_ref_wl_air[goodix]
+#             ord_ref_wl_vac = ord_ref_wl_vac[goodix]
+#             order_fit = np.poly1d(np.polyfit(ord_x, ord_ref_wl_air, 3))
+#             fitres = ord_ref_wl_air - order_fit(ord_x)
+#             goodres,goodix,badix = single_sigma_clip(fitres, 2, return_indices=True)
+#             plt.clf()
+#             plt.plot(ord_x, fitres,'x')
+#             plt.scatter(ord_x[badix], fitres[badix], marker='o', color='red')
+        
+        ######################################################################
+        allix = np.arange(len(ord_x))
+        #badix = [2,4,8,9]
+        goodix = [ix for ix in allix if ix not in badix]
+        
+        ord_x = ord_x[goodix]
+        ord_ref_wl_air = ord_ref_wl_air[goodix]
+        ord_ref_wl_vac = ord_ref_wl_vac[goodix]
+        order_fit = np.poly1d(np.polyfit(ord_x, ord_ref_wl_air, 3))
+        fitres = ord_ref_wl_air - order_fit(ord_x)
+        plt.plot(ord_x, fitres,'x-')
+        ######################################################################
+        
+        # now we can fill the global arrays and save info to table 
+        if debug_level >= 1:
+            print(str(len(ord_x)) + ' good lines found in order ' + ordnum)
+        nlines = np.append(nlines, len(ord_x))
+        order = np.append(order, np.repeat(ord+1, len(ord_x)))
+        x = np.append(x, ord_x)
+        ref_wl_air = np.append(ref_wl_air, ord_ref_wl_air)
+        ref_wl_vac = np.append(ref_wl_vac, ord_ref_wl_vac)
+        if savetables:
+            outfile = open(outfn, 'a+')
+            for i in range(len(ord_x)):
+                outfile.write("   %3d             %2d                 %3d           %11.6f     %11.6f     %11.6f\n" %(i+1, int(ordnum), mord, ord_x[i], ord_ref_wl_air[i], ord_ref_wl_vac[i]))
+            outfile.close()                                                                                                                                                                        
+    #######################################################################################################################################
+    # end of loop over all orders
+    
+        
+    # go to normalized co-ordinates
+    x_norm = (x / ((len(data)-1)/2.)) - 1.
+    order_norm = ((order-1) / ((40-1)/2.)) - 1.
+
+    # call the 2D fitting routine
+    p_air = fit_poly_surface_2D(x_norm, order_norm, ref_wl_air, weights=None, polytype=polytype, poly_deg_x=deg_spectral, poly_deg_y=deg_spatial, debug_level=0)    
+    p_vac = fit_poly_surface_2D(x_norm, order_norm, ref_wl_vac, weights=None, polytype=polytype, poly_deg_x=deg_spectral, poly_deg_y=deg_spatial, debug_level=0)    
+    
+    if savetables:
+        # get residuals from fit
+        model_wl_air = p_air(x_norm, order_norm)
+        model_wl_vac = p_vac(x_norm, order_norm)
+        resid_air = ref_wl_air - model_wl_air
+        resid_vac = ref_wl_vac - model_wl_vac
+        now = datetime.datetime.now()
+        outfn2 = '/Users/christoph/OneDrive - UNSW/linelists/'+lamptype+'_lines_used_in_' + str(deg_spectral) + 'x' + str(deg_spatial) + '_fit_as_of_'+str(now)[:10]+'.dat'
+        outfile2 = open(outfn2, 'w')
+        outfile2.write('line number   order_number   physical_order_number     pixel       air_ref_wl[A]   vac_ref_wl[A]   air_model_wl[A]   vac_model_wl[A]   air_resid[A]   vac_resid[A] \n')
+        outfile2.write('===================================================================================================================================================================\n')
+        for i in range(len(x)):
+            outfile2.write("   %3d             %2d                 %3d           %11.6f     %11.6f     %11.6f     %11.6f       %11.6f    %11.6f    %11.6f\n" 
+                         %(i+1, order[i], order[i]+64, x[i], ref_wl_air[i], ref_wl_vac[i], model_wl_air[i], model_wl_vac[i], resid_air[i], resid_vac[i]))
+        outfile2.close()                                                                                                                                                                     
+
+    # evaluate for every pixel along each order
+    if return_full:
+        xxn = (xx / ((len(xx)-1)/2.)) - 1.
+        oo = np.arange(1,len(thflux)+1)
+        oon = ((oo-1) / ((len(thflux)-1)/2.)) - 1.   
+        X,O = np.meshgrid(xxn,oon)
+        p_air_wl = p_air(X,O)
+        p_vac_wl = p_vac(X,O)
+        return p_air_wl, p_vac_wl
+    else:
+        return p_air, p_vac
+    
+
+
+
+
+def define_arc_mask(lamptype, n_ord):
+
+    mask = np.zeros((n_ord,4112), dtype='bool')
+
+    if lamptype.lower() == 'thar':
+        mask[1, 3060:3140] = True
+        mask[2, 2340:2590] = True
+        mask[7, 1650:1870] = True
+        mask[7, 3550:3670] = True
+        mask[8, 1180:1450] = True
+        mask[8, 1560:1830] = True
+        mask[9, 2260:2420] = True
+        mask[10, 2920:3500] = True
+        mask[11, 500:1150] = True
+        mask[11, 2930:3260] = True
+        mask[12, 475:850] = True
+        mask[12, 2120:2320] = True
+        mask[14, 2640:2820] = True
+        mask[15, 2380:2685] = True
+        mask[16, 0:50] = True
+        mask[16, 3060:3160] = True
+        mask[16, 3265:3435] = True
+        mask[17, 785:960] = True
+        mask[17, 1100:1275] = True
+        mask[18, 1850:2050] = True
+        mask[22, 1326:1420] = True
+        mask[23, 1850:2050] = True
+        mask[24, 1390:1765] = True
+    elif lamptype.lower() == 'thxe':
+        print('WARNING: masks for ThXe lamp are not defined yet!!!!!')
+    else:
+        print('ERROR: lamp type must either be "ThAr" or "ThXe"!!!')
+        return -1
+    
+    return mask
+
+
+
+     
+
+def xcorr_thflux(thflux, thflux2, scale=300., masking=True, satmask=None, lamptype='thar', fitwidth=7):
+    
+    #########################
+    # preparation steps
+    #########################
+
+#     # trying to figure out the offsets between each fibre in dispersion direction
+#     path = '/Volumes/BERGRAID/data/veloce/dispsol_tests/20180917/'
+#     indfib_thflux = pyfits.getdata(path + 'ARC_ThAr_17sep30080_optimal3a_extracted.fits')
+#     indfib_thflux_so = pyfits.getdata(path + 'ARC_ThAr_17sep30080_optimal3a_extracted_with_slope_and_offset.fits')
+#     nfib = indfib_thflux.shape[1]
+#     thflux2 = pyfits.getdata(path +'ARC_ThAr_17sep30080_quick_extracted_39_orders.fits')
+#     n_ord = thflux2.shape[0]
+#     
+
+
+# evaluation steps afterwards:
+
+#     fibshift = np.zeros((nfib,n_ord))
+#     w_fibshift = np.zeros((nfib,n_ord))
+#     # fibshift2 = np.zeros((nfib,n_ord))
+#     # w_fibshift2 = np.zeros((nfib,n_ord))
+#     # fibshift3 = np.zeros((nfib,n_ord))
+#     # w_fibshift3 = np.zeros((nfib,n_ord))
+#     
+#     #loop over all fibres
+#     for i in np.arange(nfib):
+#         print('Fibre '+str(i+1).zfill(2))
+#         thflux = indfib_thflux[:,i,:]
+#         thflux2 = indfib_thflux[:,0,:]
+#         # fibshift[i,:], w_fibshift[i,:], fibshift2[i,:], w_fibshift2[i,:], fibshift3[i,:], w_fibshift3[i,:] = xcorr_thflux(thflux, thflux2)
+#         fibshift[i,:], w_fibshift[i,:] = xcorr_thflux(thflux, thflux2, masking=False)
+    
+    
+    if thflux.shape[0] == thflux2.shape[0]:
+    
+        shift = []
+#         shift2 = []
+#         shift3 = []
+        wshift = []
+#         wshift2 = []
+#         wshift3 = []
+    
+        # if not passed into the routine, define a mask that masks out saturated arc lines and some other crap
+        if masking:
+            if satmask is None:
+                n_ord = thflux.shape[0]
+                satmask = define_arc_mask(lamptype, n_ord)
+    
+        for o in np.arange(thflux.shape[0]):
+            
+            raw_data = thflux[o, :]
+            raw_data2 = thflux2[o, :]
+        
+            data = quick_bg_fix(raw_data)
+            data2 = quick_bg_fix(raw_data2)
+        
+            # NAN fix
+            data[np.isnan(data)] = 0.
+            data2[np.isnan(data2)] = 0.
+            
+            # mask out saturated lines
+            if masking:
+                ordmask = satmask[o, :]
+                data[ordmask] = 0. 
+        
+            # scale = 300
+            wdata = np.arcsinh(data / scale)
+            wdata2 = np.arcsinh(data2 / scale)
+        
+            xc = np.correlate(data, data2, mode='same')
+            wxc = np.correlate(wdata, wdata2, mode='same')
+        
+            # xrange = np.arange(np.argmax(xc) - fitwidth, np.argmax(xc) + fitwidth + 1, 1)
+            xrange = np.arange(2056 - fitwidth, 2056 + fitwidth + 1, 1)
+        
+            # fit Gauss-like function to central part of xcorr function
+            mod = Model(fibmodel_with_amp_and_offset)
+            # plain (naive) cross-correlation function
+            parms = lmfit.Parameters()
+            gmod = GaussianModel()
+            gparms = gmod.guess(xc[xrange],x=xrange)
+            parms.add('mu', gparms['center'], min=gparms['center'] - 2, max=gparms['center'] + 2)
+            parms.add('sigma', gparms['sigma'].value, min=1.)
+            parms.add('amp', gparms['height'], min=0.)
+            parms.add('beta', 2., min=0.1, max=10.)
+            parms.add('offset', np.min(xc[xrange]), min=0., max=np.max(xc[xrange]))
+            result = mod.fit(xc[xrange],parms,x=xrange,weights=None)
+            # "arcsinh-scaled"
+            wparms = lmfit.Parameters()
+            gwmod = GaussianModel()
+            gwparms = gwmod.guess(wxc[xrange],x=xrange)
+            wparms.add('mu', gwparms['center'], min=gwparms['center'] - 2, max=gwparms['center'] + 2)
+            wparms.add('sigma', gwparms['sigma'].value, min=1.)
+            wparms.add('amp', gwparms['height'], min=0.)
+            wparms.add('beta', 2., min=0.1, max=10.)
+            wparms.add('offset', np.min(wxc[xrange]), min=0., max=np.max(wxc[xrange]))
+            wresult = mod.fit(wxc[xrange],wparms,x=xrange,weights=None)
+#             # fit Gaussian and Lorentzian to central part of CCF
+#             mod2 = GaussianModel()
+#             mod3 = LorentzianModel()
+#             parms2 = mod2.guess(xc[xrange],x=xrange)
+#             parms3 = mod3.guess(xc[xrange],x=xrange)
+#             result2 = mod2.fit(xc[xrange],parms2,x=xrange,weights=None)
+#             result3 = mod3.fit(xc[xrange],parms3,x=xrange,weights=None)
+#             wparms2 = mod2.guess(wxc[xrange], x=xrange)
+#             wparms3 = mod3.guess(wxc[xrange], x=xrange)
+#             wresult2 = mod2.fit(wxc[xrange], wparms2, x=xrange, weights=None)
+#             wresult3 = mod3.fit(wxc[xrange], wparms3, x=xrange, weights=None)
+        
+        
+            # #plot it?
+            # plot_osf = 10
+            # plot_os_grid = np.linspace(xrange[0],xrange[-1],plot_osf * (len(xrange)-1) + 1)
+            # guessmodel = mod.eval(result.init_params,x=plot_os_grid)
+            # bestmodel = mod.eval(result.params,x=plot_os_grid)
+            # wguessmodel = mod.eval(wresult.init_params,x=plot_os_grid)
+            # wbestmodel = mod.eval(wresult.params,x=plot_os_grid)
+            # plt.plot(wxc, 'b.-')
+            # plt.plot(xrange, wxc[xrange], 'y.-')
+            # plt.xlim(np.argmax(xc) - 2*fitwidth, np.argmax(xc) + 2*fitwidth + 1)
+            # plt.plot(plot_os_grid, wguessmodel, 'r', label='initial guess')
+            # plt.plot(plot_os_grid, wbestmodel, 'g', label='best fit')
+            # plt.legend()
+            
+            mu = result.best_values['mu']
+            wmu = wresult.best_values['mu']
+#             mu2 = result2.best_values['center']
+#             wmu2 = wresult2.best_values['center']
+#             mu3 = result3.best_values['center']
+#             wmu3 = wresult3.best_values['center']
+            
+            shift.append(mu - (len(xc)//2))
+            wshift.append(wmu - (len(wxc)//2))
+#             shift2.append(mu2 - (len(xc)//2))
+#             wshift2.append(wmu2 - (len(wxc) // 2))
+#             shift3.append(mu3 - (len(xc)//2))
+#             wshift3.append(wmu3 - (len(wxc) // 2))
+
+    else:
+        print('ERROR: dimensions of "thflux" and "thflux2" do not agree!!!')
+        return -1
+    
+    # return np.median(shift), np.median(wshift), np.median(shift2), np.median(wshift2), np.median(shift3), np.median(wshift3)
+    # return shift, wshift, shift2, wshift2, shift3, wshift3
+    return shift, wshift
+
+
+
+
+
+def get_dispsol_from_known_lines(thflux, fibre=None, fitwidth=4, satmask=None, lamptype='thar', minsigma=0.4, maxsigma=2., sigma_0=0.85, minamp=0., maxamp=np.inf, return_all_pars=False, 
+                                 deg_spectral=7, deg_spatial=7, polytype='chebyshev', return_full=True, savetable=True, outpath=None, debug_level=0, timit=False):
+
+    #read master table
+    linenum, order, m, pix, wlref, vac_wlref, _, _, _, _ = readcol('/Users/christoph/OneDrive - UNSW/linelists/thar_lines_used_in_7x7_fit_as_of_2018-10-19.dat', twod=False, skipline=2)
+    del _
+   
+    xx = np.arange(thflux.shape[1])
+   
+    all_pix = []
+    all_wl = []
+    all_vac_wl = []
+    all_order = []
+    if return_all_pars:
+        allsigma = []
+        allamp = []
+        alloffset = []
+        allslope = []
+   
+    if satmask is None:
+        n_ord = thflux.shape[0]
+        satmask = define_arc_mask(lamptype, n_ord)
+   
+   
+    # loop over all orders
+    for ord in range(thflux.shape[0]):
+    
+        # order numbers for output file
+        ordnum = str(ord+1).zfill(2)
+        mord = (ord+1) + 64
+    
+        if debug_level >= 1:
+            print('Order ' + ordnum)
+        
+        #define raw 1-dim data
+        raw_data = thflux[ord,:]
+        
+        # clean up data
+        data = quick_bg_fix(raw_data)
+        
+        # mask out saturated lines
+        ordmask = satmask[ord,:]
+        data[ordmask] = 0.
+        
+        # select individual orders from master table
+        ix = np.argwhere(m == mord).flatten()
+        ord_pix = pix[ix]
+        ord_wl = wlref[ix]
+        ord_vac_wl = vac_wlref[ix]
+        
+        # some housekeeping...
+        new_ord_pix = []
+        new_ord_wl = []
+        new_ord_vac_wl = []
+        new_ord_order = []
+        if return_all_pars:
+            new_ord_sigma = []
+            new_ord_amp = []
+            new_ord_offset = []
+            new_ord_slope = []
+            
+        # loop over all good lines in that order
+        for xguess, wl, vac_wl in zip(ord_pix, ord_wl, ord_vac_wl):
+            if debug_level >= 2:
+                print(xguess)
+            peaks = np.r_[int(np.round(xguess, 0))] 
+            xrange = xx[np.max([0,peaks[0] - fitwidth]) : np.min([peaks[-1] + fitwidth + 1,len(data)-1])] 
+#             guess = np.array([xguess, sigma_0, data[int(np.round(xguess, 0))], np.min(data[xrange]), 0.])
+#             popt, pcov = op.curve_fit(gaussian_with_offset_and_slope, xrange, data[xrange], p0=guess, bounds=([xguess-2,minsigma,minamp,-np.inf,-np.inf],[xguess+2,maxsigma,maxamp,np.inf,np.inf]))
+            # shift the peak to roughly zero, so that offset has sensible values 
+            guess = np.array([xguess - peaks, sigma_0, np.max(data[xrange]), np.min(data[xrange]), 0.])
+            try:
+                popt, pcov = op.curve_fit(gaussian_with_offset_and_slope, xrange - peaks, data[xrange], p0=guess, 
+                                          bounds=([xguess-peaks-2,minsigma,minamp,-np.inf,-np.inf], [xguess-peaks+2,maxsigma,maxamp,np.inf,np.inf]))
+                
+                # remove rubbish fits (very low signal)
+                if popt[2] > 50 and np.max(data[xrange]) > 30:
+                    new_ord_pix.append(popt[0] + peaks)
+                    new_ord_wl.append(wl)
+                    new_ord_vac_wl.append(vac_wl)
+                    new_ord_order.append(ord)
+                    if return_all_pars:
+                        new_ord_sigma.append(popt[1])
+                        new_ord_amp.append(popt[2])
+                        new_ord_offset.append(popt[3])
+                        new_ord_slope.append(popt[4])
+                else:
+                    print('WARNING: not enough signal to fit a good peak at location', xguess)
+                    
+            except RuntimeError:
+                print('WARNING: failed to fit a peak at location', xguess)
+                
+#             # plot a single fit for debugging
+#             plot_osf = 10
+#             plot_os_grid = np.linspace((xrange-peaks)[0], (xrange-peaks)[-1], plot_osf * (len(xrange)-1) + 1)
+#             plt.plot(xx-peaks, data,'b.-')
+#             plt.plot(xrange-peaks, data[xrange],'y.-')
+#             plt.xlim(-10,10)
+#             plt.ylim(np.min(data[xrange]) - 0.25 * (np.max(data[xrange] - np.min(data[xrange]))), np.max(data[xrange]) + 0.25 * (np.max(data[xrange] - np.min(data[xrange])))) 
+#             plt.plot(plot_os_grid, gaussian_with_offset_and_slope(plot_os_grid, *guess),'r--', label='initial guess')
+#             plt.plot(plot_os_grid, gaussian_with_offset_and_slope(plot_os_grid, *popt),'g-', label='best fit')
+#             plt.axvline(popt[0], color='g', linestyle=':')
+#             plt.legend()
+#             plt.xlabel('pixel')
+#             plt.ylabel('counts')
+#             plt.text(5, np.max(data[xrange]) - 0.1 * (np.max(data[xrange] - np.min(data[xrange]))), 'mu = '+str(np.round(popt[0],4)))
+    
+        all_pix.append(new_ord_pix)
+        all_wl.append(new_ord_wl)
+        all_vac_wl.append(new_ord_vac_wl)
+        all_order.append(new_ord_order)
+        if return_all_pars:
+            allsigma.append(new_ord_sigma)
+            allamp.append(new_ord_amp)
+            alloffset.append(new_ord_offset)
+            allslope.append(new_ord_slope)
+            
+#     if return_all_pars:
+#         return all_pix, all_wl, all_vac_wl, allsigma, allamp, alloffset, allslope
+#     else:
+#         return all_pix, all_wl, all_vac_wl
+    
+    
+    # now make everything a simple 1-dim array
+    x = np.array([item for sublist in all_pix for item in sublist])
+    lam = np.array([item for sublist in all_wl for item in sublist])
+    vac_lam = np.array([item for sublist in all_vac_wl for item in sublist])
+    all_order_correct_format = np.array([item for sublist in all_order for item in sublist])
+    
+    # go to normalized co-ordinates
+    x_norm = np.squeeze( (x / ((len(data)-1)/2.)) - 1. )
+    order_norm = np.squeeze( ((all_order_correct_format) / ((40-1)/2.)) - 1. )
+    
+    # call the 2D fitting routine
+    p_air = fit_poly_surface_2D(x_norm, order_norm, lam, weights=None, polytype=polytype, poly_deg_x=deg_spectral, poly_deg_y=deg_spatial, debug_level=0)    
+    p_vac = fit_poly_surface_2D(x_norm, order_norm, vac_lam, weights=None, polytype=polytype, poly_deg_x=deg_spectral, poly_deg_y=deg_spatial, debug_level=0)  
+    
+    if savetable:
+        # get residuals from fit
+#         model_wl_air = p_air(x_norm, order_norm)
+#         model_wl_vac = p_vac(x_norm, order_norm)
+#         resid_air = lam - model_wl_air
+#         resid_vac = vac_lam - model_wl_vac
+        now = datetime.datetime.now()
+        if outpath is None:
+            outpath = '/Users/christoph/OneDrive - UNSW/linelists/'
+        if fibre is None:
+            outfn = outpath + lamptype + '_lines_as_of_'+str(now)[:10]+'.dat'
+        else:
+            outfn = outpath + lamptype + '_lines_fibre_' + fibre + '_as_of_'+str(now)[:10]+'.dat'
+        outfile = open(outfn, 'w')
+        outfile.write('line number   order_number   physical_order_number     pixel       air_ref_wl[A]   vac_ref_wl[A] \n') #  air_model_wl[A]   vac_model_wl[A]   air_resid[A]   vac_resid[A] \n')
+        outfile.write('=================================================================================================\n')
+        for i in range(len(x)):
+            outfile.write("   %3d             %2d                 %3d           %11.6f     %11.6f     %11.6f \n" #     %11.6f       %11.6f    %11.6f    %11.6f\n" 
+                         %(i+1, all_order_correct_format[i]+1, all_order_correct_format[i]+65, x[i], lam[i], vac_lam[i])) #, model_wl_air[i], model_wl_vac[i], resid_air[i], resid_vac[i]))
+        outfile.close()                                                                                                                                                                     
+
+    # evaluate for every pixel along each order
+    if return_full:
+        xxn = (xx / ((len(xx)-1)/2.)) - 1.
+        oo = np.arange(1,len(thflux)+1)
+        oon = ((oo-1) / ((len(thflux)-1)/2.)) - 1.   
+        X,O = np.meshgrid(xxn,oon)
+        p_air_wl = p_air(X,O)
+        p_vac_wl = p_vac(X,O)
+        return p_air_wl, p_vac_wl
+    else:
+        return p_air, p_vac
+    
+    
+
+
+
+
+
+def WIP():
+
+    #     if new_ordnum == 2:
+    #         mask = np.zeros(len(data), dtype='bool')
+    #         mask[1,:3060:3140] = True
+    #         data[mask] = 0
+    #     if new_ordnum == 3:
+    #         mask = np.zeros(len(data),dtype='bool')
+    #         mask[2340:2590] = True
+    #         data[mask] = 0
+    #     if new_ordnum == 8:
+    #         mask = np.zeros(len(data),dtype='bool')
+    #         mask[1650:1870] = True
+    #         mask[3550:3670] = True
+    #         data[mask] = 0
+    #     if new_ordnum == 9:
+    #         mask = np.zeros(len(data),dtype='bool')
+    #         mask[1180:1450] = True
+    #         mask[1560:1830] = True
+    #         data[mask] = 0
+    #     if new_ordnum == 10:
+    #         mask = np.zeros(len(data),dtype='bool')
+    #         mask[2260:2420] = True
+    #         data[mask] = 0
+    #     if new_ordnum == 11:
+    #         mask = np.zeros(len(data),dtype='bool')
+    #         mask[2920:3500] = True
+    #         data[mask] = 0
+    #     if new_ordnum == 12:
+    #         mask = np.zeros(len(data),dtype='bool')
+    #         mask[500:1150] = True
+    #         mask[2930:3260] = True
+    #         data[mask] = 0
+    #     if new_ordnum == 13:
+    #         mask = np.zeros(len(data),dtype='bool')
+    #         mask[475:850] = True
+    #         mask[2120:2320] = True
+    #         data[mask] = 0
+    #     if new_ordnum == 15:
+    #         mask = np.zeros(len(data), dtype='bool')
+    #         mask[2640:2820] = True
+    #         data[mask] = 0
+    #     if new_ordnum == 16:
+    #         mask = np.zeros(len(data), dtype='bool')
+    #         mask[2380:2685] = True
+    #         data[mask] = 0
+    #     if new_ordnum == 17:
+    #         mask = np.zeros(len(data),dtype='bool')
+    #         mask[0:50] = True
+    #         mask[3060:3160] = True
+    #         mask[3265:3435] = True
+    #         data[mask] = 0
+    #     if new_ordnum == 18:
+    #         mask = np.zeros(len(data),dtype='bool')
+    #         mask[785:960] = True
+    #         mask[1100:1275] = True
+    #         data[mask] = 0
+    #     if new_ordnum == 19:
+    #         mask = np.zeros(len(data), dtype='bool')
+    #         mask[1850:2050] = True
+    #         data[mask] = 0
+    #     if new_ordnum == 23:
+    #         mask = np.zeros(len(data), dtype='bool')
+    #         mask[1326:1420] = True
+    #         data[mask] = 0
+    #     if new_ordnum == 24:
+    #         mask = np.zeros(len(data), dtype='bool')
+    #         mask[1850:2050] = True
+    #         data[mask] = 0
+    #     if new_ordnum == 25:
+    #         mask = np.zeros(len(data), dtype='bool')
+    #         mask[1390:1765] = True
+    #         data[mask] = 0
+    
+    # nlines = np.array([12, 25, 28, 30, 27, 34, 25, 17, 23, 22, 23, 21, 25, 28, 27, 33, 33, 30, 36, 30, 33, 36, 36, 25, 29, 33, 40, 35, 30, 23, 29, 29, 35, 28, 25, 41, 36, 40, 31, 21])
+    
+    return
+
 
 
 

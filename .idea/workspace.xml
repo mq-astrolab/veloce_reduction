@@ -1,0 +1,940 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="ChangeListManager">
+    <list default="true" id="ca0d1622-3418-437b-9459-e791235d3c4e" name="Default" comment="">
+      <change beforePath="$PROJECT_DIR$/find_laser_peaks_2D.py" beforeDir="false" afterPath="$PROJECT_DIR$/find_laser_peaks_2D.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/flat_fielding.py" beforeDir="false" afterPath="$PROJECT_DIR$/flat_fielding.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/get_dispsol_from_spectrograph_file.py" beforeDir="false" afterPath="$PROJECT_DIR$/get_dispsol_from_spectrograph_file.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/get_radial_velocity.py" beforeDir="false" afterPath="$PROJECT_DIR$/get_radial_velocity.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/helper_functions.py" beforeDir="false" afterPath="$PROJECT_DIR$/helper_functions.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/linelists.py" beforeDir="false" afterPath="$PROJECT_DIR$/linelists.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/order_tracing.py" beforeDir="false" afterPath="$PROJECT_DIR$/order_tracing.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/plot_fwhm_map.py" beforeDir="false" afterPath="$PROJECT_DIR$/plot_fwhm_map.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/plots_for_dispsol.py" beforeDir="false" afterPath="$PROJECT_DIR$/plots_for_dispsol.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/pseudoslit_simulations.py" beforeDir="false" afterPath="$PROJECT_DIR$/pseudoslit_simulations.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/wavelength_solution.py" beforeDir="false" afterPath="$PROJECT_DIR$/wavelength_solution.py" afterDir="false" />
+    </list>
+    <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
+    <option name="TRACKING_ENABLED" value="true" />
+    <option name="SHOW_DIALOG" value="false" />
+    <option name="HIGHLIGHT_CONFLICTS" value="true" />
+    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
+    <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="FileEditorManager">
+    <leaf SIDE_TABS_SIZE_LIMIT_KEY="300">
+      <file leaf-file-name="main_script.py" pinned="false" current-in-tab="false">
+        <entry file="file://$PROJECT_DIR$/main_script.py">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="435">
+              <caret line="29" column="13" selection-start-line="29" selection-start-column="13" selection-end-line="29" selection-end-column="13" />
+              <folding>
+                <element signature="e#53#64#0" expanded="true" />
+              </folding>
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file leaf-file-name="calibration.py" pinned="false" current-in-tab="false">
+        <entry file="file://$PROJECT_DIR$/calibration.py">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="195">
+              <caret line="13" column="15" selection-start-line="13" selection-start-column="15" selection-end-line="13" selection-end-column="15" />
+              <folding>
+                <element signature="e#53#85#0" expanded="true" />
+                <element signature="e#381#1118#0" />
+                <element signature="e#1162#2019#0" />
+                <element signature="e#2124#6171#0" />
+                <element signature="e#6243#7127#0" />
+                <element signature="e#7222#9552#0" />
+                <element signature="e#9627#10183#0" />
+                <element signature="e#10306#17153#0" />
+                <element signature="e#17268#22676#0" />
+                <element signature="e#25570#30035#0" />
+                <element signature="e#30140#31623#0" />
+              </folding>
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file leaf-file-name="helper_functions.py" pinned="false" current-in-tab="false">
+        <entry file="file://$PROJECT_DIR$/helper_functions.py">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="9225">
+              <caret line="615" selection-start-line="615" selection-end-line="615" />
+              <folding>
+                <element signature="e#53#85#0" expanded="true" />
+                <element signature="e#23715#24291#0" />
+              </folding>
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file leaf-file-name="wavelength_solution.py" pinned="false" current-in-tab="false">
+        <entry file="file://$PROJECT_DIR$/wavelength_solution.py">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="7365">
+              <caret line="934" column="28" lean-forward="true" selection-start-line="934" selection-start-column="28" selection-end-line="934" selection-end-column="28" />
+              <folding>
+                <element signature="e#53#64#0" expanded="true" />
+                <element signature="e#943#6072#0" />
+                <element signature="e#17124#33935#0" />
+              </folding>
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file leaf-file-name="linelists.py" pinned="false" current-in-tab="true">
+        <entry file="file://$PROJECT_DIR$/linelists.py">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="207">
+              <caret line="137" column="8" lean-forward="true" selection-start-line="137" selection-start-column="8" selection-end-line="137" selection-end-column="8" />
+              <folding>
+                <element signature="e#53#71#0" expanded="true" />
+                <element signature="e#302#2694#0" />
+              </folding>
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file leaf-file-name="process_scripts.py" pinned="false" current-in-tab="false">
+        <entry file="file://$PROJECT_DIR$/process_scripts.py">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="1635">
+              <caret line="262" column="167" lean-forward="true" selection-start-line="262" selection-start-column="8" selection-end-line="262" selection-end-column="167" />
+              <folding>
+                <element signature="e#53#85#0" expanded="true" />
+                <element signature="e#951#9922#0" />
+              </folding>
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file leaf-file-name="background.py" pinned="false" current-in-tab="false">
+        <entry file="file://$PROJECT_DIR$/background.py">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="915">
+              <caret line="61" column="84" lean-forward="true" selection-start-line="61" selection-start-column="4" selection-end-line="61" selection-end-column="84" />
+              <folding>
+                <element signature="e#52#70#0" expanded="true" />
+                <element signature="e#11226#13790#0" />
+              </folding>
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file leaf-file-name="dirty_main_script.py" pinned="false" current-in-tab="false">
+        <entry file="file://$PROJECT_DIR$/dirty_main_script.py">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="120">
+              <caret line="8" selection-start-line="8" selection-end-line="8" selection-end-column="32" />
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file leaf-file-name="flat_fielding.py" pinned="false" current-in-tab="false">
+        <entry file="file://$PROJECT_DIR$/flat_fielding.py">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="1380">
+              <caret line="92" column="119" selection-start-line="92" selection-start-column="21" selection-end-line="92" selection-end-column="119" />
+              <folding>
+                <element signature="e#53#71#0" expanded="true" />
+              </folding>
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file leaf-file-name="spatial_profiles.py" pinned="false" current-in-tab="false">
+        <entry file="file://$PROJECT_DIR$/spatial_profiles.py">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="1875">
+              <caret line="125" column="6" selection-start-line="125" selection-start-column="6" selection-end-line="125" selection-end-column="6" />
+              <folding>
+                <element signature="e#52#87#0" expanded="true" />
+                <element signature="e#12251#21634#0" />
+                <element signature="e#21785#24433#0" />
+                <element signature="e#24582#27906#0" />
+                <element signature="e#28056#30817#0" />
+                <element signature="e#30988#33782#0" />
+                <element signature="e#33955#38725#0" />
+                <element signature="e#38906#46994#0" />
+              </folding>
+            </state>
+          </provider>
+        </entry>
+      </file>
+    </leaf>
+  </component>
+  <component name="FindInProjectRecents">
+    <findStrings>
+      <find>UNSW</find>
+      <find>find_suitable_peaks</find>
+      <find>gausslike</find>
+      <find>setv</find>
+      <find>header</find>
+      <find>median</find>
+      <find>datetime</find>
+      <find>get_simu_dispsol</find>
+      <find>pyfits</find>
+      <find>op.</find>
+      <find>gaussian_with_offset</find>
+      <find>mplot3d</find>
+      <find>interp</find>
+      <find>crop</find>
+    </findStrings>
+    <replaceStrings>
+      <replace>OneDrive - UNSW</replace>
+    </replaceStrings>
+  </component>
+  <component name="Git.Settings">
+    <option name="UPDATE_TYPE" value="MERGE" />
+    <option name="ROOT_SYNC" value="DONT_SYNC" />
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
+  </component>
+  <component name="IdeDocumentHistory">
+    <option name="CHANGED_PATHS">
+      <list>
+        <option value="$PROJECT_DIR$/optimal_extraction.py" />
+        <option value="$PROJECT_DIR$/../argon_dispsol_test.py" />
+        <option value="$PROJECT_DIR$/spatial_profiles.py" />
+        <option value="$PROJECT_DIR$/calibration.py" />
+        <option value="$PROJECT_DIR$/extraction.py" />
+        <option value="$PROJECT_DIR$/process_scripts.py" />
+        <option value="$PROJECT_DIR$/main_script.py" />
+        <option value="$PROJECT_DIR$/relative_intensities.py" />
+        <option value="$PROJECT_DIR$/find_laser_peaks_2D.py" />
+        <option value="$PROJECT_DIR$/flat_fielding.py" />
+        <option value="$PROJECT_DIR$/get_dispsol_from_spectrograph_file.py" />
+        <option value="$PROJECT_DIR$/get_radial_velocity.py" />
+        <option value="$PROJECT_DIR$/helper_functions.py" />
+        <option value="$PROJECT_DIR$/order_tracing.py" />
+        <option value="$PROJECT_DIR$/dirty_main_script.py" />
+        <option value="$PROJECT_DIR$/plot_fwhm_map.py" />
+        <option value="$PROJECT_DIR$/plots_for_dispsol.py" />
+        <option value="$PROJECT_DIR$/pseudoslit_simulations.py" />
+        <option value="$PROJECT_DIR$/wavelength_solution.py" />
+        <option value="$PROJECT_DIR$/linelists.py" />
+      </list>
+    </option>
+  </component>
+  <component name="ProjectFrameBounds">
+    <option name="x" value="2" />
+    <option name="y" value="23" />
+    <option name="width" value="1400" />
+    <option name="height" value="797" />
+  </component>
+  <component name="ProjectLevelVcsManager" settingsEditedManually="true" />
+  <component name="ProjectView">
+    <navigator proportions="" version="1">
+      <foldersAlwaysOnTop value="true" />
+    </navigator>
+    <panes>
+      <pane id="Scope" />
+      <pane id="ProjectPane">
+        <subPane>
+          <expand>
+            <path>
+              <item name="veloce_reduction" type="b2602c69:ProjectViewProjectNode" />
+              <item name="CMB_python_modules" type="462c0819:PsiDirectoryNode" />
+            </path>
+            <path>
+              <item name="veloce_reduction" type="b2602c69:ProjectViewProjectNode" />
+              <item name="CMB_python_modules" type="462c0819:PsiDirectoryNode" />
+              <item name="veloce_reduction" type="462c0819:PsiDirectoryNode" />
+            </path>
+          </expand>
+          <select />
+        </subPane>
+      </pane>
+    </panes>
+  </component>
+  <component name="PropertiesComponent">
+    <property name="last_opened_file_path" value="$PROJECT_DIR$" />
+    <property name="settings.editor.selected.configurable" value="com.jetbrains.python.configuration.PyActiveSdkModuleConfigurable" />
+  </component>
+  <component name="RunDashboard">
+    <option name="ruleStates">
+      <list>
+        <RuleState>
+          <option name="name" value="ConfigurationTypeDashboardGroupingRule" />
+        </RuleState>
+        <RuleState>
+          <option name="name" value="StatusDashboardGroupingRule" />
+        </RuleState>
+      </list>
+    </option>
+  </component>
+  <component name="SvnConfiguration">
+    <configuration />
+  </component>
+  <component name="TaskManager">
+    <task active="true" id="Default" summary="Default task">
+      <changelist id="ca0d1622-3418-437b-9459-e791235d3c4e" name="Default" comment="" />
+      <created>1503557793998</created>
+      <option name="number" value="Default" />
+      <option name="presentableId" value="Default" />
+      <updated>1503557793998</updated>
+    </task>
+    <task id="LOCAL-00001" summary="push functionalioty test">
+      <created>1526963270167</created>
+      <option name="number" value="00001" />
+      <option name="presentableId" value="LOCAL-00001" />
+      <option name="project" value="LOCAL" />
+      <updated>1526963270167</updated>
+    </task>
+    <task id="LOCAL-00002" summary="push functionalioty test">
+      <created>1526964511592</created>
+      <option name="number" value="00002" />
+      <option name="presentableId" value="LOCAL-00002" />
+      <option name="project" value="LOCAL" />
+      <updated>1526964511592</updated>
+    </task>
+    <task id="LOCAL-00003" summary="push functionalioty test">
+      <created>1526964540071</created>
+      <option name="number" value="00003" />
+      <option name="presentableId" value="LOCAL-00003" />
+      <option name="project" value="LOCAL" />
+      <updated>1526964540071</updated>
+    </task>
+    <task id="LOCAL-00004" summary="push functionalioty test">
+      <created>1526966575776</created>
+      <option name="number" value="00004" />
+      <option name="presentableId" value="LOCAL-00004" />
+      <option name="project" value="LOCAL" />
+      <updated>1526966575776</updated>
+    </task>
+    <task id="LOCAL-00005" summary="push functionalioty test">
+      <created>1526969093571</created>
+      <option name="number" value="00005" />
+      <option name="presentableId" value="LOCAL-00005" />
+      <option name="project" value="LOCAL" />
+      <updated>1526969093571</updated>
+    </task>
+    <task id="LOCAL-00006" summary="changed some directories to incorporate OneDrive">
+      <created>1527036257065</created>
+      <option name="number" value="00006" />
+      <option name="presentableId" value="LOCAL-00006" />
+      <option name="project" value="LOCAL" />
+      <updated>1527036257065</updated>
+    </task>
+    <task id="LOCAL-00007" summary="changed some directories to incorporate OneDrive">
+      <created>1527037293158</created>
+      <option name="number" value="00007" />
+      <option name="presentableId" value="LOCAL-00007" />
+      <option name="project" value="LOCAL" />
+      <updated>1527037293158</updated>
+    </task>
+    <task id="LOCAL-00008" summary="changed some directories to incorporate OneDrive">
+      <created>1527040075655</created>
+      <option name="number" value="00008" />
+      <option name="presentableId" value="LOCAL-00008" />
+      <option name="project" value="LOCAL" />
+      <updated>1527040075655</updated>
+    </task>
+    <task id="LOCAL-00009" summary="changed some directories to incorporate OneDrive">
+      <created>1527155536066</created>
+      <option name="number" value="00009" />
+      <option name="presentableId" value="LOCAL-00009" />
+      <option name="project" value="LOCAL" />
+      <updated>1527155536066</updated>
+    </task>
+    <task id="LOCAL-00010" summary="changed some directories to incorporate OneDrive">
+      <created>1527747707908</created>
+      <option name="number" value="00010" />
+      <option name="presentableId" value="LOCAL-00010" />
+      <option name="project" value="LOCAL" />
+      <updated>1527747707908</updated>
+    </task>
+    <task id="LOCAL-00011" summary="major revisions on &quot;pseudoslit_simulations&quot;, new module &quot;relative_intensities&quot;">
+      <created>1529378824270</created>
+      <option name="number" value="00011" />
+      <option name="presentableId" value="LOCAL-00011" />
+      <option name="project" value="LOCAL" />
+      <updated>1529378824271</updated>
+    </task>
+    <task id="LOCAL-00012" summary="rewrote fit_emission_lines_lmfit to use LMFIT package and incorporate different peak-like functions">
+      <created>1529403253859</created>
+      <option name="number" value="00012" />
+      <option name="presentableId" value="LOCAL-00012" />
+      <option name="project" value="LOCAL" />
+      <updated>1529403253859</updated>
+    </task>
+    <task id="LOCAL-00013" summary="fixed bug in wl-rebinning / interpolation in 'get_RV_from_xcorr'">
+      <created>1530153494884</created>
+      <option name="number" value="00013" />
+      <option name="presentableId" value="LOCAL-00013" />
+      <option name="project" value="LOCAL" />
+      <updated>1530153494884</updated>
+    </task>
+    <task id="LOCAL-00014" summary="minor improvements; added otf tests">
+      <created>1530679571031</created>
+      <option name="number" value="00014" />
+      <option name="presentableId" value="LOCAL-00014" />
+      <option name="project" value="LOCAL" />
+      <updated>1530679571031</updated>
+    </task>
+    <task id="LOCAL-00015" summary="update July 20, 2018">
+      <created>1532069571884</created>
+      <option name="number" value="00015" />
+      <option name="presentableId" value="LOCAL-00015" />
+      <option name="project" value="LOCAL" />
+      <updated>1532069571884</updated>
+    </task>
+    <task id="LOCAL-00016" summary="update July 27, 2018">
+      <created>1532675260349</created>
+      <option name="number" value="00016" />
+      <option name="presentableId" value="LOCAL-00016" />
+      <option name="project" value="LOCAL" />
+      <updated>1532675260349</updated>
+    </task>
+    <task id="LOCAL-00017" summary="update July 29, 2018&#10;included gain determination in &quot;extraction&quot;">
+      <created>1532860850002</created>
+      <option name="number" value="00017" />
+      <option name="presentableId" value="LOCAL-00017" />
+      <option name="project" value="LOCAL" />
+      <updated>1532860850002</updated>
+    </task>
+    <task id="LOCAL-00018" summary="update July 29, 2018&#10;included gain determination in &quot;extraction&quot;">
+      <created>1532860981277</created>
+      <option name="number" value="00018" />
+      <option name="presentableId" value="LOCAL-00018" />
+      <option name="project" value="LOCAL" />
+      <updated>1532860981277</updated>
+    </task>
+    <task id="LOCAL-00019" summary="update July 29, 2018&#10;included gain determination in &quot;extraction&quot;">
+      <created>1532861007475</created>
+      <option name="number" value="00019" />
+      <option name="presentableId" value="LOCAL-00019" />
+      <option name="project" value="LOCAL" />
+      <updated>1532861007475</updated>
+    </task>
+    <task id="LOCAL-00020" summary="update July 29, 2018&#10;included gain determination in &quot;extraction&quot;">
+      <created>1532861032333</created>
+      <option name="number" value="00020" />
+      <option name="presentableId" value="LOCAL-00020" />
+      <option name="project" value="LOCAL" />
+      <updated>1532861032333</updated>
+    </task>
+    <task id="LOCAL-00021" summary="update Aug 01, 2018&#10;mainly added to calibration routines">
+      <created>1533104910639</created>
+      <option name="number" value="00021" />
+      <option name="presentableId" value="LOCAL-00021" />
+      <option name="project" value="LOCAL" />
+      <updated>1533104910639</updated>
+    </task>
+    <task id="LOCAL-00022" summary="update Aug 02, 2018&#10;mainly changed the error treatment/propagation in &quot;extraction&quot;">
+      <created>1533203322558</created>
+      <option name="number" value="00022" />
+      <option name="presentableId" value="LOCAL-00022" />
+      <option name="project" value="LOCAL" />
+      <updated>1533203322559</updated>
+    </task>
+    <task id="LOCAL-00023" summary="update Aug 06, 2018&#10;some minor changes to &quot;spatial_profiles&quot;&#10;also added a bit of commentary">
+      <created>1533544044409</created>
+      <option name="number" value="00023" />
+      <option name="presentableId" value="LOCAL-00023" />
+      <option name="project" value="LOCAL" />
+      <updated>1533544044409</updated>
+    </task>
+    <task id="LOCAL-00024" summary="update Aug 07, 2018&#10;fixed bug in &quot;spatial_profiles.determine_spatial_profiles_single_order&quot; when calculating weights for fitting; also various other minor changes">
+      <created>1533625922105</created>
+      <option name="number" value="00024" />
+      <option name="presentableId" value="LOCAL-00024" />
+      <option name="project" value="LOCAL" />
+      <updated>1533625922105</updated>
+    </task>
+    <task id="LOCAL-00025" summary="update Aug 10, 2018&#10;added affine transformation matrix routine for 2D peak tracing;&#10;added dummy spectra from linelist creation routines;&#10;various other minor changes">
+      <created>1533881378212</created>
+      <option name="number" value="00025" />
+      <option name="presentableId" value="LOCAL-00025" />
+      <option name="project" value="LOCAL" />
+      <updated>1533881378212</updated>
+    </task>
+    <task id="LOCAL-00026" summary="2nd update Aug 10, 2018&#10;added &quot;get_wl&quot; to &quot;wavelength_solution.py&quot;">
+      <created>1533885602382</created>
+      <option name="number" value="00026" />
+      <option name="presentableId" value="LOCAL-00026" />
+      <option name="project" value="LOCAL" />
+      <updated>1533885602382</updated>
+    </task>
+    <task id="LOCAL-00027" summary="2nd update Aug 10, 2018&#10;added &quot;get_wl&quot; to &quot;wavelength_solution.py&quot;">
+      <created>1533885755179</created>
+      <option name="number" value="00027" />
+      <option name="presentableId" value="LOCAL-00027" />
+      <option name="project" value="LOCAL" />
+      <updated>1533885755179</updated>
+    </task>
+    <task id="LOCAL-00028" summary="2nd update Aug 10, 2018&#10;added &quot;get_wl&quot; to &quot;wavelength_solution.py&quot;">
+      <created>1533885969361</created>
+      <option name="number" value="00028" />
+      <option name="presentableId" value="LOCAL-00028" />
+      <option name="project" value="LOCAL" />
+      <updated>1533885969361</updated>
+    </task>
+    <task id="LOCAL-00029" summary="update Aug 13, 2018&#10;added barycentric correction to &quot;process_science_images&quot;;&#10;changed orientation of pseudoslit in &quot;append_relints_to_FITS&quot;">
+      <created>1534158336404</created>
+      <option name="number" value="00029" />
+      <option name="presentableId" value="LOCAL-00029" />
+      <option name="project" value="LOCAL" />
+      <updated>1534158336404</updated>
+    </task>
+    <option name="localTasksCounter" value="30" />
+    <servers />
+  </component>
+  <component name="TodoView" selected-index="1">
+    <todo-panel id="selected-file">
+      <is-autoscroll-to-source value="true" />
+    </todo-panel>
+    <todo-panel id="all">
+      <are-packages-shown value="true" />
+      <is-autoscroll-to-source value="true" />
+    </todo-panel>
+  </component>
+  <component name="ToolWindowManager">
+    <frame x="2" y="23" width="1400" height="797" extended-state="0" />
+    <layout>
+      <window_info active="true" content_ui="combo" id="Project" order="0" visible="true" weight="0.25" />
+      <window_info anchor="bottom" id="TODO" order="6" weight="0.32918397" />
+      <window_info anchor="bottom" id="Event Log" order="7" sideWeight="0.5007143" side_tool="true" weight="0.32921812" />
+      <window_info anchor="bottom" id="Run" order="2" />
+      <window_info anchor="bottom" id="Version Control" order="7" sideWeight="0.49928573" weight="0.32921812" />
+      <window_info anchor="bottom" id="Python Console" order="7" visible="true" weight="0.24896266" />
+      <window_info id="Structure" order="1" side_tool="true" weight="0.25" />
+      <window_info anchor="bottom" id="Terminal" order="7" />
+      <window_info anchor="bottom" id="Debug" order="3" weight="0.4" />
+      <window_info id="Favorites" order="2" side_tool="true" />
+      <window_info anchor="right" content_ui="combo" id="Hierarchy" order="2" weight="0.25" />
+      <window_info anchor="right" id="Commander" order="0" weight="0.4" />
+      <window_info anchor="right" id="Ant Build" order="1" weight="0.25" />
+      <window_info anchor="right" id="Data View" order="3" />
+      <window_info anchor="bottom" id="Message" order="0" />
+      <window_info anchor="bottom" id="Inspection" order="5" weight="0.4" />
+      <window_info anchor="bottom" id="Cvs" order="4" weight="0.25" />
+      <window_info anchor="bottom" id="Find" order="1" />
+    </layout>
+  </component>
+  <component name="VcsContentAnnotationSettings">
+    <option name="myLimit" value="2678400000" />
+  </component>
+  <component name="VcsManagerConfiguration">
+    <option name="CHECK_NEW_TODO" value="false" />
+    <MESSAGE value="push functionalioty test" />
+    <MESSAGE value="changed some directories to incorporate OneDrive" />
+    <MESSAGE value="major revisions on &quot;pseudoslit_simulations&quot;, new module &quot;relative_intensities&quot;" />
+    <MESSAGE value="rewrote fit_emission_lines_lmfit to use LMFIT package and incorporate different peak-like functions" />
+    <MESSAGE value="fixed bug in wl-rebinning / interpolation in 'get_RV_from_xcorr'" />
+    <MESSAGE value="minor improvements; added otf tests" />
+    <MESSAGE value="update July 20, 2018" />
+    <MESSAGE value="update July 27, 2018" />
+    <MESSAGE value="update July 29, 2018&#10;included gain determination in &quot;extraction&quot;" />
+    <MESSAGE value="update Aug 01, 2018&#10;mainly added to calibration routines" />
+    <MESSAGE value="update Aug 02, 2018&#10;mainly changed the error treatment/propagation in &quot;extraction&quot;" />
+    <MESSAGE value="update Aug 06, 2018&#10;some minor changes to &quot;spatial_profiles&quot;&#10;also added a bit of commentary" />
+    <MESSAGE value="update Aug 07, 2018&#10;fixed bug in &quot;spatial_profiles.determine_spatial_profiles_single_order&quot; when calculating weights for fitting; also various other minor changes" />
+    <MESSAGE value="update Aug 10, 2018&#10;added affine transformation matrix routine for 2D peak tracing;&#10;added dummy spectra from linelist creation routines;&#10;various other minor changes" />
+    <MESSAGE value="2nd update Aug 10, 2018&#10;added &quot;get_wl&quot; to &quot;wavelength_solution.py&quot;" />
+    <MESSAGE value="update Aug 13, 2018&#10;added barycentric correction to &quot;process_science_images&quot;;&#10;changed orientation of pseudoslit in &quot;append_relints_to_FITS&quot;" />
+    <option name="LAST_COMMIT_MESSAGE" value="update Aug 13, 2018&#10;added barycentric correction to &quot;process_science_images&quot;;&#10;changed orientation of pseudoslit in &quot;append_relints_to_FITS&quot;" />
+  </component>
+  <component name="XDebuggerManager">
+    <breakpoint-manager>
+      <breakpoints>
+        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
+          <url>file://$PROJECT_DIR$/pseudoslit_simulations.py</url>
+          <line>225</line>
+        </line-breakpoint>
+      </breakpoints>
+      <option name="time" value="5" />
+    </breakpoint-manager>
+  </component>
+  <component name="editorHistoryManager">
+    <entry file="file://$PROJECT_DIR$/order_tracing.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="1785">
+          <caret line="424" column="41" selection-start-line="424" selection-start-column="9" selection-end-line="424" selection-end-column="41" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/wavelength_solution.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="11235">
+          <caret line="765" selection-start-line="765" selection-end-line="765" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/get_radial_velocity.py">
+      <provider selected="true" editor-type-id="text-editor" />
+    </entry>
+    <entry file="file://$PROJECT_DIR$/flat_fielding.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="315">
+          <caret line="68" column="10" selection-start-line="68" selection-start-column="10" selection-end-line="68" selection-end-column="10" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/../argon_dispsol_test.py">
+      <provider selected="true" editor-type-id="text-editor" />
+    </entry>
+    <entry file="file://$PROJECT_DIR$/__init__.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="30">
+          <caret line="2" column="23" selection-start-line="2" selection-start-column="23" selection-end-line="2" selection-end-column="23" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/pseudoslit_simulations.py">
+      <provider selected="true" editor-type-id="text-editor" />
+    </entry>
+    <entry file="file://$PROJECT_DIR$/wavelength_solution.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="11700">
+          <caret line="780" lean-forward="true" selection-start-line="780" selection-end-line="780" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/get_radial_velocity.py">
+      <provider selected="true" editor-type-id="text-editor" />
+    </entry>
+    <entry file="file://$PROJECT_DIR$/main_script.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="690">
+          <caret line="46" lean-forward="true" selection-start-line="46" selection-end-line="46" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/__init__.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="30">
+          <caret line="2" column="23" selection-start-line="2" selection-start-column="23" selection-end-line="2" selection-end-column="23" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/pseudoslit_simulations.py">
+      <provider selected="true" editor-type-id="text-editor" />
+    </entry>
+    <entry file="file://$PROJECT_DIR$/main_script.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="345">
+          <caret line="23" column="27" selection-start-line="23" selection-end-line="23" selection-end-column="27" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/__init__.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="30">
+          <caret line="2" column="23" selection-start-line="2" selection-start-column="23" selection-end-line="2" selection-end-column="23" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/pseudoslit_simulations.py">
+      <provider selected="true" editor-type-id="text-editor" />
+    </entry>
+    <entry file="file://$PROJECT_DIR$/main_script.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="345">
+          <caret line="23" column="27" lean-forward="true" selection-start-line="23" selection-end-line="23" selection-end-column="27" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/__init__.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="30">
+          <caret line="2" column="23" selection-start-line="2" selection-start-column="23" selection-end-line="2" selection-end-column="23" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/pseudoslit_simulations.py">
+      <provider selected="true" editor-type-id="text-editor" />
+    </entry>
+    <entry file="file://$PROJECT_DIR$/main_script.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="90">
+          <caret line="6" column="31" selection-start-line="6" selection-end-line="6" selection-end-column="31" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/__init__.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="30">
+          <caret line="2" column="23" selection-start-line="2" selection-start-column="23" selection-end-line="2" selection-end-column="23" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/__init__.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="30">
+          <caret line="2" column="23" selection-start-line="2" selection-start-column="23" selection-end-line="2" selection-end-column="23" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$APPLICATION_CONFIG_DIR$/consoles/ide/ide-scripting.groovy">
+      <provider selected="true" editor-type-id="text-editor" />
+    </entry>
+    <entry file="file://$PROJECT_DIR$/optimal_extraction.py" />
+    <entry file="file://$PROJECT_DIR$/quick_extract.py" />
+    <entry file="file://$PROJECT_DIR$/../argon_dispsol_test.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="2325">
+          <caret line="155" column="28" selection-start-line="155" selection-start-column="28" selection-end-line="155" selection-end-column="28" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/otf_template_script.py">
+      <provider selected="true" editor-type-id="text-editor" />
+    </entry>
+    <entry file="file://$PROJECT_DIR$/README.md">
+      <provider selected="true" editor-type-id="text-editor" />
+    </entry>
+    <entry file="file://$PROJECT_DIR$/cosmic_ray_removal.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state>
+          <folding>
+            <element signature="e#46#71#0" expanded="true" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/create_master_frames.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="225">
+          <caret line="15" column="37" selection-start-line="15" selection-start-column="37" selection-end-line="15" selection-end-column="37" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/extraction.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="14280">
+          <caret line="1010" column="57" lean-forward="true" selection-start-line="1010" selection-start-column="57" selection-end-line="1010" selection-end-column="57" />
+          <folding>
+            <element signature="e#53#71#0" expanded="true" />
+            <element signature="e#651#3158#0" />
+            <element signature="e#51077#52842#0" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/find_laser_peaks_2D.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="26">
+          <caret line="13" selection-start-line="13" selection-end-line="13" />
+          <folding>
+            <element signature="e#53#64#0" expanded="true" />
+            <element signature="e#1542#6547#0" />
+            <element signature="e#6627#7504#0" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/get_dispsol_from_spectrograph_file.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="165">
+          <caret line="11" lean-forward="true" selection-start-line="11" selection-end-line="11" />
+          <folding>
+            <element signature="e#52#70#0" expanded="true" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/get_info_from_headers.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="240">
+          <caret line="16" column="28" selection-start-line="16" selection-start-column="28" selection-end-line="16" selection-end-column="28" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/get_profile_parameters.py">
+      <provider selected="true" editor-type-id="text-editor" />
+    </entry>
+    <entry file="file://$PROJECT_DIR$/get_radial_velocity.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="139">
+          <caret line="12" column="108" selection-start-line="12" selection-start-column="108" selection-end-line="12" selection-end-column="108" />
+          <folding>
+            <element signature="e#5328#14038#0" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/linalg.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state>
+          <folding>
+            <element signature="e#165#2468#0" />
+            <element signature="e#2545#3740#0" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/order_tracing.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="225">
+          <caret line="15" column="37" selection-start-line="15" selection-start-column="37" selection-end-line="15" selection-end-column="37" />
+          <folding>
+            <element signature="e#51#82#0" expanded="true" />
+            <element signature="e#826#8401#0" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/plot_fwhm_map.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="105">
+          <caret line="7" column="18" selection-start-line="7" selection-start-column="18" selection-end-line="7" selection-end-column="18" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/plots_for_dispsol.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="-4135">
+          <caret line="13" lean-forward="true" selection-start-line="13" selection-end-line="13" />
+          <folding>
+            <element signature="e#53#71#0" expanded="true" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/pseudoslit_simulations.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="240">
+          <caret line="16" column="36" lean-forward="true" selection-start-line="16" selection-start-column="36" selection-end-line="16" selection-end-column="36" />
+          <folding>
+            <element signature="e#53#71#0" expanded="true" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/relative_intensities.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="2625">
+          <caret line="598" column="26" selection-start-line="598" selection-start-column="26" selection-end-line="598" selection-end-column="26" />
+          <folding>
+            <element signature="e#53#84#0" expanded="true" />
+            <element signature="e#689#8714#0" />
+            <element signature="e#8934#16521#0" />
+            <element signature="e#16680#22085#0" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/spatial_profiles.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="1875">
+          <caret line="125" column="6" selection-start-line="125" selection-start-column="6" selection-end-line="125" selection-end-column="6" />
+          <folding>
+            <element signature="e#52#87#0" expanded="true" />
+            <element signature="e#12251#21634#0" />
+            <element signature="e#21785#24433#0" />
+            <element signature="e#24582#27906#0" />
+            <element signature="e#28056#30817#0" />
+            <element signature="e#30988#33782#0" />
+            <element signature="e#33955#38725#0" />
+            <element signature="e#38906#46994#0" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/calibration.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="195">
+          <caret line="13" column="15" selection-start-line="13" selection-start-column="15" selection-end-line="13" selection-end-column="15" />
+          <folding>
+            <element signature="e#53#85#0" expanded="true" />
+            <element signature="e#381#1118#0" />
+            <element signature="e#1162#2019#0" />
+            <element signature="e#2124#6171#0" />
+            <element signature="e#6243#7127#0" />
+            <element signature="e#7222#9552#0" />
+            <element signature="e#9627#10183#0" />
+            <element signature="e#10306#17153#0" />
+            <element signature="e#17268#22676#0" />
+            <element signature="e#25570#30035#0" />
+            <element signature="e#30140#31623#0" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/main_script.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="435">
+          <caret line="29" column="13" selection-start-line="29" selection-start-column="13" selection-end-line="29" selection-end-column="13" />
+          <folding>
+            <element signature="e#53#64#0" expanded="true" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/dirty_main_script.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="120">
+          <caret line="8" selection-start-line="8" selection-end-line="8" selection-end-column="32" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/background.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="915">
+          <caret line="61" column="84" lean-forward="true" selection-start-line="61" selection-start-column="4" selection-end-line="61" selection-end-column="84" />
+          <folding>
+            <element signature="e#52#70#0" expanded="true" />
+            <element signature="e#11226#13790#0" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/process_scripts.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="1635">
+          <caret line="262" column="167" lean-forward="true" selection-start-line="262" selection-start-column="8" selection-end-line="262" selection-end-column="167" />
+          <folding>
+            <element signature="e#53#85#0" expanded="true" />
+            <element signature="e#951#9922#0" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/helper_functions.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="9225">
+          <caret line="615" selection-start-line="615" selection-end-line="615" />
+          <folding>
+            <element signature="e#53#85#0" expanded="true" />
+            <element signature="e#23715#24291#0" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/flat_fielding.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="1380">
+          <caret line="92" column="119" selection-start-line="92" selection-start-column="21" selection-end-line="92" selection-end-column="119" />
+          <folding>
+            <element signature="e#53#71#0" expanded="true" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/wavelength_solution.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="7365">
+          <caret line="934" column="28" lean-forward="true" selection-start-line="934" selection-start-column="28" selection-end-line="934" selection-end-column="28" />
+          <folding>
+            <element signature="e#53#64#0" expanded="true" />
+            <element signature="e#943#6072#0" />
+            <element signature="e#17124#33935#0" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/linelists.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="207">
+          <caret line="137" column="8" lean-forward="true" selection-start-line="137" selection-start-column="8" selection-end-line="137" selection-end-column="8" />
+          <folding>
+            <element signature="e#53#71#0" expanded="true" />
+            <element signature="e#302#2694#0" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+  </component>
+</project>

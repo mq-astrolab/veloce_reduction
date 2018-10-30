@@ -274,13 +274,13 @@ def process_science_images(imglist, P_id, mask=None, sampling_size=25, slit_heig
         #adjust errors?
 
         # (5) extract stripes
-        stripes,stripe_indices = extract_stripes(final_img, P_id, return_indices=True, slit_height=slit_height, savefiles=True, obsname=obsname, path=path, timit=True)
+        stripes,stripe_indices = extract_stripes(final_img, P_id, return_indices=True, slit_height=slit_height, savefiles=saveall, obsname=obsname, path=path, timit=True)
         if not from_indices:
             err_stripes = extract_stripes(err_img, P_id, return_indices=False, slit_height=slit_height, savefiles=True, obsname=obsname+'_err', path=path, timit=True)
 
         # (6) perform extraction of 1-dim spectrum
         if from_indices:
-            # pix,flux,err = extract_spectrum_from_indices(final_img, err_img, stripe_indices, method='quick', slit_height=25, RON=ronmask, savefile=True, 
+            # pix,flux,err = extract_spectrum_from_indices(final_img, err_img, stripe_indices, method='quick', slit_height=22, RON=ronmask, savefile=True,
             #                                              filetype='fits', obsname=obsname, path=path, timit=True)
             pix,flux,err = extract_spectrum_from_indices(final_img, err_img, stripe_indices, method=ext_method, slit_height=slit_height, RON=ronmask, savefile=True, 
                                                          filetype='fits', obsname=obsname, path=path, timit=True)

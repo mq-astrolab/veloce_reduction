@@ -549,7 +549,7 @@ def polyval2d(x, y, m):
 
 
 
-def fit_poly_surface_2D(x_norm, y_norm, z, weights=None, polytype = 'chebyshev', poly_deg=5, timit=False, debug_level=0):
+def fit_poly_surface_2D(x_norm, y_norm, z, weights=None, polytype = 'chebyshev', poly_deg_x=5, poly_deg_y=None, timit=False, debug_level=0):
     """
     Calculate 2D polynomial fit to normalized x and y values.
     Wrapper function for using the astropy fitting library.
@@ -571,16 +571,19 @@ def fit_poly_surface_2D(x_norm, y_norm, z, weights=None, polytype = 'chebyshev',
     if timit:
         start_time = time.time()
     
+    if poly_deg_y is None:
+        poly_deg_y = poly_deg_x
+    
     if polytype.lower() in ['p','polynomial']:
-        p_init = models.Polynomial2D(poly_deg)
+        p_init = models.Polynomial2D(poly_deg_x)
         if debug_level > 0:
             print('OK, using standard polynomials...')
     elif polytype.lower() in ['c','chebyshev']:
-        p_init = models.Chebyshev2D(poly_deg,poly_deg)
+        p_init = models.Chebyshev2D(poly_deg_x,poly_deg_y)
         if debug_level > 0:
             print('OK, using Chebyshev polynomials...')
     elif polytype.lower() in ['l','legendre']:
-        p_init = models.Legendre2D(poly_deg,poly_deg)  
+        p_init = models.Legendre2D(poly_deg_x,poly_deg_y)  
         if debug_level > 0:
             print('OK, using Legendre polynomials...')   
     else:
@@ -661,6 +664,58 @@ def binary_indices(x):
     return np.flatnonzero(np.array(intlist))
     
     
+   
+def single_sigma_clip(x, tl, th=None, centre='median', return_indices=False):
+    """
+    Perform sigma-clipping of 1D array.
+    
+    INPUT:
+    'x'              : the 1D array to be sigma-clipped
+    'tl'             : lower threshold (in terms of sigma)
+    'th'             : higher threshold (in terms of sigma) (if only one threshold is given then th=tl=t)
+    'centre'         : method to determine the centre ('median' or 'mean')
+    'return_indices' : boolean - do you also want to return the index masks of the unclipped and clipped data points?
+    
+    OUTPUT:
+    'x'  : the now sigma-clipped array
+
+    TODO:
+    implement return_indices keyword
+    """
+    
+    #make sure both boundaries are defined
+    if th is None:
+        th = tl
+    
+    clipped = x.copy()
+
+    # want to return indices, not boolean array with True and False
+    if return_indices:
+        indices = np.arange(len(x))
+    
+    rms = np.std(clipped)
+    if centre.lower() == 'median':
+        bad_high = clipped - np.median(clipped) > th*rms
+        bad_low = np.median(clipped) - clipped > tl*rms
+    elif centre.lower() == 'mean':
+        bad_high = clipped - np.mean(clipped) > th*rms
+        bad_low = np.mean(clipped) - clipped > tl*rms
+    else:
+        print('ERROR: Method for computing centre must be "median" or "mean"')
+        return
+    
+    goodix = ~bad_high & ~bad_low
+    badix = ~goodix
+    clipped = clipped[goodix]
+
+    if return_indices:
+        goodix = indices[goodix]
+        badix = indices[badix]
+        return clipped, goodix.astype(int), badix.astype(int)
+    else:
+        return clipped   
+   
+   
     
 def sigma_clip(x, tl, th=None, centre='median', return_indices=False):
     """
@@ -714,7 +769,7 @@ def sigma_clip(x, tl, th=None, centre='median', return_indices=False):
     if return_indices:
         goodix = np.array(sorted(list(set(all_indices) - set(badix))))
         badix = np.array(sorted(badix))
-        return clipped, goodix, badix
+        return clipped, goodix.astype(int), badix.astype(int)
     else:
         return clipped
     
