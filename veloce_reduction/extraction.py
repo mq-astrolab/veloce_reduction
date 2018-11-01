@@ -10,7 +10,7 @@ import datetime
 import astropy.io.fits as pyfits
 import os
 
-from veloce_reduction.veloce_reduction.helper_functions import fibmodel_with_amp, make_norm_profiles_4, short_filenames
+from veloce_reduction.veloce_reduction.helper_functions import fibmodel_with_amp, make_norm_profiles_5, short_filenames
 from veloce_reduction.veloce_reduction.spatial_profiles import fit_single_fibre_profile
 from veloce_reduction.veloce_reduction.linalg import linalg_extract_column
 from veloce_reduction.veloce_reduction.order_tracing import flatten_single_stripe, flatten_single_stripe_from_indices, extract_stripes
@@ -327,7 +327,7 @@ def optimal_extraction(stripes, err_stripes=None, ron_stripes=None, nfib=24, RON
         # fibparms = np.load('/Users/christoph/OneDrive - UNSW/fibre_profiles/real/first_real_veloce_test_fps.npy').item()
         # fibparms = np.load('/Users/christoph/OneDrive - UNSW/fibre_profiles/real/from_master_white_40orders.npy').item()
         # fibparms = np.load('/Users/christoph/OneDrive - UNSW/fibre_profiles/fibre_profile_fits_20180925.npy').item()
-        fibparms = np.load('/Users/christoph/OneDrive - UNSW/fibre_profiles/fibre_profile_fits_20181031.npy').item()
+        fibparms = np.load('/Users/christoph/OneDrive - UNSW/fibre_profiles/fibre_profile_fits_20181101.npy').item()
 
     flux = {}
     err = {}
@@ -445,7 +445,7 @@ def optimal_extraction(stripes, err_stripes=None, ron_stripes=None, nfib=24, RON
                     # phi = make_norm_profiles(sr[:,i], ord, i, fibparms)
                     # phi = make_norm_profiles_temp(sr[:,i], ord, i, fibparms)
                     # phi = make_norm_single_profile_temp(sr[:,i], ord, i, fibparms)
-                    phi = make_norm_profiles_4(sr[:, i], i, fppo, integrate=integrate_profiles, slope=slope, offset=offset, fibs='all')
+                    phi = make_norm_profiles_5(sr[:, i], i, fppo, integrate=integrate_profiles, slope=slope, offset=offset, fibs='all')
 
             # print('WARNING: TEMPORARY offset correction is not commented out!!!')
             # # subtract the median as the offset if BG is not properly corrected for
@@ -568,8 +568,8 @@ def optimal_extraction_from_indices(img, stripe_indices, err_img=None, nfib=24, 
         # fibparms = np.load('/Users/christoph/OneDrive - UNSW/fibre_profiles/real/first_real_veloce_test_fps.npy').item()
         # fibparms = np.load('/Users/christoph/OneDrive - UNSW/fibre_profiles/real/from_master_white_40orders.npy').item()
         # fibparms = np.load('/Users/christoph/OneDrive - UNSW/fibre_profiles/fibre_profile_fits_20180925.npy').item()
-        print('Loading NEW fibre profile parameters...')
-        fibparms = np.load('/Users/christoph/OneDrive - UNSW/fibre_profiles/fibre_profile_fits_20181031.npy').item()
+        print('Oha! Loading NEW fibre profile parameters...')
+        fibparms = np.load('/Users/christoph/OneDrive - UNSW/fibre_profiles/fibre_profile_fits_20181101.npy').item()
 
     flux = {}
     err = {}
@@ -692,7 +692,7 @@ def optimal_extraction_from_indices(img, stripe_indices, err_img=None, nfib=24, 
                     # phi = make_norm_profiles(sr[:,i], ord, i, fibparms)
                     # phi = make_norm_profiles_temp(sr[:,i], ord, i, fibparms)
                     # phi = make_norm_single_profile_temp(sr[:,i], ord, i, fibparms)
-                    phi = make_norm_profiles_4(sr[:, i], i, fppo, integrate=integrate_profiles, slope=slope, offset=offset, fibs='all')
+                    phi = make_norm_profiles_5(sr[:, i], i, fppo, integrate=integrate_profiles, slope=slope, offset=offset, fibs='all')
 
             # print('WARNING: TEMPORARY offset correction is not commented out!!!')
             # # subtract the median as the offset if BG is not properly corrected for

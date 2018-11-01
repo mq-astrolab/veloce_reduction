@@ -715,7 +715,7 @@ def fit_profiles_from_indices(P_id, img, err_img, stripe_indices, mask=None, sta
 def make_model_stripes_gausslike(fibre_profiles, flat, err_img, stripe_indices, mask, degpol=5, slit_height=10, return_fitpars=False, debug_level=0, timit=False):
     """
     Using the fibre_profiles dictionary from "fit_profiles(_from_indices)", we enforce that the parameters describing the spatial fibre profiles
-    are only smoothly varying as a function of pixel number in dispersion direction by fitting a low-level polynomial tot the fitted values of the parameters.
+    are only smoothly varying as a function of pixel number in dispersion direction by fitting a low-level polynomial to the fitted values of the parameters.
     
     We construct two sets of stripes as output:
     (1) 'fitted_stripes' - by using the fibre_profiles from each pixel column for each order

@@ -8,6 +8,9 @@ import glob
 import numpy as np
 import astropy.io.fits as pyfits
 import datetime
+from scipy.signal import savgol_filter
+from scipy import interpolate
+
 
 from veloce_reduction.veloce_reduction.order_tracing import find_stripes, make_P_id, extract_stripes, flatten_single_stripe
 
@@ -16,7 +19,9 @@ from veloce_reduction.veloce_reduction.order_tracing import find_stripes, make_P
 
 # fp_in = np.load('/Users/christoph/OneDrive - UNSW/fibre_profiles/individual_fibre_profiles_20180924.npy').item()
 
-def make_real_fibparms_by_ord(fp_in, savefile=True, degpol=6):
+def make_real_fibparms_by_ord(fp_in, savefile=True, degpol=7):
+    
+    xx = np.arange(4112)
 
     path = '/Users/christoph/OneDrive - UNSW/fibre_profiles/'
 
@@ -24,7 +29,7 @@ def make_real_fibparms_by_ord(fp_in, savefile=True, degpol=6):
 
     for ord in sorted(fp_in.keys()):
 
-        print('OK, processing ',ord)
+        print('OK, processing ', ord)
 
         fibparms[ord] = {}
 
@@ -94,9 +99,9 @@ def make_real_fibparms_by_ord(fp_in, savefile=True, degpol=6):
 
             # save fit parameters to dictionary - they will be used by "make_norm_profiles_3" to create the
             # normalized profiles during optimal extraction
-            fibparms[ord][fib]['mu_fit'] = mu_fit
-            fibparms[ord][fib]['sigma_fit'] = sigma_fit
-            fibparms[ord][fib]['beta_fit'] = beta_fit
+            fibparms[ord][fib]['mu_fit'] = mu_fit(xx)
+            fibparms[ord][fib]['sigma_fit'] = sigma_fit(xx)
+            fibparms[ord][fib]['beta_fit'] = beta_fit(xx)
             # fibparms[fib][ord]['offset_fit'] = offset_fit
             # fibparms[fib][ord]['onchip'] = onchip
 
