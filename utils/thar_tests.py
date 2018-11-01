@@ -519,7 +519,7 @@ linenum, order, m, pix, wlref, vac_wlref = readcol(ref_filename, twod=False, ski
 ix = np.argwhere(order == 3).flatten()
 ref_x = pix[ix]
 ref_wlref = wlref[ix]
-order_fit = np.poly1d(np.polyfit(ref_x, ref_wlref, 3))
+order_fit = np.poly1d(np.polyfit(ref_x, ref_wlref, 5))
 ref_fit = order_fit(xx)
 
 pixfit_coeffs = []
@@ -549,7 +549,7 @@ for i in range(24):
     pix_fit = np.poly1d(np.polyfit(matched_ref_x[goodix], delta_x[goodix], 1))
     pixfit_coeffs.append(pix_fit)
     #now fit new dispsol to the model-shifted lines
-    order_fit = np.poly1d(np.polyfit(ref_x + pix_fit(ref_x), ref_wlref, 3))
+    order_fit = np.poly1d(np.polyfit(ref_x + pix_fit(ref_x), ref_wlref, 5))
     plt.plot(xx, order_fit(xx) - ref_fit, label='fibre '+fibname[i])
     
     

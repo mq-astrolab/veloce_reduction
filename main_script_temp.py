@@ -74,7 +74,8 @@ del dumimg
 
 # (2) CALIBRATION ###################################################################################################################################
 # gain = [0.88, 0.93, 0.99, 0.93]   # from "VELOCE_DETECTOR_REPORT_V1.PDF"
-gain = [1., 1., 1., 1.]
+# gain = [1., 1., 1., 1.]
+gain = [1., 1.095, 1.125, 1.]   # eye-balled from extracted flat fields
 # (i) BIAS 
 # get offsets and read-out noise
 #either from bias frames (units: [offsets] = ADUs; [RON] = e-)
@@ -94,7 +95,8 @@ MB = make_master_bias_from_coeffs(coeffs, nx, ny, savefile=True, path=path, timi
 # (ii) DARKS
 # create (bias-subtracted) MASTER DARK frame (units = electrons)
 # MD = make_master_dark(dark_list, MB=MB, gain=gain, scalable=False, savefile=True, path=path, timit=True)
-MDS = make_master_dark(dark_list, MB=medbias, gain=gain, scalable=True, savefile=True, path=path, debug_level=1, timit=True)
+# MDS = make_master_dark(dark_list, MB=medbias, gain=gain, scalable=True, savefile=True, path=path, debug_level=1, timit=True)
+MDS = np.zeros(MB.shape)
 
 # (iii) WHITES 
 #create (bias- & dark-subtracted) MASTER WHITE frame and corresponding error array (units = electrons)
@@ -142,7 +144,7 @@ np.save(path + 'P_id.npy', P_id)
 
 # (4) PROCESS SCIENCE IMAGES
 dum = process_science_images(stellar_list, P_id, mask=mask, sampling_size=25, slit_height=30, gain=gain, MB=medbias, ronmask=ronmask, MD=MDS, scalable=True, 
-                             saveall=False, path=path, ext_method='optimal', from_indices=True, timit=False)
+                             saveall=False, path=path, ext_method='quick', from_indices=True, timit=False)
 
 
 

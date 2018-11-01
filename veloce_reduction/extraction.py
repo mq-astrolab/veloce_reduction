@@ -309,7 +309,7 @@ def collapse_extract_from_indices(img, err_img, stripe_indices, tramlines, slit_
 
 
 def optimal_extraction(stripes, err_stripes=None, ron_stripes=None, nfib=24, RON=0., slit_height=25, phi_onthefly=False,
-                       timit=False, simu=False, individual_fibres=False, combined_profiles=False, integrate_profiles=False, 
+                       timit=False, simu=False, individual_fibres=True, combined_profiles=False, integrate_profiles=False, 
                        slope=False, offset=False, relints=None, collapse=False, debug_level=0):
     # if error array is not provided, then RON and gain must be provided (but this is bad because that way we don't
     # know about large errors for cosmic-corrected pixels etc)
@@ -326,7 +326,8 @@ def optimal_extraction(stripes, err_stripes=None, ron_stripes=None, nfib=24, RON
     else:
         # fibparms = np.load('/Users/christoph/OneDrive - UNSW/fibre_profiles/real/first_real_veloce_test_fps.npy').item()
         # fibparms = np.load('/Users/christoph/OneDrive - UNSW/fibre_profiles/real/from_master_white_40orders.npy').item()
-        fibparms = np.load('/Users/christoph/OneDrive - UNSW/fibre_profiles/fibre_profile_fits_20180925.npy').item()
+        # fibparms = np.load('/Users/christoph/OneDrive - UNSW/fibre_profiles/fibre_profile_fits_20180925.npy').item()
+        fibparms = np.load('/Users/christoph/OneDrive - UNSW/fibre_profiles/fibre_profile_fits_20181031.npy').item()
 
     flux = {}
     err = {}
@@ -471,8 +472,9 @@ def optimal_extraction(stripes, err_stripes=None, ron_stripes=None, nfib=24, RON
             # fill output arrays depending on the selected method
             if not phi_onthefly and not collapse:
 
-                # there should not be negative values!!!
-                f[f < 0] = 0.
+                # theoretically there should not be negative values, but we will allow them (bias and dark subtraction can produce those)
+                # f[f < 0] = 0.
+                # however, their errors are treated below
                 # not sure if this is the proper way to do this, but we can't have negative variance
                 # v[np.logical_or(v<=0,f<=0)] = RON*RON
                 # v[v<RON*RON] = np.maximum(RON*RON,1.)   #just a stupid fix so that variance is never below 1
@@ -547,7 +549,7 @@ def optimal_extraction(stripes, err_stripes=None, ron_stripes=None, nfib=24, RON
 
 
 def optimal_extraction_from_indices(img, stripe_indices, err_img=None, nfib=24, RON=0., slit_height=25,
-                                    phi_onthefly=False, timit=False, simu=False, individual_fibres=False,
+                                    phi_onthefly=False, timit=False, simu=False, individual_fibres=True,
                                     combined_profiles=False, integrate_profiles=False, slope=False, offset=False,
                                     relints=None, collapse=False, debug_level=0):
     # if error array is not provided, then RON and gain must be provided (but this is bad because that way we don't
@@ -565,7 +567,9 @@ def optimal_extraction_from_indices(img, stripe_indices, err_img=None, nfib=24, 
     else:
         # fibparms = np.load('/Users/christoph/OneDrive - UNSW/fibre_profiles/real/first_real_veloce_test_fps.npy').item()
         # fibparms = np.load('/Users/christoph/OneDrive - UNSW/fibre_profiles/real/from_master_white_40orders.npy').item()
-        fibparms = np.load('/Users/christoph/OneDrive - UNSW/fibre_profiles/fibre_profile_fits_20180925.npy').item()
+        # fibparms = np.load('/Users/christoph/OneDrive - UNSW/fibre_profiles/fibre_profile_fits_20180925.npy').item()
+        print('Loading NEW fibre profile parameters...')
+        fibparms = np.load('/Users/christoph/OneDrive - UNSW/fibre_profiles/fibre_profile_fits_20181031.npy').item()
 
     flux = {}
     err = {}
@@ -715,8 +719,9 @@ def optimal_extraction_from_indices(img, stripe_indices, err_img=None, nfib=24, 
             # fill output arrays depending on the selected method
             if not phi_onthefly and not collapse:
 
-                # there should not be negative values!!!
-                f[f < 0] = 0.
+                # theoretically there should not be negative values, but we will allow them (bias and dark subtraction can produce those)
+                # f[f < 0] = 0.
+                # however, their errors are treated below
                 # not sure if this is the proper way to do this, but we can't have negative variance
                 # v[np.logical_or(v<=0,f<=0)] = RON*RON
                 # v[v<RON*RON] = np.maximum(RON*RON,1.)   # just a stupid fix so that variance is never below 1

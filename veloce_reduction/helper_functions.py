@@ -385,14 +385,14 @@ def make_norm_profiles_4(x, col, fppo, integrate=False, fibs='stellar', slope=Fa
         # nfib += 1
         addfibs += 1
 
-    phi = np.zeros((len(x), 24+addfibs))
+    phi = np.zeros((len(x), nfib + addfibs))
 
     # NOTE: need to turn fibre numbers around here to be correct
     for k, fib in enumerate(sorted(fppo.keys())[::-1]):
         mu = fppo[fib]['mu_fit'](col)
         sigma = fppo[fib]['sigma_fit'](col)
         beta = fppo[fib]['beta_fit'](col)
-        # now, I think we actually don't want to evaluate the functional form of the profiles  as declared by "fibmodel" at the respective locations,
+        # now, I think we actually don't want to evaluate the functional form of the profiles as declared by "fibmodel" at the respective locations,
         # but rather we want to integrate the (highly non-linear) function from the left edge to the right edge of the pixels (co-ordinates are pixel centres!!!)
         if integrate:
             for i in np.arange(len(x)):
@@ -403,14 +403,14 @@ def make_norm_profiles_4(x, col, fppo, integrate=False, fibs='stellar', slope=Fa
 
     if offset and not slope:
         phi[:, -1] = 1.
-        userange = np.append(userange, 24)
+        userange = np.append(userange, nfib)
     if slope and not offset:
         phi[:, -1] = x - x[0]
-        userange = np.append(userange, 24)
+        userange = np.append(userange, nfib)
     if offset and slope:
         phi[:, -2] = 1.
         phi[:, -1] = x - x[0]
-        userange = np.append(userange, np.array([24,25]))
+        userange = np.append(userange, np.array([nfib,nfib+1]))
 
     # deprecate phi-array to only use wanted fibres
     phi = phi[:, userange]
