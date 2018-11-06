@@ -899,7 +899,7 @@ def extract_spectrum(stripes, err_stripes, ron_stripes, method='optimal', indivi
         #tramlines = find_tramlines(fibre_profiles_02, fibre_profiles_03, fibre_profiles_21, fibre_profiles_22, mask_02, mask_03, mask_21, mask_22)
         #pix,flux,err = collapse_extract(stripes, err_stripes, tramlines, slit_height=slit_height, verbose=verbose, timit=timit, debug_level=debug_level)
     elif method.lower() == 'optimal':
-        pix,flux,err = optimal_extraction(stripes, err_stripes=err_stripes, ron_stripes=ron_stripes, nfib=24, RON=RON, slit_height=slit_height, individual_fibres=individual_fibres,
+        pix,flux,err = optimal_extraction(stripes, err_stripes=err_stripes, ron_stripes=ron_stripes, RON=RON, slit_height=slit_height, individual_fibres=individual_fibres,
                                           combined_profiles=combined_profiles, integrate_profiles=integrate_profiles, slope=slope, offset=offset, fibs=fibs, simu=simu, timit=timit, debug_level=debug_level) 
     else:
         print('ERROR: Nightmare! That should never happen  --  must be an error in the Matrix...')
@@ -1064,7 +1064,7 @@ def extract_spectrum_from_indices(img, err_img, stripe_indices, method='optimal'
         #tramlines = find_tramlines(fibre_profiles_02, fibre_profiles_03, fibre_profiles_21, fibre_profiles_22, mask_02, mask_03, mask_21, mask_22)
         #pix,flux,err = collapse_extract_from_indices(img, err_img, stripe_indices, tramlines, slit_height=slit_height, verbose=verbose, timit=timit, debug_level=debug_level)
     elif method.lower() == 'optimal':
-        pix,flux,err = optimal_extraction_from_indices(img, stripe_indices, err_img=err_img, nfib=24, RON=RON, slit_height=slit_height, individual_fibres=individual_fibres,
+        pix,flux,err = optimal_extraction_from_indices(img, stripe_indices, err_img=err_img, RON=RON, slit_height=slit_height, individual_fibres=individual_fibres,
                                                        combined_profiles=combined_profiles, integrate_profiles=integrate_profiles, slope=slope, offset=offset, fibs=fibs, 
                                                        simu=simu, timit=timit, debug_level=debug_level) 
     else:
