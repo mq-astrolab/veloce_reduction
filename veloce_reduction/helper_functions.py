@@ -430,13 +430,14 @@ def make_norm_profiles_5(x, col, fppo, integrate=False, fibs='stellar', slope=Fa
     UPDATE:
     This version now takes the fibparms in explicit form, rather than as a function to apply to 'pix'.
     """
-
+    
+    nfib = 24
+    
     # same number of fibres for every order, of course
     if fibs == 'all':
-        nfib = 24
         userange = np.arange(nfib)
     elif fibs == 'stellar':
-        nfib = 19
+        # nfib = 19
         userange = np.arange(2, 21, 1)
     # elif fibs == 'laser':
     #     nfib = 1
@@ -445,13 +446,13 @@ def make_norm_profiles_5(x, col, fppo, integrate=False, fibs='stellar', slope=Fa
     #     nfib = 1
     #     userange = np.arange(27, 28, 2)
     elif fibs == 'sky3':
-        nfib = 3
+        # nfib = 3
         userange = np.arange(21, 24, 1)
     elif fibs == 'sky2':
-        nfib = 2
+        # nfib = 2
         userange = np.arange(2)
     elif fibs == 'allsky':
-        nfib = 5
+        # nfib = 5
         userange = np.r_[np.arange(2),np.arange(21, 24, 1)]
     else:
         print('ERROR: fibre selection not recognised!!!')
