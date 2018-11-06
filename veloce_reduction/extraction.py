@@ -308,7 +308,7 @@ def collapse_extract_from_indices(img, err_img, stripe_indices, tramlines, slit_
 
 
 
-def optimal_extraction(stripes, err_stripes=None, ron_stripes=None, nfib=24, RON=0., slit_height=25, phi_onthefly=False,
+def optimal_extraction(stripes, err_stripes=None, ron_stripes=None, RON=0., slit_height=25, phi_onthefly=False,
                        timit=False, simu=False, individual_fibres=True, combined_profiles=False, integrate_profiles=False, 
                        slope=False, offset=False, fibs='all', relints=None, collapse=False, debug_level=0):
     # if error array is not provided, then RON and gain must be provided (but this is bad because that way we don't
@@ -319,6 +319,20 @@ def optimal_extraction(stripes, err_stripes=None, ron_stripes=None, nfib=24, RON
 
     if err_stripes is None:
         print('WARNING: errors not provided! Using sqrt(RON**2 + flux) as an estimate...')
+
+    if fibs.lower() == 'all':
+        nfib = 24
+    elif fibs.lower() == 'stellar':
+        nfib = 19
+    elif fibs.lower() == 'sky2':
+        nfib = 2
+    elif fibs.lower() == 'sky3':
+        nfib = 3
+    elif fibs.lower() == 'allsky':
+        nfib = 5
+    else:
+        print('WARNING: input for "fibs" not recognized - using all 24 fibres as a default...')
+        nfib = 24
 
     # read in polynomial coefficients of best-fit individual-fibre-profile parameters
     if simu:
@@ -548,7 +562,7 @@ def optimal_extraction(stripes, err_stripes=None, ron_stripes=None, nfib=24, RON
 
 
 
-def optimal_extraction_from_indices(img, stripe_indices, err_img=None, nfib=24, RON=0., slit_height=25,
+def optimal_extraction_from_indices(img, stripe_indices, err_img=None, RON=0., slit_height=25,
                                     phi_onthefly=False, timit=False, simu=False, individual_fibres=True,
                                     combined_profiles=False, integrate_profiles=False, slope=False, offset=False,
                                     fibs='all', relints=None, collapse=False, debug_level=0):
@@ -560,6 +574,20 @@ def optimal_extraction_from_indices(img, stripe_indices, err_img=None, nfib=24, 
 
     if err_img is None:
         print('WARNING: errors not provided! Using sqrt(flux + RON**2) as an estimate...')
+        
+    if fibs.lower() == 'all':
+        nfib = 24
+    elif fibs.lower() == 'stellar':
+        nfib = 19
+    elif fibs.lower() == 'sky2':
+        nfib = 2
+    elif fibs.lower() == 'sky3':
+        nfib = 3
+    elif fibs.lower() == 'allsky':
+        nfib = 5
+    else:
+        print('WARNING: input for "fibs" not recognized - using all 24 fibres as a default...')
+        nfib = 24
 
     # read in polynomial coefficients of best-fit individual-fibre-profile parameters
     if simu:

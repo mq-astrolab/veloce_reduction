@@ -143,8 +143,8 @@ np.save(path + 'P_id.npy', P_id)
 
 
 # (4) PROCESS SCIENCE IMAGES
-dum = process_science_images(stellar_list, P_id, mask=mask, sampling_size=25, slit_height=30, gain=gain, MB=medbias, ronmask=ronmask, MD=MDS, scalable=True, 
-                             saveall=False, path=path, ext_method='quick', offset='True', slope='True', fibs='stellar', from_indices=True, timit=False)
+dum = process_science_images(stellar_list, P_id, mask=mask, sampling_size=25, slit_height=24, gain=gain, MB=medbias, ronmask=ronmask, MD=MDS, scalable=True, 
+                             saveall=True, path=path, ext_method='quick', offset='True', slope='True', fibs='stellar', from_indices=True, timit=True)
 
 
 
