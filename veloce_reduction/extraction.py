@@ -598,7 +598,7 @@ def optimal_extraction_from_indices(img, stripe_indices, err_img=None, RON=0., s
         # fibparms = np.load('/Users/christoph/OneDrive - UNSW/fibre_profiles/real/first_real_veloce_test_fps.npy').item()
         # fibparms = np.load('/Users/christoph/OneDrive - UNSW/fibre_profiles/real/from_master_white_40orders.npy').item()
         # fibparms = np.load('/Users/christoph/OneDrive - UNSW/fibre_profiles/fibre_profile_fits_20180925.npy').item()
-        print('Oha! Loading NEW fibre profile parameters...')
+        print('Oha! Loading NEWest fibre profile parameters...')
         fibparms = np.load('/Users/christoph/OneDrive - UNSW/fibre_profiles/fibre_profile_fits_20181107.npy').item()
 
     flux = {}
