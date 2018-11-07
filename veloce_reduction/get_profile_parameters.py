@@ -84,10 +84,9 @@ def make_real_fibparms_by_ord(fp_in, savefile=True, degpol=7):
 
             # instead of fitting, do a smoothing and linear extrapolation instead for sigma and beta
             # (otherwise we get bad oscillations of the polynomials, ie Runge's phenomenon !!!)
-            x = fp_in[ord]['pix'] 
-            xgrid = np.arange(np.min(x), np.max(x) + 1, 1)
-            f_sigma = interpolate.interp1d(x, sigma, fill_value='extrapolate')
-            f_beta = interpolate.interp1d(x, beta, fill_value='extrapolate')
+            xgrid = np.arange(np.min(pix[good]), np.max(pix[good]) + 1, 1)
+            f_sigma = interpolate.interp1d(pix[good], sigma[good], fill_value='extrapolate')
+            f_beta = interpolate.interp1d(pix[good], beta[good], fill_value='extrapolate')
             sigma_eqspace = f_sigma(xgrid)
             beta_eqspace = f_beta(xgrid)
             filtered_sigma = savgol_filter(sigma_eqspace, 2001, 3)   # window size and order were just eye-balled to make it sensible

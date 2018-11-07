@@ -341,7 +341,7 @@ def optimal_extraction(stripes, err_stripes=None, ron_stripes=None, RON=0., slit
         # fibparms = np.load('/Users/christoph/OneDrive - UNSW/fibre_profiles/real/first_real_veloce_test_fps.npy').item()
         # fibparms = np.load('/Users/christoph/OneDrive - UNSW/fibre_profiles/real/from_master_white_40orders.npy').item()
         # fibparms = np.load('/Users/christoph/OneDrive - UNSW/fibre_profiles/fibre_profile_fits_20180925.npy').item()
-        fibparms = np.load('/Users/christoph/OneDrive - UNSW/fibre_profiles/fibre_profile_fits_20181101.npy').item()
+        fibparms = np.load('/Users/christoph/OneDrive - UNSW/fibre_profiles/fibre_profile_fits_20181107.npy').item()
 
     flux = {}
     err = {}
@@ -535,8 +535,10 @@ def optimal_extraction(stripes, err_stripes=None, ron_stripes=None, RON=0., slit
                     err[ord]['thxe'].append(np.sqrt(v[27]))
 
             else:
-                flux[ord].append(np.max([f, 0.]))
-                if f <= 0 or v <= 0:
+                # flux[ord].append(np.max([f, 0.]))
+                flux[ord].append(f)
+                # if f <= 0 or v <= 0:
+                if v <= 0:
                     # err[ord].append(np.sqrt(len(phi)*RON*RON))
                     err[ord].append(np.sqrt(np.sum(pixerr * pixerr)))
                 else:
@@ -597,7 +599,7 @@ def optimal_extraction_from_indices(img, stripe_indices, err_img=None, RON=0., s
         # fibparms = np.load('/Users/christoph/OneDrive - UNSW/fibre_profiles/real/from_master_white_40orders.npy').item()
         # fibparms = np.load('/Users/christoph/OneDrive - UNSW/fibre_profiles/fibre_profile_fits_20180925.npy').item()
         print('Oha! Loading NEW fibre profile parameters...')
-        fibparms = np.load('/Users/christoph/OneDrive - UNSW/fibre_profiles/fibre_profile_fits_20181101.npy').item()
+        fibparms = np.load('/Users/christoph/OneDrive - UNSW/fibre_profiles/fibre_profile_fits_20181107.npy').item()
 
     flux = {}
     err = {}
@@ -796,8 +798,10 @@ def optimal_extraction_from_indices(img, stripe_indices, err_img=None, RON=0., s
                     err[ord]['thxe'].append(np.sqrt(v[27]))
 
             else:
-                flux[ord].append(np.max([f, 0.]))
-                if f <= 0 or v <= 0:
+                # flux[ord].append(np.max([f, 0.]))
+                flux[ord].append(f)
+                # if f <= 0 or v <= 0:
+                if v <= 0:
                     # err[ord].append(np.sqrt(len(phi)*RON*RON))
                     err[ord].append(np.sqrt(np.sum(pixerr * pixerr)))
                 else:
