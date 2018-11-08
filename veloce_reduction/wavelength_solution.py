@@ -1083,347 +1083,6 @@ def get_simu_dispsol(fibre=None, path='/Users/christoph/OneDrive - UNSW/dispsol/
 
 
 
-
-# OLDER CODE SNIPPETS
-#
-# THE following routine is now called fit_poly_surface_2D and lives in "helper_functions"
-# def fit_dispsol_2D(x_norm, ord_norm, WL, weights=None, polytype = 'chebyshev', poly_deg=5, debug_level=0):
-#     """
-#     Calculate 2D polynomial wavelength fit to normalized x and order values.
-#     Wrapper function for using the astropy fitting library.
-# 
-#     'x_norm'   : x-values (pixels) of all the lines, re-normalized to [-1,+1]
-#     'ord_norm' : order numbers of all the lines, re-normalized to [-1,+1]
-#     'WL'       : 
-#     'polytype' : either '(p)olynomial' (default), '(l)egendre', or '(c)hebyshev' are accepted
-#     """
-#     
-#     if polytype in ['Polynomial','polynomial','p','P']:
-#         p_init = models.Polynomial2D(poly_deg)
-#         if debug_level > 0:
-#             print('OK, using standard polynomials...')
-#     elif polytype in ['Chebyshev','chebyshev','c','C']:
-#         p_init = models.Chebyshev2D(poly_deg,poly_deg)
-#         if debug_level > 0:
-#             print('OK, using Chebyshev polynomials...')
-#     elif polytype in ['Legendre','legendre','l','L']:
-#         p_init = models.Legendre2D(poly_deg,poly_deg)  
-#         if debug_level > 0:
-#             print('OK, using Legendre polynomials...')   
-#     else:
-#         print("ERROR: polytype not recognised ['(P)olynomial' / '(C)hebyshev' / '(L)egendre']")    
-#         
-#     fit_p = fitting.LevMarLSQFitter()  
-# 
-#     with warnings.catch_warnings():
-#         # Ignore model linearity warning from the fitter
-#         warnings.simplefilter('ignore')
-#         p = fit_p(p_init, x_norm, ord_norm, WL, weights=weights)
-# 
-# 
-# #     if debug_level > 0:
-# #         plt.figure()
-# #         index_include = np.array(weights, dtype=bool)
-# #         plt.scatter(x_norm[index_include], WL[index_include], c=order_norm[index_include])
-# #         plt.scatter(x_norm[np.logical_not(index_include)], WL[np.logical_not(index_include)], facecolors='none',
-# #                     edgecolors='r')
-# # 
-# #         for x, o, oo, wl in zip(x_norm[index_include], order_norm[index_include], orders[index_include],
-# #                                 WL[index_include]):
-# #             plt.arrow(x, wl, 0, (p(x, o) / oo - wl) * 1000., head_width=0.00005, head_length=0.0001, width=0.00005)
-# # 
-# #         xi = np.linspace(min(x_norm[index_include]), max(x_norm[index_include]), 101)
-# #         yi = np.linspace(min(order_norm[index_include]), max(order_norm[index_include]), 101)
-# #         zi = griddata((x_norm[index_include], order_norm[index_include]),
-# #                       ((WL[index_include] - p(x_norm[index_include], order_norm[index_include]) / orders[
-# #                           index_include]) / np.mean(WL[index_include])) * 3e8,
-# #                       (xi[None, :], yi[:, None]), method='linear')
-# #         fig, ax = plt.subplots()
-# #         ax.set_xlim((np.min(xi), np.max(xi)))
-# #         ax.set_ylim((np.min(yi), np.max(yi)))
-# #         ax.set_xlabel('Detector x normalized')
-# #         ax.set_ylabel('order normalized')
-# #         plt.title('Legendre Polynomial Degree: ' + str(poly_deg) + "\n" + "#pars: " + str(len(p.parameters)))
-# # 
-# #         im = ax.imshow(zi, interpolation='nearest', extent=[np.min(xi), np.max(xi), np.min(yi), np.max(yi)])
-# # 
-# #         divider = make_axes_locatable(ax)
-# #         cax = divider.append_axes("right", size="5%", pad=0.05)
-# # 
-# #         cb = plt.colorbar(im, cax=cax)
-# #         cb.set_label('RV deviation [m/s]')
-# # 
-# #         plt.tight_layout()
-# 
-#     return p
-
-
-#
-#
-#
-# thardata = np.load('/Users/christoph/OneDrive - UNSW/rvtest/thardata.npy').item()
-# laserdata = np.load('/Users/christoph/OneDrive - UNSW/rvtest/laserdata.npy').item()
-# thdata = thardata['flux']['order_01']
-# ldata = laserdata['flux']['order_01']
-#
-#
-# dispsol = np.load('/Users/christoph/OneDrive - UNSW/dispsol/lab_tests/thar_dispsol.npy').item()
-# OR
-# dispsol = np.load('/Users/christoph/OneDrive - UNSW/dispsol/lab_tests/thar_dispsol_2D.npy').item()
-# fitshapes = np.load('/Users/christoph/OneDrive - UNSW/dispsol/lab_tests/fitshapes.npy').item()
-# wavelengths = np.load('/Users/christoph/OneDrive - UNSW/dispsol/lab_tests/wavelengths.npy').item()
-# wl_ref = np.load('/Users/christoph/OneDrive - UNSW/linelists/AAT_folder/wl_ref.npy').item()
-# x = np.array([])
-# m = np.array([])
-# wl = np.array([])
-# wl_ref_arr = np.array([])
-# for ord in sorted(dispsol.keys()):
-#     ordnum = int(ord[-2:])
-#     x = np.append(x,fitshapes[ord]['x'])
-#     order = np.append(order, np.repeat(ordnum,len(fitshapes[ord]['x'])))
-#     wl = np.append(wl, dispsol[ord](fitshapes[ord]['x']))
-#     wl_ref_arr = np.append(wl_ref_arr, wl_ref[ord])
-# 
-# 
-# 
-#
-#
-# 
-# 
-# 
-# 
-# 
-# 
-# 
-# 
-# # ###########################################
-# # thar_refwlord01, thar_relintord01, flag = readcol('/Users/christoph/OneDrive - UNSW/linelists/test_thar_list_order_01.dat',fsep=';',twod=False)
-# # thar_refwlord01 *= 1e3
-# # refdata = {}
-# # refdata['order_01'] = {}
-# # refdata['order_01']['wl'] = thar_refwlord01[np.argwhere(flag == ' resolved')][::-1]          #note the array is turned around to match other arrays
-# # refdata['order_01']['relint'] = thar_relintord01[np.argwhere(flag == ' resolved')][::-1]     #note the array is turned around to match other arrays
-# # ###########################################
-# 
-# 
-# 
-# 
-# 
-# def get_dispsol_from_thar(thardata, refdata, deg_polynomial=5, timit=False, verbose=False):
-#     """
-#     NOT CURRENTLY USED
-#     """
-#     if timit:
-#         start_time = time.time()
-# 
-#     thar_dispsol = {}
-#     
-#     #loop over all orders
-#     #for ord in sorted(thardata['flux'].iterkeys()):
-#     for ord in ['order_01']:
-#     
-#         if verbose:
-#             print('Finding wavelength solution for '+str(ord))
-#     
-#         #find fitted x-positions of ThAr peaks
-#         fitted_thar_pos, thar_qualflag = fit_emission_lines(thardata['flux'][ord], return_all_pars=False, return_qualflag=True, varbeta=False)
-#         x = fitted_thar_pos.copy()
-#         
-#         #these are the theoretical wavelengths from the NIST linelists
-#         lam = (refdata[ord]['wl']).flatten()
-#         
-#         #exclude some peaks as they are a blend of multiple lines: TODO: clean up
-#         filt = np.ones(len(fitted_thar_pos),dtype='bool')
-#         filt[[33,40,42,58,60]] = False
-#         x = x[filt]
-#         
-#         #fit polynomial to lambda as a function of x
-#         thar_fit = np.poly1d(np.polyfit(x, lam, deg_polynomial))
-#         #save to output dictionary
-#         thar_dispsol[ord] = thar_fit
-# 
-#     if timit:
-#         print('Time taken for finding ThAr wavelength solution: '+str(time.time() - start_time)+' seconds...')
-# 
-#     return thar_dispsol
-# 
-# 
-# # '''xxx'''
-# # #################################################################
-# # # the following is needed as input for "get_dispsol_from_laser" #
-# # #################################################################
-# # laser_ref_wl,laser_relint = readcol('/Users/christoph/OneDrive - UNSW/linelists/laser_linelist_25GHz.dat',fsep=';',twod=False)
-# # laser_ref_wl *= 1e3
-# # 
-# # #wavelength solution from HDF file
-# # #read dispersion solution from file
-# # dispsol = np.load('/Users/christoph/OneDrive - UNSW/dispsol/mean_dispsol_by_orders_from_zemax.npy').item()
-# # #read extracted spectrum from files (obviously this needs to be improved)
-# # xx = np.arange(4096)
-# # #this is so as to match the order number with the physical order number (66 <= m <= 108)
-# # # order01 corresponds to m=66
-# # # order43 corresponds to m=108
-# # wl = {}
-# # for ord in dispsol.keys():
-# #     m = ord[5:]
-# #     ordnum = str(int(m)-65).zfill(2)
-# #     wl['order_'+ordnum] = dispsol['order'+m]['model'](xx)
-#     
-# 
-# 
-# 
-# 
-# def get_dispsol_from_laser(laserdata, laser_ref_wl, deg_polynomial=5, timit=False, verbose=False, return_stats=False, varbeta=False):
-#     """
-#     NOT CURRENTLY USED
-#     """
-#     
-#     if timit:
-#         start_time = time.time()
-# 
-#     if return_stats:
-#         stats = {}
-# 
-#     #read in mask for fibre_01 (ie the Laser-comb fibre) from order_tracing as a first step in excluding low-flux regions
-#     mask_01 = np.load('/Users/christoph/OneDrive - UNSW/fibre_profiles/masks/mask_01.npy').item()
-# 
-#     laser_dispsol = {}
-#     
-#     #loop over all orders
-#     #order 43 does not work properly, as some laser peaks are missing!!!
-#     for ord in sorted(laserdata['flux'].iterkeys())[:-1]:
-# 
-#         if verbose:
-#             print('Finding wavelength solution for '+str(ord))
-#         
-#         #find fitted x-positions of ThAr peaks
-#         data = laserdata['flux'][ord] * mask_01[ord]
-#         goodpeaks,mostpeaks,allpeaks,first_mask,second_mask,third_mask = find_suitable_peaks(data,return_masks=True)    #from this we just want the masks this time (should be very fast)
-#         #fitted_laser_pos, laser_qualflag = fit_emission_lines(data, laser=True, return_all_pars=False, return_qualflag=True, varbeta=varbeta)
-#         if varbeta:
-#             fitted_laser_pos, fitted_laser_sigma, fitted_laser_amp, fitted_laser_beta = fit_emission_lines(data, laser=True, return_all_pars=True, return_qualflag=False, varbeta=varbeta, timit=timit, verbose=verbose)
-#         else:
-#             fitted_laser_pos, fitted_laser_sigma, fitted_laser_amp = fit_emission_lines(data, laser=True, return_all_pars=True, return_qualflag=False, varbeta=varbeta, timit=timit, verbose=verbose)
-#         x = fitted_laser_pos.copy()
-#         #exclude the leftmost and rightmost peaks (nasty edge effects...)
-# #         blue_cutoff = int(np.round((x[-1]+x[-2])/2.,0))
-# #         red_cutoff = int(np.round((x[0]+x[1])/2.,0))
-#         blue_cutoff = int(np.round(allpeaks[-1]+((allpeaks[-1] - allpeaks[-2])/2),0))
-#         red_cutoff = int(np.round(allpeaks[0]-((allpeaks[1] - allpeaks[0])/2),0))
-#         cond1 = (laser_ref_wl >= wl[ord][blue_cutoff])
-#         cond2 = (laser_ref_wl <= wl[ord][red_cutoff])
-#         #these are the theoretical wavelengths from the NIST linelists
-#         lam = laser_ref_wl[np.logical_and(cond1,cond2)][::-1]
-#         lam = lam[first_mask][second_mask][third_mask]
-#         
-#         #check if the number of lines found equals the number of lines from the line list
-# #         if verbose:
-# #             print(len(x),len(lam))
-#         if len(x) != len(lam):
-#             print('fuganda')
-#             return 'fuganda'
-#         
-#         #fit polynomial to lambda as a function of x
-#         laser_fit = np.poly1d(np.polyfit(x, lam, deg_polynomial))
-#         
-#         if return_stats:
-#             stats[ord] = {}
-#             resid = laser_fit(x) - lam
-#             stats[ord]['resids'] = resid
-#             #mean error in RV for a single line = c * (stddev(resid) / mean(lambda))
-#             stats[ord]['single_rverr'] = 3e8 * (np.std(resid) / np.mean(lam))
-#             stats[ord]['rverr'] = 3e8 * (np.std(resid) / np.mean(lam)) / np.sqrt(len(lam))
-#             stats[ord]['n_lines'] = len(lam)
-#             
-#         #save to output dictionary
-#         laser_dispsol[ord] = laser_fit
-# 
-#     
-#     #let's do order 43 differently because it has the stupid gap in the middle
-#     #find fitted x-positions of ThAr peaks
-#     ord = 'order_43'
-#     if verbose:
-#             print('Finding wavelength solution for '+str(ord))
-#     data = laserdata['flux'][ord] * mask_01[ord]
-#     data1 = data[:2500]
-#     data2 = data[2500:]
-#     goodpeaks1,mostpeaks1,allpeaks1,first_mask1,second_mask1,third_mask1 = find_suitable_peaks(data1,return_masks=True)    #from this we just want use_mask this time (should be very fast)
-#     goodpeaks2,mostpeaks2,allpeaks2,first_mask2,second_mask2,third_mask2 = find_suitable_peaks(data2,return_masks=True)    #from this we just want use_mask this time (should be very fast)
-#     #fitted_laser_pos1, laser_qualflag1 = fit_emission_lines(data1, laser=True, return_all_pars=False, return_qualflag=True, varbeta=varbeta)
-#     #fitted_laser_pos2, laser_qualflag2 = fit_emission_lines(data2, laser=True, return_all_pars=False, return_qualflag=True, varbeta=varbeta)
-#     if varbeta:
-#         fitted_laser_pos1, fitted_laser_sigma1, fitted_laser_amp1, fitted_laser_beta1 = fit_emission_lines(data1, laser=True, return_all_pars=True, return_qualflag=False, varbeta=varbeta)
-#         fitted_laser_pos2, fitted_laser_sigma2, fitted_laser_amp2, fitted_laser_beta2 = fit_emission_lines(data2, laser=True, return_all_pars=True, return_qualflag=False, varbeta=varbeta)
-#     else:
-#         fitted_laser_pos1, fitted_laser_sigma1, fitted_laser_amp1 = fit_emission_lines(data1, laser=True, return_all_pars=True, return_qualflag=False, varbeta=varbeta)
-#         fitted_laser_pos2, fitted_laser_sigma2, fitted_laser_amp2 = fit_emission_lines(data2, laser=True, return_all_pars=True, return_qualflag=False, varbeta=varbeta)
-#     x1 = fitted_laser_pos1.copy()
-#     x2 = fitted_laser_pos2.copy() + 2500
-#     #exclude the leftmost and rightmost peaks (nasty edge effects...)
-# #         blue_cutoff = int(np.round((x[-1]+x[-2])/2.,0))
-# #         red_cutoff = int(np.round((x[0]+x[1])/2.,0))
-#     blue_cutoff1 = int(np.round(allpeaks1[-1]+((allpeaks1[-1] - allpeaks1[-2])/2),0))
-#     blue_cutoff2 = int(np.round(allpeaks2[-1]+((allpeaks2[-1] - allpeaks2[-2])/2)+2500,0))
-#     red_cutoff1 = int(np.round(allpeaks1[0]-((allpeaks1[1] - allpeaks1[0])/2),0))
-#     red_cutoff2 = int(np.round(allpeaks2[0]-((allpeaks2[1] - allpeaks2[0])/2)+2500,0))
-#     cond1_1 = (laser_ref_wl >= wl[ord][blue_cutoff1])
-#     cond1_2 = (laser_ref_wl >= wl[ord][blue_cutoff2])
-#     cond2_1 = (laser_ref_wl <= wl[ord][red_cutoff1])
-#     cond2_2 = (laser_ref_wl <= wl[ord][red_cutoff2])
-#     #these are the theoretical wavelengths from the NIST linelists
-#     lam1 = laser_ref_wl[np.logical_and(cond1_1,cond2_1)][::-1]
-#     lam2 = laser_ref_wl[np.logical_and(cond1_2,cond2_2)][::-1]
-#     lam1 = lam1[first_mask1][second_mask1][third_mask1]
-#     lam2 = lam2[first_mask2][second_mask2][third_mask2]
-#     
-#     x = np.r_[x1,x2]
-#     lam = np.r_[lam1,lam2]
-#     
-#     #check if the number of lines found equals the number of lines from the line list
-#     if verbose:
-#         print(len(x),len(lam))
-#     if len(x) != len(lam):
-#         print('fuganda')
-#         return 'fuganda'
-#     
-#     #fit polynomial to lambda as a function of x
-#     laser_fit = np.poly1d(np.polyfit(x, lam, deg_polynomial))
-#     
-#     if return_stats:
-#         stats[ord] = {}
-#         resid = laser_fit(x) - lam
-#         stats[ord]['resids'] = resid
-#         #mean error in RV for a single line = c * (stddev(resid) / mean(lambda))
-#         stats[ord]['single_rverr'] = 3e8 * (np.std(resid) / np.mean(lam))
-#         stats[ord]['rverr'] = 3e8 * (np.std(resid) / np.mean(lam)) / np.sqrt(len(lam))
-#         stats[ord]['n_lines'] = len(lam)
-#     
-#     #save to output dictionary
-#     laser_dispsol[ord] = laser_fit
-# 
-#     if timit:
-#         print('Time taken for finding Laser-comb wavelength solution: '+str(time.time() - start_time)+' seconds...')
-# 
-#     if return_stats:
-#         return laser_dispsol, stats 
-#     else:
-#         return laser_dispsol
-#         
-# 
-# 
-# 
-# 
-# ###########################################################################################################
-# # laser_dispsol2,stats2 = get_dispsol_from_laser(laserdata, laser_ref_wl, verbose=True, timit=True, return_stats=True, deg_polynomial=2)
-# # laser_dispsol3,stats3 = get_dispsol_from_laser(laserdata, laser_ref_wl, verbose=True, timit=True, return_stats=True, deg_polynomial=3)
-# # laser_dispsol5,stats5 = get_dispsol_from_laser(laserdata, laser_ref_wl, verbose=True, timit=True, return_stats=True, deg_polynomial=5)
-# # laser_dispsol11,stats11 = get_dispsol_from_laser(laserdata, laser_ref_wl, verbose=True, timit=True, return_stats=True, deg_polynomial=11)
-# ###########################################################################################################
-
-
-
-
-
 def quick_bg_fix(raw_data, npix=4112):
     left_xx = np.arange(npix/2)
     right_xx = np.arange(npix/2, npix)
@@ -1725,7 +1384,7 @@ def xcorr_thflux(thflux, thflux2, scale=300., masking=True, satmask=None, lampty
     #########################
 
 #     # trying to figure out the offsets between each fibre in dispersion direction
-#     path = '/Volumes/BERGRAID/data/veloce/dispsol_tests/20180917/'
+#     path = '/Users/christoph/OneDrive - UNSW/dispsol_tests/20180917/'
 #     indfib_thflux = pyfits.getdata(path + 'ARC_ThAr_17sep30080_optimal3a_extracted.fits')
 #     indfib_thflux_so = pyfits.getdata(path + 'ARC_ThAr_17sep30080_optimal3a_extracted_with_slope_and_offset.fits')
 #     nfib = indfib_thflux.shape[1]
@@ -2031,7 +1690,7 @@ def get_dispsol_from_known_lines(thflux, fibre=None, fitwidth=4, satmask=None, l
     if return_full:
         xxn = (xx / ((len(xx)-1)/2.)) - 1.
         oo = np.arange(1,len(thflux)+1)
-        oon = ((oo-1) / ((len(thflux)-1)/2.)) - 1.   
+        oon = ((oo-1) / ((40-1)/2.)) - 1.   
         X,O = np.meshgrid(xxn,oon)
         p_air_wl = p_air(X,O)
         p_vac_wl = p_vac(X,O)
@@ -2046,6 +1705,344 @@ def get_dispsol_from_known_lines(thflux, fibre=None, fitwidth=4, satmask=None, l
 
 
 def WIP():
+    # OLDER CODE SNIPPETS
+    #
+    # THE following routine is now called fit_poly_surface_2D and lives in "helper_functions"
+    # def fit_dispsol_2D(x_norm, ord_norm, WL, weights=None, polytype = 'chebyshev', poly_deg=5, debug_level=0):
+    #     """
+    #     Calculate 2D polynomial wavelength fit to normalized x and order values.
+    #     Wrapper function for using the astropy fitting library.
+    #
+    #     'x_norm'   : x-values (pixels) of all the lines, re-normalized to [-1,+1]
+    #     'ord_norm' : order numbers of all the lines, re-normalized to [-1,+1]
+    #     'WL'       :
+    #     'polytype' : either '(p)olynomial' (default), '(l)egendre', or '(c)hebyshev' are accepted
+    #     """
+    #
+    #     if polytype in ['Polynomial','polynomial','p','P']:
+    #         p_init = models.Polynomial2D(poly_deg)
+    #         if debug_level > 0:
+    #             print('OK, using standard polynomials...')
+    #     elif polytype in ['Chebyshev','chebyshev','c','C']:
+    #         p_init = models.Chebyshev2D(poly_deg,poly_deg)
+    #         if debug_level > 0:
+    #             print('OK, using Chebyshev polynomials...')
+    #     elif polytype in ['Legendre','legendre','l','L']:
+    #         p_init = models.Legendre2D(poly_deg,poly_deg)
+    #         if debug_level > 0:
+    #             print('OK, using Legendre polynomials...')
+    #     else:
+    #         print("ERROR: polytype not recognised ['(P)olynomial' / '(C)hebyshev' / '(L)egendre']")
+    #
+    #     fit_p = fitting.LevMarLSQFitter()
+    #
+    #     with warnings.catch_warnings():
+    #         # Ignore model linearity warning from the fitter
+    #         warnings.simplefilter('ignore')
+    #         p = fit_p(p_init, x_norm, ord_norm, WL, weights=weights)
+    #
+    #
+    # #     if debug_level > 0:
+    # #         plt.figure()
+    # #         index_include = np.array(weights, dtype=bool)
+    # #         plt.scatter(x_norm[index_include], WL[index_include], c=order_norm[index_include])
+    # #         plt.scatter(x_norm[np.logical_not(index_include)], WL[np.logical_not(index_include)], facecolors='none',
+    # #                     edgecolors='r')
+    # #
+    # #         for x, o, oo, wl in zip(x_norm[index_include], order_norm[index_include], orders[index_include],
+    # #                                 WL[index_include]):
+    # #             plt.arrow(x, wl, 0, (p(x, o) / oo - wl) * 1000., head_width=0.00005, head_length=0.0001, width=0.00005)
+    # #
+    # #         xi = np.linspace(min(x_norm[index_include]), max(x_norm[index_include]), 101)
+    # #         yi = np.linspace(min(order_norm[index_include]), max(order_norm[index_include]), 101)
+    # #         zi = griddata((x_norm[index_include], order_norm[index_include]),
+    # #                       ((WL[index_include] - p(x_norm[index_include], order_norm[index_include]) / orders[
+    # #                           index_include]) / np.mean(WL[index_include])) * 3e8,
+    # #                       (xi[None, :], yi[:, None]), method='linear')
+    # #         fig, ax = plt.subplots()
+    # #         ax.set_xlim((np.min(xi), np.max(xi)))
+    # #         ax.set_ylim((np.min(yi), np.max(yi)))
+    # #         ax.set_xlabel('Detector x normalized')
+    # #         ax.set_ylabel('order normalized')
+    # #         plt.title('Legendre Polynomial Degree: ' + str(poly_deg) + "\n" + "#pars: " + str(len(p.parameters)))
+    # #
+    # #         im = ax.imshow(zi, interpolation='nearest', extent=[np.min(xi), np.max(xi), np.min(yi), np.max(yi)])
+    # #
+    # #         divider = make_axes_locatable(ax)
+    # #         cax = divider.append_axes("right", size="5%", pad=0.05)
+    # #
+    # #         cb = plt.colorbar(im, cax=cax)
+    # #         cb.set_label('RV deviation [m/s]')
+    # #
+    # #         plt.tight_layout()
+    #
+    #     return p
+
+    #
+    #
+    #
+    # thardata = np.load('/Users/christoph/OneDrive - UNSW/rvtest/thardata.npy').item()
+    # laserdata = np.load('/Users/christoph/OneDrive - UNSW/rvtest/laserdata.npy').item()
+    # thdata = thardata['flux']['order_01']
+    # ldata = laserdata['flux']['order_01']
+    #
+    #
+    # dispsol = np.load('/Users/christoph/OneDrive - UNSW/dispsol/lab_tests/thar_dispsol.npy').item()
+    # OR
+    # dispsol = np.load('/Users/christoph/OneDrive - UNSW/dispsol/lab_tests/thar_dispsol_2D.npy').item()
+    # fitshapes = np.load('/Users/christoph/OneDrive - UNSW/dispsol/lab_tests/fitshapes.npy').item()
+    # wavelengths = np.load('/Users/christoph/OneDrive - UNSW/dispsol/lab_tests/wavelengths.npy').item()
+    # wl_ref = np.load('/Users/christoph/OneDrive - UNSW/linelists/AAT_folder/wl_ref.npy').item()
+    # x = np.array([])
+    # m = np.array([])
+    # wl = np.array([])
+    # wl_ref_arr = np.array([])
+    # for ord in sorted(dispsol.keys()):
+    #     ordnum = int(ord[-2:])
+    #     x = np.append(x,fitshapes[ord]['x'])
+    #     order = np.append(order, np.repeat(ordnum,len(fitshapes[ord]['x'])))
+    #     wl = np.append(wl, dispsol[ord](fitshapes[ord]['x']))
+    #     wl_ref_arr = np.append(wl_ref_arr, wl_ref[ord])
+    #
+    #
+    #
+    #
+    #
+    #
+    #
+    #
+    #
+    #
+    #
+    #
+    #
+    # # ###########################################
+    # # thar_refwlord01, thar_relintord01, flag = readcol('/Users/christoph/OneDrive - UNSW/linelists/test_thar_list_order_01.dat',fsep=';',twod=False)
+    # # thar_refwlord01 *= 1e3
+    # # refdata = {}
+    # # refdata['order_01'] = {}
+    # # refdata['order_01']['wl'] = thar_refwlord01[np.argwhere(flag == ' resolved')][::-1]          #note the array is turned around to match other arrays
+    # # refdata['order_01']['relint'] = thar_relintord01[np.argwhere(flag == ' resolved')][::-1]     #note the array is turned around to match other arrays
+    # # ###########################################
+    #
+    #
+    #
+    #
+    #
+    # def get_dispsol_from_thar(thardata, refdata, deg_polynomial=5, timit=False, verbose=False):
+    #     """
+    #     NOT CURRENTLY USED
+    #     """
+    #     if timit:
+    #         start_time = time.time()
+    #
+    #     thar_dispsol = {}
+    #
+    #     #loop over all orders
+    #     #for ord in sorted(thardata['flux'].iterkeys()):
+    #     for ord in ['order_01']:
+    #
+    #         if verbose:
+    #             print('Finding wavelength solution for '+str(ord))
+    #
+    #         #find fitted x-positions of ThAr peaks
+    #         fitted_thar_pos, thar_qualflag = fit_emission_lines(thardata['flux'][ord], return_all_pars=False, return_qualflag=True, varbeta=False)
+    #         x = fitted_thar_pos.copy()
+    #
+    #         #these are the theoretical wavelengths from the NIST linelists
+    #         lam = (refdata[ord]['wl']).flatten()
+    #
+    #         #exclude some peaks as they are a blend of multiple lines: TODO: clean up
+    #         filt = np.ones(len(fitted_thar_pos),dtype='bool')
+    #         filt[[33,40,42,58,60]] = False
+    #         x = x[filt]
+    #
+    #         #fit polynomial to lambda as a function of x
+    #         thar_fit = np.poly1d(np.polyfit(x, lam, deg_polynomial))
+    #         #save to output dictionary
+    #         thar_dispsol[ord] = thar_fit
+    #
+    #     if timit:
+    #         print('Time taken for finding ThAr wavelength solution: '+str(time.time() - start_time)+' seconds...')
+    #
+    #     return thar_dispsol
+    #
+    #
+    # # '''xxx'''
+    # # #################################################################
+    # # # the following is needed as input for "get_dispsol_from_laser" #
+    # # #################################################################
+    # # laser_ref_wl,laser_relint = readcol('/Users/christoph/OneDrive - UNSW/linelists/laser_linelist_25GHz.dat',fsep=';',twod=False)
+    # # laser_ref_wl *= 1e3
+    # #
+    # # #wavelength solution from HDF file
+    # # #read dispersion solution from file
+    # # dispsol = np.load('/Users/christoph/OneDrive - UNSW/dispsol/mean_dispsol_by_orders_from_zemax.npy').item()
+    # # #read extracted spectrum from files (obviously this needs to be improved)
+    # # xx = np.arange(4096)
+    # # #this is so as to match the order number with the physical order number (66 <= m <= 108)
+    # # # order01 corresponds to m=66
+    # # # order43 corresponds to m=108
+    # # wl = {}
+    # # for ord in dispsol.keys():
+    # #     m = ord[5:]
+    # #     ordnum = str(int(m)-65).zfill(2)
+    # #     wl['order_'+ordnum] = dispsol['order'+m]['model'](xx)
+    #
+    #
+    #
+    #
+    #
+    # def get_dispsol_from_laser(laserdata, laser_ref_wl, deg_polynomial=5, timit=False, verbose=False, return_stats=False, varbeta=False):
+    #     """
+    #     NOT CURRENTLY USED
+    #     """
+    #
+    #     if timit:
+    #         start_time = time.time()
+    #
+    #     if return_stats:
+    #         stats = {}
+    #
+    #     #read in mask for fibre_01 (ie the Laser-comb fibre) from order_tracing as a first step in excluding low-flux regions
+    #     mask_01 = np.load('/Users/christoph/OneDrive - UNSW/fibre_profiles/masks/mask_01.npy').item()
+    #
+    #     laser_dispsol = {}
+    #
+    #     #loop over all orders
+    #     #order 43 does not work properly, as some laser peaks are missing!!!
+    #     for ord in sorted(laserdata['flux'].iterkeys())[:-1]:
+    #
+    #         if verbose:
+    #             print('Finding wavelength solution for '+str(ord))
+    #
+    #         #find fitted x-positions of ThAr peaks
+    #         data = laserdata['flux'][ord] * mask_01[ord]
+    #         goodpeaks,mostpeaks,allpeaks,first_mask,second_mask,third_mask = find_suitable_peaks(data,return_masks=True)    #from this we just want the masks this time (should be very fast)
+    #         #fitted_laser_pos, laser_qualflag = fit_emission_lines(data, laser=True, return_all_pars=False, return_qualflag=True, varbeta=varbeta)
+    #         if varbeta:
+    #             fitted_laser_pos, fitted_laser_sigma, fitted_laser_amp, fitted_laser_beta = fit_emission_lines(data, laser=True, return_all_pars=True, return_qualflag=False, varbeta=varbeta, timit=timit, verbose=verbose)
+    #         else:
+    #             fitted_laser_pos, fitted_laser_sigma, fitted_laser_amp = fit_emission_lines(data, laser=True, return_all_pars=True, return_qualflag=False, varbeta=varbeta, timit=timit, verbose=verbose)
+    #         x = fitted_laser_pos.copy()
+    #         #exclude the leftmost and rightmost peaks (nasty edge effects...)
+    # #         blue_cutoff = int(np.round((x[-1]+x[-2])/2.,0))
+    # #         red_cutoff = int(np.round((x[0]+x[1])/2.,0))
+    #         blue_cutoff = int(np.round(allpeaks[-1]+((allpeaks[-1] - allpeaks[-2])/2),0))
+    #         red_cutoff = int(np.round(allpeaks[0]-((allpeaks[1] - allpeaks[0])/2),0))
+    #         cond1 = (laser_ref_wl >= wl[ord][blue_cutoff])
+    #         cond2 = (laser_ref_wl <= wl[ord][red_cutoff])
+    #         #these are the theoretical wavelengths from the NIST linelists
+    #         lam = laser_ref_wl[np.logical_and(cond1,cond2)][::-1]
+    #         lam = lam[first_mask][second_mask][third_mask]
+    #
+    #         #check if the number of lines found equals the number of lines from the line list
+    # #         if verbose:
+    # #             print(len(x),len(lam))
+    #         if len(x) != len(lam):
+    #             print('fuganda')
+    #             return 'fuganda'
+    #
+    #         #fit polynomial to lambda as a function of x
+    #         laser_fit = np.poly1d(np.polyfit(x, lam, deg_polynomial))
+    #
+    #         if return_stats:
+    #             stats[ord] = {}
+    #             resid = laser_fit(x) - lam
+    #             stats[ord]['resids'] = resid
+    #             #mean error in RV for a single line = c * (stddev(resid) / mean(lambda))
+    #             stats[ord]['single_rverr'] = 3e8 * (np.std(resid) / np.mean(lam))
+    #             stats[ord]['rverr'] = 3e8 * (np.std(resid) / np.mean(lam)) / np.sqrt(len(lam))
+    #             stats[ord]['n_lines'] = len(lam)
+    #
+    #         #save to output dictionary
+    #         laser_dispsol[ord] = laser_fit
+    #
+    #
+    #     #let's do order 43 differently because it has the stupid gap in the middle
+    #     #find fitted x-positions of ThAr peaks
+    #     ord = 'order_43'
+    #     if verbose:
+    #             print('Finding wavelength solution for '+str(ord))
+    #     data = laserdata['flux'][ord] * mask_01[ord]
+    #     data1 = data[:2500]
+    #     data2 = data[2500:]
+    #     goodpeaks1,mostpeaks1,allpeaks1,first_mask1,second_mask1,third_mask1 = find_suitable_peaks(data1,return_masks=True)    #from this we just want use_mask this time (should be very fast)
+    #     goodpeaks2,mostpeaks2,allpeaks2,first_mask2,second_mask2,third_mask2 = find_suitable_peaks(data2,return_masks=True)    #from this we just want use_mask this time (should be very fast)
+    #     #fitted_laser_pos1, laser_qualflag1 = fit_emission_lines(data1, laser=True, return_all_pars=False, return_qualflag=True, varbeta=varbeta)
+    #     #fitted_laser_pos2, laser_qualflag2 = fit_emission_lines(data2, laser=True, return_all_pars=False, return_qualflag=True, varbeta=varbeta)
+    #     if varbeta:
+    #         fitted_laser_pos1, fitted_laser_sigma1, fitted_laser_amp1, fitted_laser_beta1 = fit_emission_lines(data1, laser=True, return_all_pars=True, return_qualflag=False, varbeta=varbeta)
+    #         fitted_laser_pos2, fitted_laser_sigma2, fitted_laser_amp2, fitted_laser_beta2 = fit_emission_lines(data2, laser=True, return_all_pars=True, return_qualflag=False, varbeta=varbeta)
+    #     else:
+    #         fitted_laser_pos1, fitted_laser_sigma1, fitted_laser_amp1 = fit_emission_lines(data1, laser=True, return_all_pars=True, return_qualflag=False, varbeta=varbeta)
+    #         fitted_laser_pos2, fitted_laser_sigma2, fitted_laser_amp2 = fit_emission_lines(data2, laser=True, return_all_pars=True, return_qualflag=False, varbeta=varbeta)
+    #     x1 = fitted_laser_pos1.copy()
+    #     x2 = fitted_laser_pos2.copy() + 2500
+    #     #exclude the leftmost and rightmost peaks (nasty edge effects...)
+    # #         blue_cutoff = int(np.round((x[-1]+x[-2])/2.,0))
+    # #         red_cutoff = int(np.round((x[0]+x[1])/2.,0))
+    #     blue_cutoff1 = int(np.round(allpeaks1[-1]+((allpeaks1[-1] - allpeaks1[-2])/2),0))
+    #     blue_cutoff2 = int(np.round(allpeaks2[-1]+((allpeaks2[-1] - allpeaks2[-2])/2)+2500,0))
+    #     red_cutoff1 = int(np.round(allpeaks1[0]-((allpeaks1[1] - allpeaks1[0])/2),0))
+    #     red_cutoff2 = int(np.round(allpeaks2[0]-((allpeaks2[1] - allpeaks2[0])/2)+2500,0))
+    #     cond1_1 = (laser_ref_wl >= wl[ord][blue_cutoff1])
+    #     cond1_2 = (laser_ref_wl >= wl[ord][blue_cutoff2])
+    #     cond2_1 = (laser_ref_wl <= wl[ord][red_cutoff1])
+    #     cond2_2 = (laser_ref_wl <= wl[ord][red_cutoff2])
+    #     #these are the theoretical wavelengths from the NIST linelists
+    #     lam1 = laser_ref_wl[np.logical_and(cond1_1,cond2_1)][::-1]
+    #     lam2 = laser_ref_wl[np.logical_and(cond1_2,cond2_2)][::-1]
+    #     lam1 = lam1[first_mask1][second_mask1][third_mask1]
+    #     lam2 = lam2[first_mask2][second_mask2][third_mask2]
+    #
+    #     x = np.r_[x1,x2]
+    #     lam = np.r_[lam1,lam2]
+    #
+    #     #check if the number of lines found equals the number of lines from the line list
+    #     if verbose:
+    #         print(len(x),len(lam))
+    #     if len(x) != len(lam):
+    #         print('fuganda')
+    #         return 'fuganda'
+    #
+    #     #fit polynomial to lambda as a function of x
+    #     laser_fit = np.poly1d(np.polyfit(x, lam, deg_polynomial))
+    #
+    #     if return_stats:
+    #         stats[ord] = {}
+    #         resid = laser_fit(x) - lam
+    #         stats[ord]['resids'] = resid
+    #         #mean error in RV for a single line = c * (stddev(resid) / mean(lambda))
+    #         stats[ord]['single_rverr'] = 3e8 * (np.std(resid) / np.mean(lam))
+    #         stats[ord]['rverr'] = 3e8 * (np.std(resid) / np.mean(lam)) / np.sqrt(len(lam))
+    #         stats[ord]['n_lines'] = len(lam)
+    #
+    #     #save to output dictionary
+    #     laser_dispsol[ord] = laser_fit
+    #
+    #     if timit:
+    #         print('Time taken for finding Laser-comb wavelength solution: '+str(time.time() - start_time)+' seconds...')
+    #
+    #     if return_stats:
+    #         return laser_dispsol, stats
+    #     else:
+    #         return laser_dispsol
+    #
+    #
+    #
+    #
+    #
+    # ###########################################################################################################
+    # # laser_dispsol2,stats2 = get_dispsol_from_laser(laserdata, laser_ref_wl, verbose=True, timit=True, return_stats=True, deg_polynomial=2)
+    # # laser_dispsol3,stats3 = get_dispsol_from_laser(laserdata, laser_ref_wl, verbose=True, timit=True, return_stats=True, deg_polynomial=3)
+    # # laser_dispsol5,stats5 = get_dispsol_from_laser(laserdata, laser_ref_wl, verbose=True, timit=True, return_stats=True, deg_polynomial=5)
+    # # laser_dispsol11,stats11 = get_dispsol_from_laser(laserdata, laser_ref_wl, verbose=True, timit=True, return_stats=True, deg_polynomial=11)
+    # ###########################################################################################################
+
+
+
+
 
     #     if new_ordnum == 2:
     #         mask = np.zeros(len(data), dtype='bool')

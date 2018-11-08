@@ -465,7 +465,7 @@ plt.savefig(path + 'linefit_'+type+'.eps')
 
 
 ####################################################################################################################################
-path = '/Volumes/BERGRAID/data/veloce/dispsol_tests/20180917/'
+path = '/Users/christoph/OneDrive - UNSW/dispsol_tests/20180917/'
 indfib_thflux_so = pyfits.getdata(path + 'ARC_ThAr_17sep30080_optimal3a_extracted_with_slope_and_offset.fits')
 fibname = ['S5', 'S2', '07', '18', '17', '06', '16', '15', '05', '14', '13', '01', '12', '11', '04', '10', '09', '03', '08', '19', '02', 'S4', 'S3', 'S1']
 for i in range(24):
@@ -556,26 +556,26 @@ for i in range(24):
    
 ####################################################################################################################################
 # difference in pixel space (ie peak locations)    
-path = '/Volumes/BERGRAID/data/veloce/dispsol_tests/20180917/'
+path = '/Users/christoph/OneDrive - UNSW/dispsol_tests/20180917/'
 xx = np.arange(4112)
 fibslot = [0,1,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,23,24,25]
 fibname = ['S5', 'S2', '07', '18', '17', '06', '16', '15', '05', '14', '13', '01', '12', '11', '04', '10', '09', '03', '08', '19', '02', 'S4', 'S3', 'S1']
 
 pixfit_coeffs = []
-zeroth_coeffs = np.zeros(39,24)
-first_coeffs = np.zeros(39,24)
+zeroth_coeffs = np.zeros((39,24))
+first_coeffs = np.zeros((39,24))
 
 # o = 38
 for o in range(39):
     
-    # ref_filename = path + 'thar_lines_fibre_' + fibname[0] + '_as_of_2018-10-30.dat'
-    # linenum, order, m, pix, wlref, vac_wlref = readcol(ref_filename, twod=False, skipline=2)
-    linenum, order, m, pix, wlref, vac_wlref, _, _, _, _ = readcol('/Users/christoph/OneDrive - UNSW/linelists/thar_lines_used_in_7x7_fit_as_of_2018-10-19.dat', twod=False, skipline=2)
+    ref_filename = path + 'thar_lines_fibre_' + fibname[0] + '_as_of_2018-10-30.dat'
+    linenum, order, m, pix, wlref, vac_wlref = readcol(ref_filename, twod=False, skipline=2)
+    # linenum, order, m, pix, wlref, vac_wlref, _, _, _, _ = readcol('/Users/christoph/OneDrive - UNSW/linelists/thar_lines_used_in_7x7_fit_as_of_2018-10-19.dat', twod=False, skipline=2)
     ix = np.argwhere(order == o+1).flatten()
     ref_x = pix[ix]
     ref_wlref = wlref[ix]
-    order_fit = np.poly1d(np.polyfit(ref_x, ref_wlref, 5))
-    ref_fit = order_fit(xx)
+#     order_fit = np.poly1d(np.polyfit(ref_x, ref_wlref, 5))
+#     ref_fit = order_fit(xx)
     
     ord_pixfit_coeffs = []
     ord_zeroth_coeffs = []
@@ -588,7 +588,8 @@ for o in range(39):
         x = pix[ix]
         lam = wlref[ix]
         matched_ref_x = ref_x[np.in1d(ref_wlref, lam)]
-        delta_x = x - matched_ref_x
+        matched_x = x[np.in1d(lam, ref_wlref)]
+        delta_x = matched_x - matched_ref_x
     #     plt.plot(matched_ref_x, x - matched_ref_x, 'x-', label='fibre '+fibname[i])
         # perform sanity-check 1D fit (remove only very obvious outliers, as there is quite a bit of scatter)
         test_fit = np.poly1d(np.polyfit(matched_ref_x, delta_x, 1))
@@ -596,7 +597,7 @@ for o in range(39):
             plt.figure()
             plt.plot(matched_ref_x, delta_x, 'x-')
             plt.title('fibre '+fibname[i])
-            plt.plot(xx, test_fit(xx))
+            plt.plot(xx, test_fit(xx), 'r--')
             plt.xlim(0, 4111)
         # remove obvious outliers
         fitres = delta_x - test_fit(matched_ref_x)
@@ -604,6 +605,9 @@ for o in range(39):
         goodres,goodix,badix = single_sigma_clip(fitres, 2, return_indices=True)
         #fit again
         pix_fit = np.poly1d(np.polyfit(matched_ref_x[goodix], delta_x[goodix], 1))
+        if debug_level >= 2:
+            plt.scatter(matched_ref_x[badix], delta_x[badix], color='r', marker='o')
+            plt.plot(xx, pix_fit(xx), 'g-')
         ord_pixfit_coeffs.append(pix_fit)
         ord_zeroth_coeffs.append(pix_fit[0])
         ord_first_coeffs.append(pix_fit[1])
@@ -614,10 +618,7 @@ for o in range(39):
     # now fill array of fit coefficients
     pixfit_coeffs.append(ord_pixfit_coeffs)
     zeroth_coeffs[o,:] = ord_zeroth_coeffs
-    first_coeffs[o,:] = ord_first_coeffs 
-    
-    
-    
+    first_coeffs[o,:] = ord_first_coeffs     
     
     # now save a plot of both 0th and 1st order terms
     if saveplots:
