@@ -1,4 +1,5 @@
 from lmfit.models import LorentzianModel
+from bokeh.colors import black
 
 
 
@@ -555,107 +556,55 @@ for i in range(24):
     
    
 ####################################################################################################################################
-# difference in pixel space (ie peak locations)    
-path = '/Users/christoph/OneDrive - UNSW/dispsol_tests/20180917/'
-xx = np.arange(4112)
-fibslot = [0,1,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,23,24,25]
-fibname = ['S5', 'S2', '07', '18', '17', '06', '16', '15', '05', '14', '13', '01', '12', '11', '04', '10', '09', '03', '08', '19', '02', 'S4', 'S3', 'S1']
 
-pixfit_coeffs = []
-zeroth_coeffs = np.zeros((39,24))
-first_coeffs = np.zeros((39,24))
-
-# o = 38
-for o in range(39):
-    
-    ref_filename = path + 'thar_lines_fibre_' + fibname[0] + '_as_of_2018-10-30.dat'
-    linenum, order, m, pix, wlref, vac_wlref = readcol(ref_filename, twod=False, skipline=2)
-    # linenum, order, m, pix, wlref, vac_wlref, _, _, _, _ = readcol('/Users/christoph/OneDrive - UNSW/linelists/thar_lines_used_in_7x7_fit_as_of_2018-10-19.dat', twod=False, skipline=2)
-    ix = np.argwhere(order == o+1).flatten()
-    ref_x = pix[ix]
-    ref_wlref = wlref[ix]
-#     order_fit = np.poly1d(np.polyfit(ref_x, ref_wlref, 5))
-#     ref_fit = order_fit(xx)
-    
-    ord_pixfit_coeffs = []
-    ord_zeroth_coeffs = []
-    ord_first_coeffs = []
-    
-    for i in range(24):
-        filename = path + 'thar_lines_fibre_' + fibname[i] + '_as_of_2018-10-30.dat'
-        linenum, order, m, pix, wlref, vac_wlref = readcol(filename, twod=False, skipline=2)
-        ix = np.argwhere(order == o+1).flatten()
-        x = pix[ix]
-        lam = wlref[ix]
-        matched_ref_x = ref_x[np.in1d(ref_wlref, lam)]
-        matched_x = x[np.in1d(lam, ref_wlref)]
-        delta_x = matched_x - matched_ref_x
-    #     plt.plot(matched_ref_x, x - matched_ref_x, 'x-', label='fibre '+fibname[i])
-        # perform sanity-check 1D fit (remove only very obvious outliers, as there is quite a bit of scatter)
-        test_fit = np.poly1d(np.polyfit(matched_ref_x, delta_x, 1))
-        if debug_level >= 2:
-            plt.figure()
-            plt.plot(matched_ref_x, delta_x, 'x-')
-            plt.title('fibre '+fibname[i])
-            plt.plot(xx, test_fit(xx), 'r--')
-            plt.xlim(0, 4111)
-        # remove obvious outliers
-        fitres = delta_x - test_fit(matched_ref_x)
-        # do single sigma clipping
-        goodres,goodix,badix = single_sigma_clip(fitres, 2, return_indices=True)
-        #fit again
-        pix_fit = np.poly1d(np.polyfit(matched_ref_x[goodix], delta_x[goodix], 1))
-        if debug_level >= 2:
-            plt.scatter(matched_ref_x[badix], delta_x[badix], color='r', marker='o')
-            plt.plot(xx, pix_fit(xx), 'g-')
-        ord_pixfit_coeffs.append(pix_fit)
-        ord_zeroth_coeffs.append(pix_fit[0])
-        ord_first_coeffs.append(pix_fit[1])
-#         #now fit new dispsol to the model-shifted lines
-#         order_fit = np.poly1d(np.polyfit(ref_x + pix_fit(ref_x), ref_wlref, 5))
-#         plt.plot(xx, order_fit(xx) - ref_fit, label='fibre '+fibname[i])
-    
-    # now fill array of fit coefficients
-    pixfit_coeffs.append(ord_pixfit_coeffs)
-    zeroth_coeffs[o,:] = ord_zeroth_coeffs
-    first_coeffs[o,:] = ord_first_coeffs     
-    
-    # now save a plot of both 0th and 1st order terms
-    if saveplots:
-        
-        ordstring = 'Order_'+str(o+1).zfill(2)    
-    
-    #     plt.figure()
-        plt.plot(fibslot, zeroth_coeffs, 'bo-')
-        plt.title('0th order coefficients  -  ' + ordstring)
-        plt.xlim(-2,27)
-        plt.xlabel('fibre')
-        plt.ylabel('offset [pix]')
-        plt.axvline(2, color='gray', linestyle=':')
-        plt.axvline(22, color='gray', linestyle=':')    
-        plt.savefig(path + '0th_order_coeffs_pixel_shits_' + ordstring + '.eps')
-        plt.clf()
-        
-    #     plt.figure()
-        plt.plot(fibslot, first_coeffs, 'bo')
-        plt.title('1st order coefficients  -  ' + ordstring)
-        plt.xlim(-2,27)
-        plt.xlabel('fibre')
-        plt.ylabel('slope')
-        plt.axvline(2, color='gray', linestyle=':')
-        plt.axvline(22, color='gray', linestyle=':')    
-        slope_fit = np.poly1d(np.polyfit(fibslot, first_coeffs, 2))
-        plot_x = np.arange(-1,26,0.1)
-        plt.plot(plot_x, slope_fit(plot_x), 'r')
-        plt.savefig(path + '1st_order_coeffs_pixel_shits_' + ordstring + '.eps')
-        plt.clf()
     
     
     
     
     
+def get_dispsol_for_all_fibs(shift=0, pixfit_coeffs=None, relto='S1', fibs='all', dim=1, degpol=7, debug_level=0, timit=False):
     
+    if pixfit_coeffs is None:
+        # laod default coefficients
+        pixfit_coeffs = np.load('/Users/christoph/OneDrive - UNSW/dispsol_tests/20180917/pixfit_coeffs_relto_' + relto + '_as_of_2018-11-09.npy').item()
     
+    fibslot = [0,1,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,23,24,25]
+    fibname = ['S5', 'S2', '07', '18', '17', '06', '16', '15', '05', '14', '13', '01', '12', '11', '04', '10', '09', '03', '08', '19', '02', 'S4', 'S3', 'S1']
+    xx = np.arange(4112)
+    
+    # read master LFC linelist
+    lfc_ord, lfc_pix, lfc_wl = readcol('/Users/christoph/OneDrive - UNSW/dispsol/laser_dispsol_20181015/PeakPos.txt', twod=False)
+    
+    n_ord = len(np.unique(lfc_ord))
+    
+    if dim == 1:
+        if debug_level >= 1:
+            print('OK, getting a 1-D wavelength solution...')
+        # loop over all orders
+        for o in np.unique(lfc_ord):
+            
+            ord = 'order_'+str(o+1).zfill(2)
+            
+            ix = np.argwhere(lfc_ord == o).flatten()
+            x = lfc_pix[ix] + shift
+            lam = lfc_wl[ix]
+            lfc_fit = np.poly1d(np.polyfit(x, lam, degpol))
+            # loop over all fibres
+            for fib in enumerate(fibname):
+                xfib = x + pixfit_coeffs[ord]['fibre_'+fib](x)
+                fib_fit = np.poly1d(np.polyfit(xfib, lam, degpol))
+            
+            
+            
+            
+    elif dim == 2:
+        if debug_level >= 1:
+            print('OK, getting a 2-D wavelength solution...')
+        print('blablabla')
+    else:
+        print('ERROR: "dim" must either be 1 or 2!!!')
+        return -1
+  
     
     
     
