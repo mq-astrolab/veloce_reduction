@@ -19,7 +19,7 @@ import datetime
 import astropy.io.fits as pyfits
 
 from veloce_reduction.veloce_reduction.helper_functions import fibmodel_with_amp, CMB_pure_gaussian, multi_fibmodel_with_amp, CMB_multi_gaussian, offset_pseudo_gausslike
-from veloce_reduction.veloce_reduction.helper_functions import fit_poly_surface_2D, single_sigma_clip, find_nearest, gaussian_with_offset_and_slope
+from veloce_reduction.veloce_reduction.helper_functions import fit_poly_surface_2D, single_sigma_clip, find_nearest, gaussian_with_offset_and_slope, fibmodel_with_amp_and_offset
 from veloce_reduction.utils.linelists import make_gaussmask_from_linelist 
 
 
@@ -1806,6 +1806,116 @@ def define_pixel_offsets_between_fibres(relto='S1', savedict=False, saveplots=Fa
             plt.clf()
     
     return pixfit_coeffs
+
+
+
+
+
+def get_dispsol_for_all_fibs(shift=0, pixfit_coeffs=None, relto='S1', twod=False, degpol=7, deg_spectral=7, deg_spatial=7, polytype='chebyshev', nx=4112, debug_level=0, timit=False):
+    
+    if pixfit_coeffs is None:
+        # laod default coefficients
+        pixfit_coeffs = np.load('/Users/christoph/OneDrive - UNSW/dispsol_tests/20180917/pixfit_coeffs_relto_' + relto + '_as_of_2018-11-09.npy').item()
+    
+    # fibslot = [0,1,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,23,24,25]
+    fibname = ['S5', 'S2', '07', '18', '17', '06', '16', '15', '05', '14', '13', '01', '12', '11', '04', '10', '09', '03', '08', '19', '02', 'S4', 'S3', 'S1']
+    
+    nfib = len(fibname)
+    
+    # read master LFC linelist
+    lfc_ord, lfc_pix, lfc_wl = readcol('/Users/christoph/OneDrive - UNSW/dispsol/laser_dispsol_20181015/PeakPos.txt', twod=False)
+    
+    # some housekeeping...
+    n_ord = len(np.unique(lfc_ord)) 
+    xx = np.arange(nx)
+    
+    # prepare output array
+    wldict = {}
+    # wl = np.zeros((n_ord, nfib, nx))
+    wl = np.zeros((40, nfib, nx))
+    
+    if not twod:
+        if debug_level >= 1:
+            print('OK, getting a 1-D wavelength solution...')
+        # loop over all orders
+        for o in np.unique(lfc_ord)[:-1]:
+            ord = 'order_'+str(o+1).zfill(2)     # DW's order numbers are offset by one to CB's
+            wldict[ord] = {}
+            ix = np.argwhere(lfc_ord == o).flatten()
+            x = lfc_pix[ix] + shift
+            lam = lfc_wl[ix]
+            lfc_fit = np.poly1d(np.polyfit(x, lam, degpol))
+            wldict[ord]['laser'] = lfc_fit(xx)
+            
+            # loop over all fibres
+            for i,fib in enumerate(fibname):
+                xfib = x + pixfit_coeffs[ord]['fibre_'+fib](x)
+                fib_fit = np.poly1d(np.polyfit(xfib, lam, degpol))
+                wldict[ord][fib] = fib_fit(xx)
+                wl[o,i,:] = fib_fit(xx)
+            
+    else:
+        if debug_level >= 1:
+            print('OK, getting a 2-D wavelength solution...')
+            
+        order = lfc_ord.copy() + 1     # DW's order numbers are offset by one to CB's
+        pixel = np.tile(lfc_pix.copy(), (nfib,1))
+        lam = lfc_wl.copy()
+        
+        # temporarily remove the blue-most order until I have incorporated that into the rest of the reduction
+        dumix = np.argwhere(lfc_ord == 39).flatten()
+        order = np.delete(order, dumix)
+        pixel = np.delete(pixel,dumix,1)
+        lam = np.delete(lam,dumix)
+        
+        # fit the pure LFC dispsol
+        x_norm = np.squeeze( (pixel[0,:] / ((nx-1)/2.)) - 1. )
+        order_norm = np.squeeze( ((order-1) / ((40-1)/2.)) - 1. )
+        p_wl_lfc = fit_poly_surface_2D(x_norm, order_norm, lam, weights=None, polytype=polytype, poly_deg_x=deg_spectral, poly_deg_y=deg_spatial, debug_level=0)    
+        # calculate wavelengths from model for full (n_ord x n_pix)-array
+        xxn = (xx / ((len(xx)-1)/2.)) - 1.
+        oo = np.arange(1,41)
+        oon = ((oo-1) / ((40-1)/2.)) - 1.   
+        X,O = np.meshgrid(xxn,oon)
+        wl_lfc = p_wl_lfc(X,O)
+            
+        # loop over all orders
+        for o in np.unique(lfc_ord)[:-1]:    
+            ord = 'order_'+str(o+1).zfill(2)     # DW's order numbers are offset by one to CB's
+            wldict[ord] = {}
+            ix = np.argwhere(lfc_ord == o).flatten()
+            x = lfc_pix[ix] + shift
+            # loop over all fibres
+            for i,fib in enumerate(fibname):
+                pixel[i,ix] = x + pixfit_coeffs[ord]['fibre_'+fib](x)
+        
+        # now fit a 2-D wavelength solution for each fibre individually
+        # loop over all fibres
+        for i,fib in enumerate(fibname):
+            if debug_level >= 1:
+                print(fib)
+            # print(fib)
+            # go to normalized co-ordinates
+            x_norm = np.squeeze( (pixel[i,:] / ((nx-1)/2.)) - 1. )
+            order_norm = np.squeeze( ((order-1) / ((40-1)/2.)) - 1. )
+        
+            # call the 2D fitting routine
+            p_wl = fit_poly_surface_2D(x_norm, order_norm, lam, weights=None, polytype=polytype, poly_deg_x=deg_spectral, poly_deg_y=deg_spatial, debug_level=0)    
+            
+            # calculate wavelengths from model for full (n_ord x n_pix)-array
+            xxn = (xx / ((len(xx)-1)/2.)) - 1.
+            oo = np.arange(1,41)
+            oon = ((oo-1) / ((40-1)/2.)) - 1.   
+            X,O = np.meshgrid(xxn,oon)
+            wl[:,i,:] = p_wl(X,O)
+            
+        for i,o in enumerate(np.unique(lfc_ord)[:-1]):    
+            ord = 'order_'+str(o+1).zfill(2)
+            for j,fib in enumerate(fibname):
+                wldict[ord]['fibre_'+fib] = wl[o,j,:].copy()
+            wldict[ord]['laser'] = wl_lfc[o,:].copy()
+             
+    return wldict,wl
 
 
 

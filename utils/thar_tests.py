@@ -562,50 +562,7 @@ for i in range(24):
     
     
     
-def get_dispsol_for_all_fibs(shift=0, pixfit_coeffs=None, relto='S1', fibs='all', dim=1, degpol=7, debug_level=0, timit=False):
-    
-    if pixfit_coeffs is None:
-        # laod default coefficients
-        pixfit_coeffs = np.load('/Users/christoph/OneDrive - UNSW/dispsol_tests/20180917/pixfit_coeffs_relto_' + relto + '_as_of_2018-11-09.npy').item()
-    
-    fibslot = [0,1,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,23,24,25]
-    fibname = ['S5', 'S2', '07', '18', '17', '06', '16', '15', '05', '14', '13', '01', '12', '11', '04', '10', '09', '03', '08', '19', '02', 'S4', 'S3', 'S1']
-    xx = np.arange(4112)
-    
-    # read master LFC linelist
-    lfc_ord, lfc_pix, lfc_wl = readcol('/Users/christoph/OneDrive - UNSW/dispsol/laser_dispsol_20181015/PeakPos.txt', twod=False)
-    
-    n_ord = len(np.unique(lfc_ord))
-    
-    if dim == 1:
-        if debug_level >= 1:
-            print('OK, getting a 1-D wavelength solution...')
-        # loop over all orders
-        for o in np.unique(lfc_ord):
-            
-            ord = 'order_'+str(o+1).zfill(2)
-            
-            ix = np.argwhere(lfc_ord == o).flatten()
-            x = lfc_pix[ix] + shift
-            lam = lfc_wl[ix]
-            lfc_fit = np.poly1d(np.polyfit(x, lam, degpol))
-            # loop over all fibres
-            for fib in enumerate(fibname):
-                xfib = x + pixfit_coeffs[ord]['fibre_'+fib](x)
-                fib_fit = np.poly1d(np.polyfit(xfib, lam, degpol))
-            
-            
-            
-            
-    elif dim == 2:
-        if debug_level >= 1:
-            print('OK, getting a 2-D wavelength solution...')
-        print('blablabla')
-    else:
-        print('ERROR: "dim" must either be 1 or 2!!!')
-        return -1
-  
-    
+
     
     
     
