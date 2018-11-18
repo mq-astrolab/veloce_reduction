@@ -8,7 +8,6 @@ import astropy.io.fits as pyfits
 import numpy as np
 import time
 import os
-import barycorrpy
 
 from veloce_reduction.veloce_reduction.helper_functions import binary_indices
 from veloce_reduction.veloce_reduction.calibration import correct_for_bias_and_dark_from_filename
@@ -300,11 +299,14 @@ def process_science_images(imglist, P_id, mask=None, sampling_size=25, slit_heig
 # 
 # 
 #         # (9) get barycentric correction
-#         lat, long, alt = get_obs_coords_from_header(fn)
-#         bc = barycorrpy.get_BC_vel(JDUTC=JDUTC, hip_id=8102, lat=lat, longi=long, alt=float(alt), ephemeris='de430', zmeas=0.0)
-#         #bc = barycorrpy.get_BC_vel(JDUTC=JDUTC, hip_id=8102, lat=-31.2755, longi=149.0673, alt=1165.0, ephemeris='de430', zmeas=0.0)
-#         #bc = barycorrpy.get_BC_vel(JDUTC=JDUTC, hip_id=8102, obsname='AAO', ephemeris='de430')
-# 
+#         lat, long, alt = get_obs_coords_from_header(fn)    # not really necessary, obsname='AAO' does the trick (agree to within ~0.01 cm/s!!!
+#         utmjd = pyfits.getval(fn, 'UTMJD') + 2.4e6
+#         ra = pyfits.getval(fn, 'MEANRA')
+#         dec = pyfits.getval(fn, 'MEANDEC')
+#         # HMMM...using hip_id=xxx and actual coordinates from header makes a huge difference (~11m/s for the tau Ceti example I tried)!!!
+#         bc1 = barycorrpy.get_BC_vel(JDUTC=utmjd, hip_id=8102, obsname='AAO', ephemeris='de430')
+#         bc2 = barycorrpy.get_BC_vel(JDUTC=utmjd, ra=ra, dec=dec, obsname='AAO', ephemeris='de430')
+#
 #         #now append relints, wl-solution, and barycorr to extracted FITS file header
 #         outfn = path + obsname + '_extracted.fits'
 #         if os.path.isfile(outfn):

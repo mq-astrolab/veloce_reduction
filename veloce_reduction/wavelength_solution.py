@@ -21,6 +21,7 @@ import astropy.io.fits as pyfits
 from veloce_reduction.veloce_reduction.helper_functions import fibmodel_with_amp, CMB_pure_gaussian, multi_fibmodel_with_amp, CMB_multi_gaussian, offset_pseudo_gausslike
 from veloce_reduction.veloce_reduction.helper_functions import fit_poly_surface_2D, single_sigma_clip, find_nearest, gaussian_with_offset_and_slope, fibmodel_with_amp_and_offset
 from veloce_reduction.utils.linelists import make_gaussmask_from_linelist 
+from numpy.fft import using_mklfft
 
 
 
@@ -1097,7 +1098,8 @@ def quick_bg_fix(raw_data, npix=4112):
 
 
 
-def get_arc_dispsol(thflux, satmask=None, polytype='chebyshev', lamptype=None, deg_spectral=5, deg_spatial=3, return_full=True, savetables=True, debug_level=0, timit=False):
+def get_arc_dispsol(thflux, satmask=None, polytype='chebyshev', lamptype=None, deg_spectral=5, deg_spatial=3,
+                    return_full=True, savetables=True, debug_level=0, timit=False):
 
     if lamptype.lower() not in ['thar', 'thxe']:
         lamptype = raw_input('Please enter valid lamp type ["thar" / "thxe"]: ')
@@ -1528,8 +1530,9 @@ def xcorr_thflux(thflux, thflux2, scale=300., masking=True, satmask=None, lampty
 
 
 
-def get_dispsol_from_known_lines(thflux, fibre=None, fitwidth=4, satmask=None, lamptype='thar', minsigma=0.4, maxsigma=2., sigma_0=0.85, minamp=0., maxamp=np.inf, return_all_pars=False, 
-                                 deg_spectral=7, deg_spatial=7, polytype='chebyshev', return_full=True, savetable=True, outpath=None, debug_level=0, timit=False):
+def get_dispsol_from_known_lines(thflux, fibre=None, fitwidth=4, satmask=None, lamptype='thar', minsigma=0.4, maxsigma=2.,
+                                 sigma_0=0.85, minamp=0., maxamp=np.inf, return_all_pars=False, deg_spectral=7, deg_spatial=7,
+                                 polytype='chebyshev', return_full=True, savetable=True, outpath=None, debug_level=0, timit=False):
 
     #read master table
     linenum, order, m, pix, wlref, vac_wlref, _, _, _, _ = readcol('/Users/christoph/OneDrive - UNSW/linelists/thar_lines_used_in_7x7_fit_as_of_2018-10-19.dat', twod=False, skipline=2)
@@ -1702,7 +1705,7 @@ def get_dispsol_from_known_lines(thflux, fibre=None, fitwidth=4, satmask=None, l
 
 
 
-def define_pixel_offsets_between_fibres(relto='S1', savedict=False, saveplots=False, debug_level=0):
+def define_pixel_offsets_between_fibres(relto='S1', savedict=False, saveplots=False, extra_lfc_offset=True, return_all=False, debug_level=0):
     # difference in pixel space (ie peak locations)    
     path = '/Users/christoph/OneDrive - UNSW/dispsol_tests/20180917/'
     xx = np.arange(4112)
@@ -1713,7 +1716,6 @@ def define_pixel_offsets_between_fibres(relto='S1', savedict=False, saveplots=Fa
     zeroth_coeffs = np.zeros((39,24))
     first_coeffs = np.zeros((39,24))
     
-    # o = 38
     for o in range(39):
         
         ord = 'order_'+str(o+1).zfill(2)
@@ -1770,10 +1772,23 @@ def define_pixel_offsets_between_fibres(relto='S1', savedict=False, saveplots=Fa
         zeroth_coeffs[o,:] = ord_zeroth_coeffs
         first_coeffs[o,:] = ord_first_coeffs     
         
+        # now estimate the extra offset between fibre 'S1' and the LFC fibre by extrapolating to the next fibre slot (ie slot 26)
+        if extra_lfc_offset:
+            ex_fit_0 = np.poly1d(np.polyfit(fibslot, zeroth_coeffs[o,:], 2))
+            ex_fit_1 = np.poly1d(np.polyfit(fibslot, first_coeffs[o,:], 2))
+            zeroth_coeffs[o,:] -= ex_fit_0(26)
+            first_coeffs[o,:] -= ex_fit_1(26)
+            for fib in pixfit_coeffs[ord].keys():
+                pixfit_coeffs[ord][fib][0] -= ex_fit_0(26)
+                pixfit_coeffs[ord][fib][1] -= ex_fit_1(26)
+                
         # now save the dictionary containing the fit coefficients that describe shift and slope in pixel space to file
         if savedict:
             now = datetime.datetime.now()
-            np.save(path + 'pixfit_coeffs_relto_' + relto + '_as_of_' + str(now)[:10] + '.npy', pixfit_coeffs)
+            if extra_lfc_offset:
+                np.save(path + 'pixfit_coeffs_relto_LFC_as_of_' + str(now)[:10] + '.npy', pixfit_coeffs)
+            else:
+                np.save(path + 'pixfit_coeffs_relto_' + relto + '_as_of_' + str(now)[:10] + '.npy', pixfit_coeffs)
         
         # now save a plot of both 0th and 1st order terms
         if saveplots:
@@ -1805,17 +1820,19 @@ def define_pixel_offsets_between_fibres(relto='S1', savedict=False, saveplots=Fa
             plt.savefig(path + '1st_order_coeffs_pixel_shits_' + ordstring + '.eps')
             plt.clf()
     
-    return pixfit_coeffs
+    if return_all:
+        return pixfit_coeffs, zeroth_coeffs, first_coeffs
+    else:
+        return pixfit_coeffs
 
 
 
 
 
-def get_dispsol_for_all_fibs(shift=0, pixfit_coeffs=None, relto='S1', twod=False, degpol=7, deg_spectral=7, deg_spatial=7, polytype='chebyshev', nx=4112, debug_level=0, timit=False):
+def get_dispsol_for_all_fibs(shift=0, relto='LFC', twod=False, degpol=7, deg_spectral=7, deg_spatial=7, polytype='chebyshev', nx=4112, debug_level=0, timit=False):
     
-    if pixfit_coeffs is None:
-        # laod default coefficients
-        pixfit_coeffs = np.load('/Users/christoph/OneDrive - UNSW/dispsol_tests/20180917/pixfit_coeffs_relto_' + relto + '_as_of_2018-11-09.npy').item()
+    # laod default coefficients
+    pixfit_coeffs = np.load('/Users/christoph/OneDrive - UNSW/dispsol_tests/20180917/pixfit_coeffs_relto_' + relto + '_as_of_2018-11-14.npy').item()
     
     # fibslot = [0,1,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,23,24,25]
     fibname = ['S5', 'S2', '07', '18', '17', '06', '16', '15', '05', '14', '13', '01', '12', '11', '04', '10', '09', '03', '08', '19', '02', 'S4', 'S3', 'S1']
