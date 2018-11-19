@@ -8,9 +8,7 @@ import barycorrpy
 
 def get_barycentric_correction(fn, h=0.01, w=0.01):
 
-    height = u.Quantity(h, u.deg)
-    width = u.Quantity(w, u.deg)
-    r = Gaia.query_object_async(coordinate=coord, width=width, height=height)
+    # wrapper routine for using barycorrpy with Gaia DR2 coordinates
 
     utmjd = pyfits.getval(fn, 'UTMJD') + 2.4e6
     ra = pyfits.getval(fn, 'MEANRA')
@@ -20,7 +18,12 @@ def get_barycentric_correction(fn, h=0.01, w=0.01):
 
     gaia_data = Gaia.query_object_async(coordinate=coord, width=width, height=height)
 
-    bc = barycorrpy.get_BC_vel(JDUTC=utmjd, ra=ra, dec=dec, obsname='AAO', ephemeris='de430')
+
+
+    bc = barycorrpy.get_BC_vel(JDUTC=utmjd, ra=ra, dec=dec, pmra=gaia_data['pmra'], pmdec=gaia_data['pmdec'],
+                               px=gaia_data['parallax'], rv=rv, obsname='AAO', ephemeris='de430')
+
+    return bc[0][0]
 
     #         # HMMM...using hip_id=xxx and actual coordinates from header makes a huge difference (~11m/s for the tau Ceti example I tried)!!!
     #         bc1 = barycorrpy.get_BC_vel(JDUTC=utmjd, hip_id=8102, obsname='AAO', ephemeris='de430')

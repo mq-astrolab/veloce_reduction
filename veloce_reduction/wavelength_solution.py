@@ -1829,7 +1829,7 @@ def define_pixel_offsets_between_fibres(relto='S1', savedict=False, saveplots=Fa
 
 
 
-def get_dispsol_for_all_fibs(shift=0, relto='LFC', twod=False, degpol=7, deg_spectral=7, deg_spatial=7, polytype='chebyshev', nx=4112, debug_level=0, timit=False):
+def get_dispsol_for_all_fibs(obsname, relto='LFC', twod=False, degpol=7, deg_spectral=7, deg_spatial=7, polytype='chebyshev', nx=4112, debug_level=0, timit=False):
     
     # laod default coefficients
     pixfit_coeffs = np.load('/Users/christoph/OneDrive - UNSW/dispsol_tests/20180917/pixfit_coeffs_relto_' + relto + '_as_of_2018-11-14.npy').item()
@@ -1841,9 +1841,12 @@ def get_dispsol_for_all_fibs(shift=0, relto='LFC', twod=False, degpol=7, deg_spe
     
     # read master LFC linelist
     lfc_ord, lfc_pix, lfc_wl = readcol('/Users/christoph/OneDrive - UNSW/dispsol/laser_dispsol_20181015/PeakPos.txt', twod=False)
-    
+
+    # read file containing slope and offset as measured from LFC peak positions
+    lfc_slope, lfc_shift = readcol('/Users/christoph/OneDrive - UNSW/dispsol/laser_offsets/' + obsname + '_Slope_and_Offset.txt', twod=False)
+
     # some housekeeping...
-    n_ord = len(np.unique(lfc_ord)) 
+    n_ord = len(np.unique(lfc_ord))
     xx = np.arange(nx)
     
     # prepare output array
@@ -1859,7 +1862,10 @@ def get_dispsol_for_all_fibs(shift=0, relto='LFC', twod=False, degpol=7, deg_spe
             ord = 'order_'+str(o+1).zfill(2)     # DW's order numbers are offset by one to CB's
             wldict[ord] = {}
             ix = np.argwhere(lfc_ord == o).flatten()
-            x = lfc_pix[ix] + shift
+            x0 = lfc_pix[ix]
+            # now apply the shift to the pixel positions
+            diff = - lfc_shift[o-1] + lfc_slope[o-1] * x0     # signs are confusing here, but comparison to DW's results suggests this is correct
+            x = x0 + diff - np.max(diff) + np.min(diff)       # signs are confusing here, but comparison to DW's results suggests this is correct
             lam = lfc_wl[ix]
             lfc_fit = np.poly1d(np.polyfit(x, lam, degpol))
             wldict[ord]['laser'] = lfc_fit(xx)
