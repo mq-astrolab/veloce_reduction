@@ -296,9 +296,13 @@ def process_science_images(imglist, P_id, mask=None, sampling_size=25, slit_heig
 #     
 #         # (8) get wavelength solution
 #         #XXXXX
-# 
-# 
-#         # (9) get barycentric correction
+
+
+        # (9) get barycentric correction
+        bc = get_barycentric_correction(filename)
+        outfn = path + obsname + '_extracted.fits'
+        pyfits.setval(filename, 'BARYCORR', value=bc, comment='barycentric velocity correction [m/s]')
+
 #         lat, long, alt = get_obs_coords_from_header(fn)    # not really necessary, obsname='AAO' does the trick (agree to within ~0.01 cm/s!!!
 #         utmjd = pyfits.getval(fn, 'UTMJD') + 2.4e6
 #         ra = pyfits.getval(fn, 'MEANRA')

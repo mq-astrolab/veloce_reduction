@@ -1829,18 +1829,23 @@ def define_pixel_offsets_between_fibres(relto='S1', savedict=False, saveplots=Fa
 
 
 
-def get_dispsol_for_all_fibs(obsname, relto='LFC', twod=False, degpol=7, deg_spectral=7, deg_spatial=7, polytype='chebyshev', nx=4112, debug_level=0, timit=False):
-    
+def get_dispsol_for_all_fibs(obsname, relto='LFC', twod=False, degpol=7, deg_spectral=7, deg_spatial=7,
+                             fibs='stellar', polytype='chebyshev', nx=4112, debug_level=0, timit=False):
+
+    if timit:
+        start_time = time.time()
+
     # laod default coefficients
     pixfit_coeffs = np.load('/Users/christoph/OneDrive - UNSW/dispsol_tests/20180917/pixfit_coeffs_relto_' + relto + '_as_of_2018-11-14.npy').item()
     
-    # fibslot = [0,1,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,23,24,25]
+    # fibslot = [0,1, 3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21, 23,24,25]
     fibname = ['S5', 'S2', '07', '18', '17', '06', '16', '15', '05', '14', '13', '01', '12', '11', '04', '10', '09', '03', '08', '19', '02', 'S4', 'S3', 'S1']
     
     nfib = len(fibname)
     
     # read master LFC linelist
     lfc_ord, lfc_pix, lfc_wl = readcol('/Users/christoph/OneDrive - UNSW/dispsol/laser_dispsol_20181015/PeakPos.txt', twod=False)
+    lfc_pix -= 1.   # b/c DW is using Matlab, which starts indexing at 1 not at 0!!!!!!!
 
     # read file containing slope and offset as measured from LFC peak positions
     lfc_slope, lfc_shift = readcol('/Users/christoph/OneDrive - UNSW/dispsol/laser_offsets/' + obsname + '_Slope_and_Offset.txt', twod=False)
@@ -1863,21 +1868,31 @@ def get_dispsol_for_all_fibs(obsname, relto='LFC', twod=False, degpol=7, deg_spe
             wldict[ord] = {}
             ix = np.argwhere(lfc_ord == o).flatten()
             x0 = lfc_pix[ix]
-            # now apply the shift to the pixel positions
-            diff = - lfc_shift[o-1] + lfc_slope[o-1] * x0     # signs are confusing here, but comparison to DW's results suggests this is correct
-            x = x0 + diff - np.max(diff) + np.min(diff)       # signs are confusing here, but comparison to DW's results suggests this is correct
+            # FFFFUUUUU, broke my brain turning that around, but don't need to, b/c DW's LFC spectra are flipped (left-right) wrt to CBs
+            # # now apply the shift to the pixel positions
+            # diff = - lfc_shift[o-1] + lfc_slope[o-1] * x0     # signs are confusing here, but comparison to DW's results suggests this is correct
+            # x = x0 + diff - np.max(diff) + np.min(diff)       # signs are confusing here, but comparison to DW's results suggests this is correctly
+            diff = lfc_shift[o-1] + lfc_slope[o-1] * x0
+            x = x0 - diff
             lam = lfc_wl[ix]
+            # master_lfc_fit = np.poly1d(np.polyfit(x0, lam, degpol))
             lfc_fit = np.poly1d(np.polyfit(x, lam, degpol))
-            wldict[ord]['laser'] = lfc_fit(xx)
-            
+            wldict[ord]['laser'] = lfc_fit(xx)[::-1]     # need to turn around, b/c b/c DW's LFC spectra are flipped (left-right) wrt to CBs
+
+            # need to flip x now, because the pixfit_coeffs are using CMB layout
+            x_flipped = nx - 1 - x
+
             # loop over all fibres
             for i,fib in enumerate(fibname):
-                xfib = x + pixfit_coeffs[ord]['fibre_'+fib](x)
+                xfib = x_flipped + pixfit_coeffs[ord]['fibre_'+fib](x_flipped)
                 fib_fit = np.poly1d(np.polyfit(xfib, lam, degpol))
                 wldict[ord][fib] = fib_fit(xx)
                 wl[o,i,:] = fib_fit(xx)
             
     else:
+
+        print('THIS IS STILL WRONG (needs to be flipped) - USE THE 1-DIM VERSION FOR NOW!!!')
+
         if debug_level >= 1:
             print('OK, getting a 2-D wavelength solution...')
             
@@ -1907,7 +1922,10 @@ def get_dispsol_for_all_fibs(obsname, relto='LFC', twod=False, degpol=7, deg_spe
             ord = 'order_'+str(o+1).zfill(2)     # DW's order numbers are offset by one to CB's
             wldict[ord] = {}
             ix = np.argwhere(lfc_ord == o).flatten()
-            x = lfc_pix[ix] + shift
+            x0 = lfc_pix[ix]
+            # now apply the shift to the pixel positions
+            diff = - lfc_shift[o-1] + lfc_slope[o-1] * x0   # signs are confusing here, but comparison to DW's results suggests this is correct
+            x = x0 + diff - np.max(diff) + np.min(diff)     # signs are confusing here, but comparison to DW's results suggests this is correct
             # loop over all fibres
             for i,fib in enumerate(fibname):
                 pixel[i,ix] = x + pixfit_coeffs[ord]['fibre_'+fib](x)
@@ -1937,7 +1955,16 @@ def get_dispsol_for_all_fibs(obsname, relto='LFC', twod=False, degpol=7, deg_spe
             for j,fib in enumerate(fibname):
                 wldict[ord]['fibre_'+fib] = wl[o,j,:].copy()
             wldict[ord]['laser'] = wl_lfc[o,:].copy()
-             
+
+    if timit:
+        print('Time elapsed: '+str(np.round(time.time() - start_time,1))+' seconds')
+
+    if fibs not in ['all', 'stellar']:
+        print('ERROR: "fibs" not valid!!!')
+        return
+    elif fibs == 'stellar':
+        wl = wl[:,2:21,:]
+
     return wldict,wl
 
 

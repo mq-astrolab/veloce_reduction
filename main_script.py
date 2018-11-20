@@ -168,11 +168,24 @@ dum = process_science_images(stellar_list, P_id, mask=mask, sampling_size=25, sl
 
 
 
-# (5) calculate barycentric correction and append to FITS header
+# (5) calculate RVs
+# #preparations, eg:
+# f = quick_extracted['seeing1.5']['flux'].copy()
+# err = quick_extracted['seeing1.5']['err'].copy()
+# wl = quick_extracted['seeing1.5']['wl'].copy()
+# f0 = quick_extracted['template']['flux'].copy()
+# wl0 = quick_extracted['template']['wl'].copy()
+# #(a) using cross-correlation
+# #if using cross-correlation, we need to de-blaze the spectra first
+# f_dblz, err_dblz = deblaze_orders(f, wl, smoothed_flat, mask, err=err)
+# f0_dblz = deblaze_orders(f0, wl0, smoothed_flat, mask, err=None)
+# #we also only want to use the central TRUE parts of the masks, ie want ONE consecutive stretch per order
+# cenmask = central_parts_of_mask(mask)
+# #call RV routine
+# rv,rverr = get_RV_from_xcorr(f_dblz, err_dblz, wl, f0_dblz, wl0, mask=cenmask, filter_width=25, debug_level=0)     #NOTE: 'filter_width' must be the same as used in 'onedim_pixtopix_variations' above
 
 
-
-# (6) calculate RV
+rv,rverr = get_rvs_from_xcorr(quick_extracted, obsnames, mask, smoothed_flat, debug_level=0)
 
 
 

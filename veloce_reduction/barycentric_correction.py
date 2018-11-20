@@ -5,6 +5,24 @@ import astropy.io.fits as pyfits
 import barycorrpy
 
 
+# starnames = ['HD10700', 'HD190248', 'Gl87', 'GJ1132', 'GJ674', 'HD194640', 'HD212301']
+
+
+def define_target_dict(starnames):
+    target_dict = {}
+    #add stars
+
+    # for TAUCETI
+    ra = 26.00930287666994
+    dec = -15.933798650941204
+    pmra = -1729.7257241911389
+    pmdec = 855.492578244384
+    px = 277.516215785613
+    rv = -16.68e3
+
+    return target_dict
+
+
 
 def get_barycentric_correction(fn, h=0.01, w=0.01):
 
@@ -15,26 +33,15 @@ def get_barycentric_correction(fn, h=0.01, w=0.01):
     dec = pyfits.getval(fn, 'MEANDEC')
 
     coord = SkyCoord(ra=ra, dec=dec, unit=(u.degree, u.degree), frame='icrs')
+    width = u.Quantity(w, u.deg)
+    height = u.Quantity(h, u.deg)
 
-    gaia_data = Gaia.query_object_async(coordinate=coord, width=width, height=height)
-
-
+    # gaia_data = Gaia.query_object_async(coordinate=coord, width=width, height=height)
 
     bc = barycorrpy.get_BC_vel(JDUTC=utmjd, ra=ra, dec=dec, pmra=gaia_data['pmra'], pmdec=gaia_data['pmdec'],
-                               px=gaia_data['parallax'], rv=rv, obsname='AAO', ephemeris='de430')
+                               px=gaia_data['parallax'], rv=gaia_data['radial_velocity']*1e3, obsname='AAO', ephemeris='de430')
+    # bc = barycorrpy.get_BC_vel(JDUTC=utmjd, ra=ra, dec=dec, pmra=pmra, pmdec=pmdec,
+    #                            px=px, rv=rv, obsname='AAO', ephemeris='de430')
 
     return bc[0][0]
 
-    #         # HMMM...using hip_id=xxx and actual coordinates from header makes a huge difference (~11m/s for the tau Ceti example I tried)!!!
-    #         bc1 = barycorrpy.get_BC_vel(JDUTC=utmjd, hip_id=8102, obsname='AAO', ephemeris='de430')
-    #         bc2 = barycorrpy.get_BC_vel(JDUTC=utmjd, ra=ra, dec=dec, obsname='AAO', ephemeris='de430')
-    #
-    #         #now append relints, wl-solution, and barycorr to extracted FITS file header
-    #         outfn = path + obsname + '_extracted.fits'
-    #         if os.path.isfile(outfn):
-    #             #relative fibre intensities
-    #             dum = append_relints_to_FITS(relints, outfn, nfib=19)
-    #             #wavelength solution
-    #             #pyfits.setval(fn, 'RELINT' + str(i + 1).zfill(2), value=relints[i], comment='fibre #' + str(fibnums[i]) + ' - ' + fibinfo[i] + ' fibre')
-    #             #barycentric correction
-    #             pyfits.setval(outfn, 'BARYCORR', value=np.array(bc[0])[0], comment='barycentric correction [m/s]')
