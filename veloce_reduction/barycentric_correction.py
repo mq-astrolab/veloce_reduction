@@ -31,7 +31,7 @@ def get_barycentric_correction(fn, h=0.01, w=0.01):
     # use 2015.5 as an epoch (Gaia DR2)
     epoch = 2457206.375
 
-    utmjd = pyfits.getval(fn, 'UTMJD') + 2.4e6
+    utmjd = pyfits.getval(fn, 'UTMJD') + 2.4e6 + 0.5   # the fits header has 2,400,000.5 subtracted!!!!!
     # ra = pyfits.getval(fn, 'MEANRA')
     # dec = pyfits.getval(fn, 'MEANDEC')
     ra = 26.00930287666994
