@@ -289,7 +289,7 @@ def get_RV_from_xcorr(f, err, wl, f0, wl0, mask=None, smoothed_flat=None, osf=2,
 
 
 def get_RV_from_xcorr_combined_fibres(f, err, wl, f0, err0, wl0, mask=None, smoothed_flat=None, osf=2, delta_log_wl=1e-6, relgrid=False,
-                      filter_width=25, bad_threshold=0.05, simu=False, return_xc=False, flipped=True, individual_fibres=True, debug_level=0, timit=False):
+                      filter_width=25, bad_threshold=0.05, simu=False, return_xc=False, flipped=False, individual_fibres=True, debug_level=0, timit=False):
     """
     This routine calculates the radial velocity of an observed spectrum relative to a template using cross-correlation.
     Note that input spectra should be de-blazed already!!!
@@ -340,11 +340,12 @@ def get_RV_from_xcorr_combined_fibres(f, err, wl, f0, err0, wl0, mask=None, smoo
 
     rv = {}
     rverr = {}
+    all_xc = []
 
     # loop over orders
     # for ord in sorted(f.iterkeys()):
     # for o in range(wl.shape[0]):
-    for o in [27]:
+    for o in [4,5,6,25,26,33,34,35]:
 
         if debug_level >= 1:
             print('Order ' + str(o+1).zfill(2))
@@ -449,8 +450,10 @@ def get_RV_from_xcorr_combined_fibres(f, err, wl, f0, err0, wl0, mask=None, smoo
         else:
             xc = np.correlate(rebinned_f, rebinned_f0, mode='full')
 
+        all_xc.append(xc)
+
         if return_xc:
-            return xc
+            return all_xc
 
         # now fit Gaussian to central section of CCF
         if relgrid:
@@ -484,16 +487,16 @@ def get_RV_from_xcorr_combined_fibres(f, err, wl, f0, err0, wl0, mask=None, smoo
         print('Time taken for calculating RV: ' + str(np.round(delta_t, 2)) + ' seconds')
 
     return rv, rverr
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
+
+
+
+
+
+
+
+
+
+
 ###COMMENT: the template should be stored in an unblazed way already here
 #loop over orders
 
