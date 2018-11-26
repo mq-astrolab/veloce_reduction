@@ -345,7 +345,8 @@ def get_RV_from_xcorr_combined_fibres(f, err, wl, f0, err0, wl0, mask=None, smoo
     # loop over orders
     # for ord in sorted(f.iterkeys()):
     # for o in range(wl.shape[0]):
-    for o in [4,5,6,25,26,33,34,35]:
+    # for o in [4,5,6,25,26,33,34,35]:
+    for o in [5, 6, 17, 25, 26, 27, 31, 34, 35, 36, 37]:
 
         if debug_level >= 1:
             print('Order ' + str(o+1).zfill(2))
@@ -452,41 +453,44 @@ def get_RV_from_xcorr_combined_fibres(f, err, wl, f0, err0, wl0, mask=None, smoo
 
         all_xc.append(xc)
 
-        if return_xc:
-            return all_xc
 
-        # now fit Gaussian to central section of CCF
-        if relgrid:
-            fitrangesize = osf * 6  # this factor was simply eye-balled
-        else:
-            # fitrangesize = 30
-            fitrangesize = int(np.round(0.0036 * len(xc) / 2. - 1, 0))  # this factor was simply eye-balled
+        if not return_xc:
 
-        xrange = np.arange(np.argmax(xc) - fitrangesize, np.argmax(xc) + fitrangesize + 1, 1)
-        # parameters: mu, sigma, amp, beta, offset, slope
-        guess = np.array((np.argmax(xc), 0.0006 * len(xc), (xc[np.argmax(xc)] - xc[np.argmax(xc) - fitrangesize]), 2.,
-                          xc[np.argmax(xc) - fitrangesize], 0.))
-        # guess = np.array((np.argmax(xc), 5., (xc[np.argmax(xc)]-xc[np.argmax(xc)-fitrangesize]), 2., xc[np.argmax(xc)-fitrangesize], 0.))
-        # guess = np.array((np.argmax(xc), 10., (xc[np.argmax(xc)]-xc[np.argmax(xc)-fitrangesize])/np.max(xc), 2., xc[np.argmax(xc)-fitrangesize]/np.max(xc), 0.))
-        # popt, pcov = op.curve_fit(gaussian_with_offset_and_slope, xrange, xc[np.argmax(xc)-fitrangesize : np.argmax(xc)+fitrangesize+1]/np.max(xc[xrange]), p0=guess)
-        # popt, pcov = op.curve_fit(gausslike_with_amp_and_offset_and_slope, xrange, xc[xrange]/np.max(xc[xrange]), p0=guess)
-        popt, pcov = op.curve_fit(gausslike_with_amp_and_offset_and_slope, xrange, xc[xrange], p0=guess)
-        mu = popt[0]
-        #         print(ord, f[ord][3000:3003])
-        #         print(ord, f[ord][::-1][3000:3003])
-        mu_err = pcov[0, 0]
-        # convert to RV in m/s
-        rv[ord] = c * (mu - (len(xc) // 2)) * delta_log_wl
-        rverr[ord] = c * mu_err * delta_log_wl
+            # now fit Gaussian to central section of CCF
+            if relgrid:
+                fitrangesize = osf * 6  # this factor was simply eye-balled
+            else:
+                # fitrangesize = 30
+                fitrangesize = int(np.round(0.0036 * len(xc) / 2. - 1, 0))  # this factor was simply eye-balled
 
-        # plotting CCF vs RV
-        # plt.plot(c * (np.arange(len(xc)) - (len(xc) // 2)) * delta_log_wl, xc, '.')
+            xrange = np.arange(np.argmax(xc) - fitrangesize, np.argmax(xc) + fitrangesize + 1, 1)
+            # parameters: mu, sigma, amp, beta, offset, slope
+            guess = np.array((np.argmax(xc), 0.0006 * len(xc), (xc[np.argmax(xc)] - xc[np.argmax(xc) - fitrangesize]), 2.,
+                              xc[np.argmax(xc) - fitrangesize], 0.))
+            # guess = np.array((np.argmax(xc), 5., (xc[np.argmax(xc)]-xc[np.argmax(xc)-fitrangesize]), 2., xc[np.argmax(xc)-fitrangesize], 0.))
+            # guess = np.array((np.argmax(xc), 10., (xc[np.argmax(xc)]-xc[np.argmax(xc)-fitrangesize])/np.max(xc), 2., xc[np.argmax(xc)-fitrangesize]/np.max(xc), 0.))
+            # popt, pcov = op.curve_fit(gaussian_with_offset_and_slope, xrange, xc[np.argmax(xc)-fitrangesize : np.argmax(xc)+fitrangesize+1]/np.max(xc[xrange]), p0=guess)
+            # popt, pcov = op.curve_fit(gausslike_with_amp_and_offset_and_slope, xrange, xc[xrange]/np.max(xc[xrange]), p0=guess)
+            popt, pcov = op.curve_fit(gausslike_with_amp_and_offset_and_slope, xrange, xc[xrange], p0=guess)
+            mu = popt[0]
+            #         print(ord, f[ord][3000:3003])
+            #         print(ord, f[ord][::-1][3000:3003])
+            mu_err = pcov[0, 0]
+            # convert to RV in m/s
+            rv[ord] = c * (mu - (len(xc) // 2)) * delta_log_wl
+            rverr[ord] = c * mu_err * delta_log_wl
+
+            # plotting CCF vs RV
+            # plt.plot(c * (np.arange(len(xc)) - (len(xc) // 2)) * delta_log_wl, xc, '.')
 
     if timit:
         delta_t = time.time() - start_time
         print('Time taken for calculating RV: ' + str(np.round(delta_t, 2)) + ' seconds')
 
-    return rv, rverr
+    if return_xc:
+        return all_xc
+    else:
+        return rv, rverr
 
 
 

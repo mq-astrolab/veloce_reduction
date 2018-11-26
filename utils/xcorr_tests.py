@@ -1,4 +1,21 @@
 ########################################################################################################################
+# HOUSEKEEPING
+path = '/Users/christoph/data/reduced/tauceti/tauceti_with_LFC/'
+files = glob.glob(path + 'HD10700*')
+# sort list of files
+all_shortnames = []
+for i,filename in enumerate(files):
+    dum = filename.split('/')
+    dum2 = dum[-1].split('.')
+    dum3 = dum2[0]
+    dum4 = dum3.split('_')
+    shortname = dum4[1]
+    all_shortnames.append(shortname)
+files = files[np.argsort(all_shortnames)]
+
+########################################################################################################################
+########################################################################################################################
+########################################################################################################################
 
 # calculating BARYCORR
 
@@ -76,6 +93,8 @@ for file in files:
 
 # plotting the CCFs on RV axis with and without BC applied
 
+# WHEN THERE IS ONLY ONE CCF PER OBSERVATION
+
 plt.figure()
 plt.title('OLD ; CCF flipped = False')
 plt.xlim(-2e4,2e4)
@@ -113,5 +132,34 @@ for i in range(len(files)):
              all_xc_flipped[i] / np.max(all_xc_flipped[i]), 'r.-')
     plt.plot(c * (np.arange(len(all_xc[i])) - (len(all_xc[i]) // 2)) * delta_log_wl - all_bc[i],
              all_xc_flipped[i] / np.max(all_xc_flipped[i]), 'b.-')
+
+
+# WHEN THERE ARE MULTIPLE CCFs (for different orders) PER OBSERVATION
+addrange = 40
+# index = [4,5,6,25,26,33,34,35]
+index = [5,6,17,25,26,27,31,34,35,36,37]
+
+for i in range(len(index)):
+    test =
+
+xcarr = np.zeros((len(all_xc), len(all_xc[0]), 2*addrange+1))
+for i,j in zip(range(xcarr.shape[0]), range(xcarr.shape[1])):
+    dum = np.array(all_xc[i][j])
+    xcarr[i,j,:] = dum[len(dum)//2 - addrange : len(dum)//2 + addrange +1]
+xcsums = np.sum(xcarr,axis=1)
+
+
+plt.figure()
+plt.title('tau Ceti - CCFs for 9 orders added up')
+plt.xlim(-2e4,2e4)
+plt.ylim(0.9980,1.0005)
+for i in range(len(files)):
+    plt.plot(c * (np.arange(len(xcsums[i,:])) - (len(xcsums[i,:]) // 2)) * delta_log_wl,
+             xcsums[i,:] / np.max(xcsums[i,:]), 'k.-')
+    plt.plot(c * (np.arange(len(xcsums[i,:])) - (len(xcsums[i,:]) // 2)) * delta_log_wl + all_bc[i],
+             xcsums[i,:] / np.max(xcsums[i,:]), 'r.-')
+    plt.plot(c * (np.arange(len(xcsums[i,:])) - (len(xcsums[i,:]) // 2)) * delta_log_wl - all_bc[i],
+             xcsums[i,:] / np.max(xcsums[i,:]), 'b.-')
+
 ########################################################################################################################
 
