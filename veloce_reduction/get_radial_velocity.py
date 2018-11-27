@@ -288,8 +288,9 @@ def get_RV_from_xcorr(f, err, wl, f0, wl0, mask=None, smoothed_flat=None, osf=2,
 
 
 
-def get_RV_from_xcorr_combined_fibres(f, err, wl, f0, err0, wl0, mask=None, smoothed_flat=None, osf=2, delta_log_wl=1e-6, relgrid=False,
-                      filter_width=25, bad_threshold=0.05, simu=False, return_xc=False, flipped=False, individual_fibres=True, debug_level=0, timit=False):
+def get_rv_from_xcorr_combined_fibres(f, err, wl, f0, err0, wl0, mask=None, smoothed_flat=None, osf=2, delta_log_wl=1e-6,
+                                      relgrid=False, addrange=40, fitrange=10, return_xcs=False, flipped=False,
+                                      individual_fibres=True, individual_orders=True, debug_level=0, timit=False):
     """
     This routine calculates the radial velocity of an observed spectrum relative to a template using cross-correlation.
     Note that input spectra should be de-blazed already!!!
@@ -338,9 +339,132 @@ def get_RV_from_xcorr_combined_fibres(f, err, wl, f0, err0, wl0, mask=None, smoo
         wl[0, :, :] = 1.
         wl0[0, :, :] = 1.
 
-    rv = {}
-    rverr = {}
-    all_xc = []
+    rv = []
+    rverr = []
+
+    # make cross-correlation functions (list of length n_orders used)
+    xcs = make_ccfs(f, wl, f0, wl0, mask=None, smoothed_flat=None, delta_log_wl=delta_log_wl, relgrid=False,
+                    flipped=flipped, individual_fibres=individual_fibres, debug_level=debug_level, timit=timit)
+    if return_xcs:
+        return xcs
+
+    if debug_level >= 1:
+        print('Order ' + str(o+1).zfill(2))
+
+    # now fit Gaussian to central section of CCF for that order
+    if relgrid:
+        fitrangesize = osf * 6  # this factor was simply eye-balled
+    else:
+        # fitrangesize = 30
+        # fitrangesize = int(np.round(0.0036 * len(xc) / 2. - 1, 0))  # this factor was simply eye-balled
+        fitrangesize = fitrange
+
+    # make array only containing the central parts of the CCFs (which can have different total lengths) for fitting
+    xcarr = np.zeros((len(xcs),2 * addrange + 1))
+    for i in range(xcarr.shape[0]):
+        dum = np.array(xcs[i])
+        xcarr[i,:] = dum[len(dum) // 2 - addrange : len(dum) // 2 + addrange + 1]
+
+    if individual_fibres:
+        if individual_orders:
+            print('giggidy indfib and indord')
+        else:
+            print('giggidy indfib and sumord')
+    else:
+        if individual_orders:
+            print('giggidy sumfib and indord')
+        else:
+            # sum up the CCFs for all orders
+            xcsum = np.sum(xcarr, axis=0)
+
+            xrange = np.arange(np.argmax(xcsum) - fitrangesize, np.argmax(xcsum) + fitrangesize + 1, 1)
+            # parameters: mu, sigma, amp, beta, offset, slope
+            guess = np.array((np.argmax(xcsum), 10, (xcsum[np.argmax(xcsum)] - xcsum[np.argmax(xcsum) - fitrangesize]), 2.,
+                              xcsum[np.argmax(xcsum) - fitrangesize], 0.))
+            # guess = np.array((np.argmax(xc), 5., (xc[np.argmax(xc)]-xc[np.argmax(xc)-fitrangesize]), 2., xc[np.argmax(xc)-fitrangesize], 0.))
+            # guess = np.array((np.argmax(xc), 10., (xc[np.argmax(xc)]-xc[np.argmax(xc)-fitrangesize])/np.max(xc), 2., xc[np.argmax(xc)-fitrangesize]/np.max(xc), 0.))
+            # popt, pcov = op.curve_fit(gaussian_with_offset_and_slope, xrange, xc[np.argmax(xc)-fitrangesize : np.argmax(xc)+fitrangesize+1]/np.max(xc[xrange]), p0=guess)
+            # popt, pcov = op.curve_fit(gausslike_with_amp_and_offset_and_slope, xrange, xc[xrange]/np.max(xc[xrange]), p0=guess)
+            popt, pcov = op.curve_fit(gausslike_with_amp_and_offset_and_slope, xrange, xcsum[xrange], p0=guess)
+            mu = popt[0]
+            mu_err = pcov[0, 0]
+            # convert to RV in m/s
+            rv.append(c * (mu - (len(xcsum) // 2)) * delta_log_wl)
+            rverr.append(c * mu_err * delta_log_wl)
+
+            # # plot a single fit for debugging
+            # plot_osf = 10
+            # plot_os_grid = np.linspace(xrange[0], xrange[-1], plot_osf * (len(xrange)-1) + 1)
+            # plt.plot(c * (xrange - (len(xcsums) // 2)) * delta_log_wl, xcsum[xrange], 'b.', label='data')
+            # plt.plot(c * (plot_os_grid - (len(xcsums) // 2)) * delta_log_wl, gausslike_with_amp_and_offset_and_slope(plot_os_grid, *guess),'r--', label='initial guess')
+            # plt.plot(c * (plot_os_grid - (len(xcsums) // 2)) * delta_log_wl, gausslike_with_amp_and_offset_and_slope(plot_os_grid, *popt),'g-', label='best fit')
+            # plt.axvline(c * (mu - (len(xcsum) // 2)) * delta_log_wl, color='g', linestyle=':')
+            # plt.legend()
+            # plt.xlabel('delta RV [m/s]')
+            # plt.ylabel('power')
+            # plt.title('CCF')
+
+    if timit:
+        delta_t = time.time() - start_time
+        print('Time taken for calculating RV: ' + str(np.round(delta_t, 2)) + ' seconds')
+
+    return np.array(rv), np.array(rverr)
+
+
+
+
+
+def make_ccfs(f, wl, f0, wl0, mask=None, smoothed_flat=None, osf=2, delta_log_wl=1e-6, relgrid=False,
+             filter_width=25, bad_threshold=0.05, flipped=False, individual_fibres=True, debug_level=0, timit=False):
+    """
+    This routine calculates the radial velocity of an observed spectrum relative to a template using cross-correlation.
+    Note that input spectra should be de-blazed already!!!
+    If the mask from "find_stripes" has gaps, do the filtering for each segment independently. If no mask is provided, create a simple one on the fly.
+
+    INPUT:
+    'f'             : dictionary containing the observed flux (keys = orders)
+    'err'           : dictionary containing the uncertainties in the observed flux (keys = orders)
+    'wl'            : dictionary containing the wavelengths of the observed spectrum (keys = orders)
+    'f0'            : dictionary containing the template (keys = orders) (errors assumed to be negligible)
+    'wl0'           : dictionary containing the wavelengths of the template spectrum (keys = orders)
+    'mask'          : mask-dictionary from "find_stripes" (keys = orders)
+    'smoothed_flat' : if no mask is provided, need to provide the smoothed_flat, so that a mask can be created on the fly
+    'osf'           : oversampling factor for the logarithmic wavelength rebinning (only used if 'relgrid' is TRUE)
+    'delta_log_wl'  : stepsize of the log-wl grid (only used if 'relgrid' is FALSE)
+    'relgrid'       : boolean - do you want to use an absolute stepsize of the log-wl grid, or relative using 'osf'?
+    'filter_width'  : width of smoothing filter in pixels; needed b/c of edge effects of the smoothing; number of pixels to disregard should be >~ 2 * width of smoothing kernel
+    'bad_threshold' : if no mask is provided, create a mask that requires the flux in the extracted white to be larger than this fraction of the maximum flux in that order
+    'simu'          : boolean - are you using ES simulated spectra? (only used if mask is not provided)
+    'debug_level'   : boolean - for debugging...
+    'timit'         : boolean - for timing the execution run time...
+
+    OUTPUT:
+    'rv'         : dictionary with the measured RVs for each order
+    'rverr'      : dictionary with the uncertainties in the measured RVs for each order
+
+    MODHIST:
+    Dec 2017 - CMB create
+    04/06/2018 - CMB fixed bug when turning around arrays (need to use new variable)
+    28/06/2018 - CMB fixed bug with interpolation of log wls
+    """
+
+    if timit:
+        start_time = time.time()
+
+    # speed of light in m/s
+    c = 2.99792458e8
+
+    # the dummy wavelengths for orders 'order_01' and 'order_40' cannot be zero as we're taking a log!!!
+    if wl.shape[0] == 40:
+        wl[0, :, :] = 1.
+        wl[-1, :, :] = 1.
+        wl0[0, :, :] = 1.
+        wl0[-1, :, :] = 1.
+    if wl.shape[0] == 39:
+        wl[0, :, :] = 1.
+        wl0[0, :, :] = 1.
+
+    xcs = []
 
     # loop over orders
     # for ord in sorted(f.iterkeys()):
@@ -391,8 +515,8 @@ def get_RV_from_xcorr_combined_fibres(f, err, wl, f0, err0, wl0, mask=None, smoo
         ordmask[:2 * int(filter_width)] = False
         ordmask[-2 * int(filter_width):] = False
 
-        #         f0_unblazed = f0[ord] / np.max(f0[ord]) / normflat   #see COMMENT above
-        #         f_unblazed = f[ord] / np.max(f[ord]) / normflat
+        # f0_unblazed = f0[ord] / np.max(f0[ord]) / normflat   #see COMMENT above
+        # f_unblazed = f[ord] / np.max(f[ord]) / normflat
 
         # create logarithmic wavelength grid
         logwl = np.log(wl[o,:,:])
@@ -420,11 +544,11 @@ def get_RV_from_xcorr_combined_fibres(f, err, wl, f0, err0, wl0, mask=None, smoo
             ord_f_sorted = f[ord].copy()
 
         # rebin spectra onto logarithmic wavelength grid
-        #         rebinned_f0 = np.interp(logwlgrid,logwl[mask],f0_unblazed[mask])
-        #         rebinned_f = np.interp(logwlgrid,logwl[mask],f_unblazed[mask])
-
-        rebinned_f0 = np.zeros((ord_f0_sorted.shape[0], len(logwlgrid)))
-        rebinned_f = np.zeros((ord_f0_sorted.shape[0], len(logwlgrid)))
+        # rebinned_f0 = np.interp(logwlgrid,logwl[mask],f0_unblazed[mask])
+        # rebinned_f = np.interp(logwlgrid,logwl[mask],f_unblazed[mask])
+        nfib = ord_f0_sorted.shape[0]
+        rebinned_f0 = np.zeros((nfib, len(logwlgrid)))
+        rebinned_f = np.zeros((nfib, len(logwlgrid)))
         for i in range(rebinned_f.shape[0]):
             spl_ref_f0 = interp.InterpolatedUnivariateSpline(logwl0_sorted[i,ordmask_sorted], ord_f0_sorted[i,ordmask_sorted], k=3)  # slightly slower than linear, but best performance for cubic spline
             rebinned_f0[i,:] = spl_ref_f0(logwlgrid)
@@ -434,7 +558,7 @@ def get_RV_from_xcorr_combined_fibres(f, err, wl, f0, err0, wl0, mask=None, smoo
         if individual_fibres:
             print('not yet implemented')
         else:
-            rebinned_f = np.sum(rebinned_f,axis=0)
+            rebinned_f = np.sum(rebinned_f, axis=0)
             rebinned_f0 = np.sum(rebinned_f0, axis=0)
 
         # do we want to cross-correlate the entire order???
@@ -451,58 +575,17 @@ def get_RV_from_xcorr_combined_fibres(f, err, wl, f0, err0, wl0, mask=None, smoo
         else:
             xc = np.correlate(rebinned_f, rebinned_f0, mode='full')
 
-        all_xc.append(xc)
+        xcs.append(xc)
 
-
-        if not return_xc:
-
-            # now fit Gaussian to central section of CCF
-            if relgrid:
-                fitrangesize = osf * 6  # this factor was simply eye-balled
-            else:
-                # fitrangesize = 30
-                fitrangesize = int(np.round(0.0036 * len(xc) / 2. - 1, 0))  # this factor was simply eye-balled
-
-            xrange = np.arange(np.argmax(xc) - fitrangesize, np.argmax(xc) + fitrangesize + 1, 1)
-            # parameters: mu, sigma, amp, beta, offset, slope
-            guess = np.array((np.argmax(xc), 0.0006 * len(xc), (xc[np.argmax(xc)] - xc[np.argmax(xc) - fitrangesize]), 2.,
-                              xc[np.argmax(xc) - fitrangesize], 0.))
-            # guess = np.array((np.argmax(xc), 5., (xc[np.argmax(xc)]-xc[np.argmax(xc)-fitrangesize]), 2., xc[np.argmax(xc)-fitrangesize], 0.))
-            # guess = np.array((np.argmax(xc), 10., (xc[np.argmax(xc)]-xc[np.argmax(xc)-fitrangesize])/np.max(xc), 2., xc[np.argmax(xc)-fitrangesize]/np.max(xc), 0.))
-            # popt, pcov = op.curve_fit(gaussian_with_offset_and_slope, xrange, xc[np.argmax(xc)-fitrangesize : np.argmax(xc)+fitrangesize+1]/np.max(xc[xrange]), p0=guess)
-            # popt, pcov = op.curve_fit(gausslike_with_amp_and_offset_and_slope, xrange, xc[xrange]/np.max(xc[xrange]), p0=guess)
-            popt, pcov = op.curve_fit(gausslike_with_amp_and_offset_and_slope, xrange, xc[xrange], p0=guess)
-            mu = popt[0]
-            #         print(ord, f[ord][3000:3003])
-            #         print(ord, f[ord][::-1][3000:3003])
-            mu_err = pcov[0, 0]
-            # convert to RV in m/s
-            rv[ord] = c * (mu - (len(xc) // 2)) * delta_log_wl
-            rverr[ord] = c * mu_err * delta_log_wl
-
-            # plotting CCF vs RV
-            # plt.plot(c * (np.arange(len(xc)) - (len(xc) // 2)) * delta_log_wl, xc, '.')
 
     if timit:
         delta_t = time.time() - start_time
-        print('Time taken for calculating RV: ' + str(np.round(delta_t, 2)) + ' seconds')
+        print('Time taken for creating CCFs: ' + str(np.round(delta_t, 2)) + ' seconds')
 
-    if return_xc:
-        return all_xc
-    else:
-        return rv, rverr
+    return xcs
 
 
 
-
-
-
-
-
-
-
-###COMMENT: the template should be stored in an unblazed way already here
-#loop over orders
 
 
 

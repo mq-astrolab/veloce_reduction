@@ -72,10 +72,11 @@ for i,filename in enumerate(files):
 ########################################################################################################################
 ########################################################################################################################
 
-# calculating the CCFs for one order
+# calculating the CCFs for one order / 11 orders
 # (either with or without the LFC shifts applied, comment out the 'wl' and 'wl0' you don't want)
 
 all_xc = []
+all_rv = []
 for file in files:
     f = pyfits.getdata(file, 0)
     err = pyfits.getdata(file, 1)
@@ -85,7 +86,11 @@ for file in files:
     err0 = pyfits.getdata(files[2], 1)
     wl0 = pyfits.getdata(files[2], 2)
     # wl0 = pyfits.getdata('/Users/christoph/OneDrive - UNSW/dispsol/individual_fibres_dispsol_poly7_21sep30019.fits')
-    all_xc.append(get_RV_from_xcorr_combined_fibres(f, err, wl, f0, err0, wl0, return_xc=True, individual_fibres=False))
+    all_xc.append(get_RV_from_xcorr_combined_fibres(f, err, wl, f0, err0, wl0, return_xcs=True, individual_fibres=False,
+                                                    individual_orders=False))
+    rv,rverr = get_RV_from_xcorr_combined_fibres(f, err, wl, f0, err0, wl0, return_xcs=False, individual_fibres=False,
+                                                    individual_orders=False)
+    all_rv.append(rv)
 
 ########################################################################################################################
 ########################################################################################################################
@@ -139,18 +144,17 @@ addrange = 40
 # index = [4,5,6,25,26,33,34,35]
 index = [5,6,17,25,26,27,31,34,35,36,37]
 
-for i in range(len(index)):
-    test =
-
-xcarr = np.zeros((len(all_xc), len(all_xc[0]), 2*addrange+1))
-for i,j in zip(range(xcarr.shape[0]), range(xcarr.shape[1])):
-    dum = np.array(all_xc[i][j])
-    xcarr[i,j,:] = dum[len(dum)//2 - addrange : len(dum)//2 + addrange +1]
-xcsums = np.sum(xcarr,axis=1)
+# # this was for all obs at once
+# xcarr = np.zeros((len(all_xc), len(all_xc[0]), 2*addrange+1))
+# for i in range(xcarr.shape[0]):
+#     for j in range(xcarr.shape[1]):
+#         dum = np.array(all_xc[i][j])
+#         xcarr[i,j,:] = dum[len(dum)//2 - addrange : len(dum)//2 + addrange +1]
+# xcsums = np.sum(xcarr,axis=1)
 
 
 plt.figure()
-plt.title('tau Ceti - CCFs for 9 orders added up')
+plt.title('tau Ceti - CCFs for 11 orders added up')
 plt.xlim(-2e4,2e4)
 plt.ylim(0.9980,1.0005)
 for i in range(len(files)):
