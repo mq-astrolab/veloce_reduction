@@ -58,14 +58,14 @@ outfile_names.close()
 ########################################################################################################################
 
 # calculate wl-solution for all fibres, including the LFC shifts and slopes; also append to reduced spectrum FITS file
-signflip=True
+signflip_slope = True
 for i,filename in enumerate(files):
     print('Processing tau Ceti observation ' + str(i+1) + '/' + str(len(files)))
     dum = filename.split('/')
     dum2 = dum[-1].split('.')
     dum3 = dum2[0].split('_')
     obsname = dum3[1]
-    wldict,wl = get_dispsol_for_all_fibs(obsname, signflip=signflip)
+    wldict,wl = get_dispsol_for_all_fibs(obsname, signflip_slope=signflip_slope)
     pyfits.append(filename, wl, clobber=True)
 
 ########################################################################################################################

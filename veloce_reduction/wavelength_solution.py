@@ -1830,7 +1830,7 @@ def define_pixel_offsets_between_fibres(relto='S1', savedict=False, saveplots=Fa
 
 
 def get_dispsol_for_all_fibs(obsname, relto='LFC', twod=False, degpol=7, deg_spectral=7, deg_spatial=7,
-                             fibs='stellar', polytype='chebyshev', nx=4112, debug_level=0, timit=False, signflip=False):
+                             fibs='stellar', polytype='chebyshev', nx=4112, debug_level=0, timit=False, signflip_slope=False):
 
     if timit:
         start_time = time.time()
