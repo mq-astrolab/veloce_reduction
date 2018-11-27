@@ -1850,7 +1850,7 @@ def get_dispsol_for_all_fibs(obsname, relto='LFC', twod=False, degpol=7, deg_spe
     # read file containing slope and offset as measured from LFC peak positions
     lfc_slope, lfc_shift = readcol('/Users/christoph/OneDrive - UNSW/dispsol/laser_offsets/relto_21sep30019/' + obsname + '_LFC_Slope_and_Offset.txt', twod=False)
 
-    if signflip:
+    if signflip_slope:
         lfc_slope *= -1.
         lfc_shift *= -1.
 
