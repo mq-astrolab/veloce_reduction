@@ -179,14 +179,14 @@ def get_flux_and_variance_pairs(imglist, MB, MD=None, scalable=True, simu=False,
     q1, q2, q3, q4 = make_quadrant_masks(nx, ny)
 
     #prepare arrays containing flux and variance
-    f_q1 = np.array([])
-    f_q2 = np.array([])
-    f_q3 = np.array([])
-    f_q4 = np.array([])
-    v_q1 = np.array([])
-    v_q2 = np.array([])
-    v_q3 = np.array([])
-    v_q4 = np.array([])
+    f_q1 = []
+    f_q2 = []
+    f_q3 = []
+    f_q4 = []
+    v_q1 = []
+    v_q2 = []
+    v_q3 = []
+    v_q4 = []
 
     #list of all possible pairs of files
     list_of_combinations = list(combinations(imglist, 2))
@@ -242,14 +242,14 @@ def get_flux_and_variance_pairs(imglist, MB, MD=None, scalable=True, simu=False,
         var_q4 = (np.nanstd(sigma_clip(diff_q4, 5)) / np.sqrt(2)) ** 2
 
         #fill output arrays
-        f_q1 = np.append(f_q1, med1_q1)
-        f_q2 = np.append(f_q2, med1_q2)
-        f_q3 = np.append(f_q3, med1_q3)
-        f_q4 = np.append(f_q4, med1_q4)
-        v_q1 = np.append(v_q1, var_q1)
-        v_q2 = np.append(v_q2, var_q2)
-        v_q3 = np.append(v_q3, var_q3)
-        v_q4 = np.append(v_q4, var_q4)
+        f_q1.append(med1_q1)
+        f_q2.append(med1_q2)
+        f_q3.append(med1_q3)
+        f_q4.append(med1_q4)
+        v_q1.append(var_q1)
+        v_q2.append(var_q2)
+        v_q3.append(var_q3)
+        v_q4.append(var_q4)
 
     if timit:
         print('Time elapsed: '+str(np.round(time.time() - start_time,1))+' seconds')
@@ -326,27 +326,27 @@ def measure_gains(filelist, MB, MD=None, scalable=True, timit=False, debug_level
     uniq_times = np.unique(texp)
 
     #prepare some arrays
-    signal_q1 = np.array([])
-    signal_q2 = np.array([])
-    signal_q3 = np.array([])
-    signal_q4 = np.array([])
-    variance_q1 = np.array([])
-    variance_q2 = np.array([])
-    variance_q3 = np.array([])
-    variance_q4 = np.array([])
+    signal_q1 = []
+    signal_q2 = []
+    signal_q3 = []
+    signal_q4 = []
+    variance_q1 = []
+    variance_q2 = []
+    variance_q3 = []
+    variance_q4 = []
 
     #for all brightness levels
     for t in uniq_times:
         sublist = np.array(filelist)[texp == t]
         f_q1, f_q2, f_q3, f_q4, v_q1, v_q2, v_q3, v_q4 = get_flux_and_variance_pairs(sublist, MB, MD=MD, scalable=scalable, timit=timit)
-        signal_q1 = np.append(signal_q1, f_q1)
-        signal_q2 = np.append(signal_q2, f_q2)
-        signal_q3 = np.append(signal_q3, f_q3)
-        signal_q4 = np.append(signal_q4, f_q4)
-        variance_q1 = np.append(variance_q1, v_q1)
-        variance_q2 = np.append(variance_q2, v_q2)
-        variance_q3 = np.append(variance_q3, v_q3)
-        variance_q4 = np.append(variance_q4, v_q4)
+        signal_q1.append(f_q1)
+        signal_q2.append(f_q2)
+        signal_q3.append(f_q3)
+        signal_q4.append(f_q4)
+        variance_q1.append(v_q1)
+        variance_q2.append(v_q2)
+        variance_q3.append(v_q3)
+        variance_q4.append(v_q4)
 
     #have to do this for each quadrant individually
     g1 = measure_gain_from_slope(signal_q1, variance_q1, debug_level=debug_level)
@@ -799,9 +799,9 @@ def make_master_dark(dark_list, MB, gain=None, scalable=False, savefile=True, pa
         print('Creating master dark frame from '+str(len(dark_list))+' dark frames...')       
 
     # get a list of all the exposure times first
-    exp_times = np.array([])
+    exp_times = []
     for file in sorted(dark_list):
-        exp_times =  np.append(exp_times, np.round(pyfits.getval(file,'TOTALEXP'),0))
+        exp_times.append(np.round(pyfits.getval(file,'TOTALEXP'),0))
 
     # list of unique exposure times
     unique_exp_times = np.array(list(sorted(set(exp_times))))

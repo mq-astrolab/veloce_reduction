@@ -744,10 +744,10 @@ def get_wavelength_solution_from_thorium(thflux, poly_deg=5, polytype='chebyshev
 #     thresholds = np.load('/Users/christoph/OneDrive - UNSW/linelists/AAT_folder/thresholds.npy').item()
     
     #prepare arrays for fitting
-    x = np.array([])
-    order = np.array([])
-    m_order = np.array([])
-    wl = np.array([])
+    x = []
+    order = []
+    m_order = []
+    wl = []
 
     for ord in sorted(thflux.keys()):    #make sure there are enough lines in every order
     #for ord in sorted(thflux.keys())[:-1]:    #don't have enough emission lines in order 40
@@ -778,12 +778,15 @@ def get_wavelength_solution_from_thorium(thflux, poly_deg=5, polytype='chebyshev
         #########################################################################################################################################
         
         #fill arrays for fitting
-        x = np.append(x, xord)
-        order = np.append(order, np.repeat(int(ordnum), len(xord)))
-        #m_order = np.append(m_order, np.repeat(105 - int(ordnum), len(xord)))
-        m_order = np.append(m_order, np.repeat(64 + int(ordnum), len(xord)))
-        wl = np.append(wl, refwlord)
-        
+        x.append(xord)
+        x = np.array(x)
+        order.append(np.repeat(int(ordnum), len(xord)))
+        order = np.array(order)
+        #m_order.append(np.repeat(105 - int(ordnum), len(xord)))
+        m_order.append(np.repeat(64 + int(ordnum), len(xord)))
+        m_order = np.array(m_order)
+        wl.append(refwlord)
+        wl = np.array(wl)
     
     
     #now re-normalize arrays to [-1,+1]
@@ -902,10 +905,10 @@ def get_wavelength_solution_labtests(thflux, thflux2, poly_deg=5, polytype='cheb
         zemax_dispsol = np.load('/Users/christoph/OneDrive - UNSW/dispsol/mean_dispsol_by_orders_from_zemax.npy').item()
     
     #prepare arrays for fitting
-    x = np.array([])
-    order = np.array([])
-    m_order = np.array([])
-    wl = np.array([])
+    x = []
+    order = []
+    m_order = []
+    wl = []
 
     for ord in sorted(thflux.keys())[:-1]:    #don't have enough emission lines in order 40
         ordnum = ord[-2:]
@@ -948,10 +951,14 @@ def get_wavelength_solution_labtests(thflux, thflux2, poly_deg=5, polytype='cheb
             zemax_wl = 10. * zemax_dispsol['order'+str(m)]['model'](xx[::-1])
         
         #fill arrays for fitting
-        x = np.append(x, xord)
-        order = np.append(order, np.repeat(int(ordnum), len(xord)))
-        m_order = np.append(m_order, np.repeat(105 - int(ordnum), len(xord)))
-        wl = np.append(wl, refwlord)
+        x.append(xord)
+        x = np.array(x)
+        order.append(np.repeat(int(ordnum), len(xord)))
+        order = np.array(order)
+        m_order.append(np.repeat(105 - int(ordnum), len(xord)))
+        m_order = np.array(m_order)
+        wl.append(refwlord)
+        wl = np.array(wl)
         
         
 #         #perform the fit
@@ -1133,11 +1140,11 @@ def get_arc_dispsol(thflux, satmask=None, polytype='chebyshev', lamptype=None, d
         outfile.close()
     
     # prepare global output arrays
-    x = np.array([])
-    nlines = np.array([])
-    order = np.array([])
-    ref_wl_air = np.array([])
-    ref_wl_vac = np.array([])
+    x = []
+    nlines = []
+    order = []
+    ref_wl_air = []
+    ref_wl_vac = []
     
     # if not passed into the routine, define a mask that masks out saturated arc lines and some other crap
     if satmask is None:
@@ -1157,9 +1164,9 @@ def get_arc_dispsol(thflux, satmask=None, polytype='chebyshev', lamptype=None, d
         mord = (ord+1) + 64
     
         # prepare output arrays for this order
-        ord_x = np.array([])
-        ord_ref_wl_air = np.array([])
-        ord_ref_wl_vac = np.array([])
+        ord_x = []
+        ord_ref_wl_air = []
+        ord_ref_wl_vac = []
         
         # normalized co-ordinates
         ord_norm = (ord / ((40-1)/2.)) - 1.
@@ -1218,22 +1225,24 @@ def get_arc_dispsol(thflux, satmask=None, polytype='chebyshev', lamptype=None, d
                 if debug_level >= 1:
                     print(str(found) + ' possible match(es) found!')
                 if found == 1:
-                    ord_x = np.append(ord_x, checkval)
-                    #ord_order = np.append(ord_order, ord)
-                    ord_ref_wl_air = np.append(ord_ref_wl_air, wlair[q])
-                    ord_ref_wl_vac = np.append(ord_ref_wl_vac, wlvac[q])
+                    ord_x.append(checkval)
+                    ord_ref_wl_air.append(wlair[q])
+                    ord_ref_wl_vac.append(wlvac[q])
                 else:
                     if debug_level >= 1:
                         print('Selecting closest match...')
                     qq = find_nearest(wlair, p(x_norm, ord_norm), return_index=True)
-                    ord_x = np.append(ord_x, checkval)
-                    #ord_order = np.append(ord_order, ord)
-                    ord_ref_wl_air = np.append(ord_ref_wl_air, wlair[qq])
-                    ord_ref_wl_vac = np.append(ord_ref_wl_vac, wlvac[qq])
+                    ord_x.append(checkval)
+                    ord_ref_wl_air.append(wlair[qq])
+                    ord_ref_wl_vac.append(wlvac[qq])
             else:
                 if debug_level >= 1:
                     print('NO LINE FOUND in MASTERTABLE!!!')
         
+        # convert to numpy arrays
+        ord_x = np.array(ord_x)
+        ord_ref_wl_air = np.array(ord_ref_wl_air)
+        ord_ref_wl_vac = np.array(ord_ref_wl_vac)
         
         if debug_level >= 1:
             print(str(len(ord_x)) + ' lines could initially be matched to known lines from MM line list')
@@ -1285,11 +1294,11 @@ def get_arc_dispsol(thflux, satmask=None, polytype='chebyshev', lamptype=None, d
         # now we can fill the global arrays and save info to table 
         if debug_level >= 1:
             print(str(len(ord_x)) + ' good lines found in order ' + ordnum)
-        nlines = np.append(nlines, len(ord_x))
-        order = np.append(order, np.repeat(ord+1, len(ord_x)))
-        x = np.append(x, ord_x)
-        ref_wl_air = np.append(ref_wl_air, ord_ref_wl_air)
-        ref_wl_vac = np.append(ref_wl_vac, ord_ref_wl_vac)
+        nlines.append(len(ord_x))
+        order.append(np.repeat(ord+1, len(ord_x)))
+        x.append(ord_x)
+        ref_wl_air.append(ord_ref_wl_air)
+        ref_wl_vac.append(ord_ref_wl_vac)
         if savetables:
             outfile = open(outfn, 'a+')
             for i in range(len(ord_x)):
@@ -1298,6 +1307,12 @@ def get_arc_dispsol(thflux, satmask=None, polytype='chebyshev', lamptype=None, d
     #######################################################################################################################################
     # end of loop over all orders
     
+    # convert to numpy arrays
+    x = np.array(x)
+    nlines = np.array(nlines)
+    order = np.array(order)
+    ref_wl_air = np.array(ref_wl_air)
+    ref_wl_vac = np.array(ref_wl_vac)
         
     # go to normalized co-ordinates
     x_norm = (x / ((len(data)-1)/2.)) - 1.
@@ -1829,8 +1844,8 @@ def define_pixel_offsets_between_fibres(relto='S1', savedict=False, saveplots=Fa
 
 
 
-def get_dispsol_for_all_fibs(obsname, relto='LFC', twod=False, degpol=7, deg_spectral=7, deg_spatial=7,
-                             fibs='stellar', polytype='chebyshev', nx=4112, debug_level=0, timit=False, signflip_slope=False):
+def get_dispsol_for_all_fibs(obsname, relto='LFC', twod=False, degpol=7, deg_spectral=7, deg_spatial=7, fibs='stellar',
+                             polytype='chebyshev', nx=4112, debug_level=0, timit=False, fudge=1., signflip_shift=False, signflip_slope=False):
 
     if timit:
         start_time = time.time()
@@ -1852,6 +1867,7 @@ def get_dispsol_for_all_fibs(obsname, relto='LFC', twod=False, degpol=7, deg_spe
 
     if signflip_slope:
         lfc_slope *= -1.
+    if signflip_shift:
         lfc_shift *= -1.
 
     # some housekeeping...
@@ -1877,7 +1893,7 @@ def get_dispsol_for_all_fibs(obsname, relto='LFC', twod=False, degpol=7, deg_spe
             # diff = - lfc_shift[o-1] + lfc_slope[o-1] * x0     # signs are confusing here, but comparison to DW's results suggests this is correct
             # x = x0 + diff - np.max(diff) + np.min(diff)       # signs are confusing here, but comparison to DW's results suggests this is correctly
             diff = lfc_shift[o-1] + lfc_slope[o-1] * x0
-            x = x0 - diff
+            x = x0 - fudge * diff
             lam = lfc_wl[ix]
             # master_lfc_fit = np.poly1d(np.polyfit(x0, lam, degpol))
             lfc_fit = np.poly1d(np.polyfit(x, lam, degpol))

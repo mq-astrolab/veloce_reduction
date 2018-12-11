@@ -14,6 +14,7 @@ from veloce_reduction.veloce_reduction.helper_functions import gausslike_with_am
 from veloce_reduction.veloce_reduction.flat_fielding import deblaze_orders
 
 
+
 # #speed of light in m/s
 # c = 2.99792458e8
 # #oversampling factor for logarithmic wavelength rebinning
@@ -288,7 +289,7 @@ def get_RV_from_xcorr(f, err, wl, f0, wl0, mask=None, smoothed_flat=None, osf=2,
 
 
 
-def get_rv_from_xcorr_combined_fibres(f, err, wl, f0, err0, wl0, mask=None, smoothed_flat=None, osf=2, delta_log_wl=1e-6,
+def get_RV_from_xcorr_combined_fibres(f, wl, f0, wl0, mask=None, smoothed_flat=None, osf=2, delta_log_wl=1e-6,
                                       relgrid=False, addrange=40, fitrange=10, return_xcs=False, flipped=False,
                                       individual_fibres=True, individual_orders=True, debug_level=0, timit=False):
     """
@@ -339,8 +340,6 @@ def get_rv_from_xcorr_combined_fibres(f, err, wl, f0, err0, wl0, mask=None, smoo
         wl[0, :, :] = 1.
         wl0[0, :, :] = 1.
 
-    rv = []
-    rverr = []
 
     # make cross-correlation functions (list of length n_orders used)
     xcs = make_ccfs(f, wl, f0, wl0, mask=None, smoothed_flat=None, delta_log_wl=delta_log_wl, relgrid=False,
@@ -360,7 +359,7 @@ def get_rv_from_xcorr_combined_fibres(f, err, wl, f0, err0, wl0, mask=None, smoo
         fitrangesize = fitrange
 
     # make array only containing the central parts of the CCFs (which can have different total lengths) for fitting
-    xcarr = np.zeros((len(xcs),2 * addrange + 1))
+    xcarr = np.zeros((len(xcs), 2 * addrange + 1))
     for i in range(xcarr.shape[0]):
         dum = np.array(xcs[i])
         xcarr[i,:] = dum[len(dum) // 2 - addrange : len(dum) // 2 + addrange + 1]
@@ -388,9 +387,11 @@ def get_rv_from_xcorr_combined_fibres(f, err, wl, f0, err0, wl0, mask=None, smoo
             popt, pcov = op.curve_fit(gausslike_with_amp_and_offset_and_slope, xrange, xcsum[xrange], p0=guess)
             mu = popt[0]
             mu_err = pcov[0, 0]
+
             # convert to RV in m/s
-            rv.append(c * (mu - (len(xcsum) // 2)) * delta_log_wl)
-            rverr.append(c * mu_err * delta_log_wl)
+            rv = c * (mu - (len(xcsum) // 2)) * delta_log_wl
+            rverr = c * mu_err * delta_log_wl
+
 
             # # plot a single fit for debugging
             # plot_osf = 10
@@ -408,7 +409,7 @@ def get_rv_from_xcorr_combined_fibres(f, err, wl, f0, err0, wl0, mask=None, smoo
         delta_t = time.time() - start_time
         print('Time taken for calculating RV: ' + str(np.round(delta_t, 2)) + ' seconds')
 
-    return np.array(rv), np.array(rverr)
+    return np.array(rv), np.array(rverr), np.array(xcsum)
 
 
 
@@ -549,7 +550,7 @@ def make_ccfs(f, wl, f0, wl0, mask=None, smoothed_flat=None, osf=2, delta_log_wl
         nfib = ord_f0_sorted.shape[0]
         rebinned_f0 = np.zeros((nfib, len(logwlgrid)))
         rebinned_f = np.zeros((nfib, len(logwlgrid)))
-        for i in range(rebinned_f.shape[0]):
+        for i in range(nfib):
             spl_ref_f0 = interp.InterpolatedUnivariateSpline(logwl0_sorted[i,ordmask_sorted], ord_f0_sorted[i,ordmask_sorted], k=3)  # slightly slower than linear, but best performance for cubic spline
             rebinned_f0[i,:] = spl_ref_f0(logwlgrid)
             spl_ref_f = interp.InterpolatedUnivariateSpline(logwl_sorted[i,ordmask_sorted], ord_f_sorted[i,ordmask_sorted], k=3)  # slightly slower than linear, but best performance for cubic spline

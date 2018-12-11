@@ -11,7 +11,9 @@ for i,filename in enumerate(files):
     dum4 = dum3.split('_')
     shortname = dum4[1]
     all_shortnames.append(shortname)
-files = files[np.argsort(all_shortnames)]
+sortix = np.argsort(all_shortnames)
+files = np.array(files)
+files = files[sortix]
 
 ########################################################################################################################
 ########################################################################################################################
@@ -21,17 +23,17 @@ files = files[np.argsort(all_shortnames)]
 
 all_jd = []
 all_bc = []
-outfn = '/Users/christoph/data/reduced/tauceti/tauceti_with_LFC/tauceti_all_info.dat'
-outfile = open(outfn, 'w')
-outfn_jd = '/Users/christoph/data/reduced/tauceti/tauceti_with_LFC/tauceti_all_jds.dat'
-outfile_jd = open(outfn_jd, 'w')
-outfn_bc = '/Users/christoph/data/reduced/tauceti/tauceti_with_LFC/tauceti_all_bcs.dat'
-outfile_bc = open(outfn_bc, 'w')
-outfn_names = '/Users/christoph/data/reduced/tauceti/tauceti_with_LFC/tauceti_all_obsnames.dat'
-outfile_names = open(outfn_names, 'w')
+# outfn = '/Users/christoph/data/reduced/tauceti/tauceti_with_LFC/tauceti_all_info.dat'
+# outfile = open(outfn, 'w')
+# outfn_jd = '/Users/christoph/data/reduced/tauceti/tauceti_with_LFC/tauceti_all_jds.dat'
+# outfile_jd = open(outfn_jd, 'w')
+# outfn_bc = '/Users/christoph/data/reduced/tauceti/tauceti_with_LFC/tauceti_all_bcs.dat'
+# outfile_bc = open(outfn_bc, 'w')
+# outfn_names = '/Users/christoph/data/reduced/tauceti/tauceti_with_LFC/tauceti_all_obsnames.dat'
+# outfile_names = open(outfn_names, 'w')
 
 for i,filename in enumerate(files):
-    print('Processing tau Ceti observation '+str(i+1)+'/'+str(len(files)))
+    print('Processing BCs for tau Ceti observation '+str(i+1)+'/'+str(len(files)))
     # do some housekeeping with filenames
     dum = filename.split('/')
     dum2 = dum[-1].split('.')
@@ -43,29 +45,31 @@ for i,filename in enumerate(files):
     all_bc.append(bc[0])
     jd = pyfits.getval(filename, 'UTMJD') + 2.4e6 + 0.5
     all_jd.append(jd)
-    outfile_names.write(shortname + ' \n')
-    outfile_jd.write('%14.6f \n' % (jd))
-    outfile_bc.write('%14.6f \n' % (bc))
-    outfile.write(shortname + '     %14.6f     %14.6f \n' % (jd, bc))
+    # outfile_names.write(shortname + ' \n')
+    # outfile_jd.write('%14.6f \n' % (jd))
+    # outfile_bc.write('%14.6f \n' % (bc))
+    # outfile.write(shortname + '     %14.6f     %14.6f \n' % (jd, bc))
 
-outfile.close()
-outfile_jd.close()
-outfile_bc.close()
-outfile_names.close()
+# outfile.close()
+# outfile_jd.close()
+# outfile_bc.close()
+# outfile_names.close()
 
 ########################################################################################################################
 ########################################################################################################################
 ########################################################################################################################
 
 # calculate wl-solution for all fibres, including the LFC shifts and slopes; also append to reduced spectrum FITS file
+signflip_shift = True
 signflip_slope = True
+fudge = 1.25
 for i,filename in enumerate(files):
-    print('Processing tau Ceti observation ' + str(i+1) + '/' + str(len(files)))
+    print('Processing wl-solution for tau Ceti observation ' + str(i+1) + '/' + str(len(files)))
     dum = filename.split('/')
     dum2 = dum[-1].split('.')
     dum3 = dum2[0].split('_')
     obsname = dum3[1]
-    wldict,wl = get_dispsol_for_all_fibs(obsname, signflip_slope=signflip_slope)
+    wldict,wl = get_dispsol_for_all_fibs(obsname, fudge=fudge, signflip_shift=signflip_shift, signflip_slope=signflip_slope)
     pyfits.append(filename, wl, clobber=True)
 
 ########################################################################################################################
@@ -77,24 +81,63 @@ for i,filename in enumerate(files):
 
 all_xc = []
 all_rv = []
-for file in files:
-    f = pyfits.getdata(file, 0)
-    err = pyfits.getdata(file, 1)
-    wl = pyfits.getdata(file, 2)
+xcsums = []
+for i,filename in enumerate(files):
+    print('Processing RV for tau Ceti observation ' + str(i+1) + '/' + str(len(files)))
+    f = pyfits.getdata(filename, 0)
+    # err = pyfits.getdata(file, 1)
+    wl = pyfits.getdata(filename, 2)
     # wl = pyfits.getdata('/Users/christoph/OneDrive - UNSW/dispsol/individual_fibres_dispsol_poly7_21sep30019.fits')
-    f0 = pyfits.getdata(files[2], 0)
-    err0 = pyfits.getdata(files[2], 1)
-    wl0 = pyfits.getdata(files[2], 2)
+    f0 = pyfits.getdata(files[69], 0)   #that's the highest SNR observation
+    # err0 = pyfits.getdata(files[69], 1)
+    wl0 = pyfits.getdata(files[69], 2)
     # wl0 = pyfits.getdata('/Users/christoph/OneDrive - UNSW/dispsol/individual_fibres_dispsol_poly7_21sep30019.fits')
-    all_xc.append(get_RV_from_xcorr_combined_fibres(f, err, wl, f0, err0, wl0, return_xcs=True, individual_fibres=False,
+    all_xc.append(get_RV_from_xcorr_combined_fibres(f, wl, f0, wl0, return_xcs=True, individual_fibres=False,
                                                     individual_orders=False))
-    rv,rverr = get_RV_from_xcorr_combined_fibres(f, err, wl, f0, err0, wl0, return_xcs=False, individual_fibres=False,
+    rv,rverr,xcsum = get_RV_from_xcorr_combined_fibres(f, wl, f0, wl0, return_xcs=False, individual_fibres=False,
                                                     individual_orders=False)
     all_rv.append(rv)
+    xcsums.append(xcsum)
+xcsums = np.array(xcsums)
 
 ########################################################################################################################
 ########################################################################################################################
 ########################################################################################################################
+
+# tests to determine the best fudge factor...
+rvs_fudge_test = {}
+for fudge in np.arange(0.75,1.26,0.025):
+    signflip_shift = True
+    signflip_slope = True
+
+    all_rv = []
+
+    for i, filename in enumerate(files):
+        print('Processing tau Ceti observation ' + str(i + 1) + '/' + str(len(files)))
+        dum = filename.split('/')
+        dum2 = dum[-1].split('.')
+        dum3 = dum2[0].split('_')
+        obsname = dum3[1]
+        wldict, wl = get_dispsol_for_all_fibs(obsname, fudge=fudge, signflip_shift=signflip_shift,
+                                              signflip_slope=signflip_slope)
+        obsname0 = '24sep30078'
+        wldict0, wl0 = get_dispsol_for_all_fibs(obsname0, fudge=fudge, signflip_shift=signflip_shift,
+                                              signflip_slope=signflip_slope)
+        f = pyfits.getdata(filename, 0)
+        f0 = pyfits.getdata(files[69], 0)  # that's the highest SNR observation
+        # wl0 = pyfits.getdata('/Users/christoph/OneDrive - UNSW/dispsol/individual_fibres_dispsol_poly7_21sep30019.fits')
+        # all_xc.append(get_RV_from_xcorr_combined_fibres(f, wl, f0, wl0, return_xcs=True, individual_fibres=False,
+        #                                                 individual_orders=False))
+        rv, rverr, xcsum = get_RV_from_xcorr_combined_fibres(f, wl, f0, wl0, return_xcs=False, individual_fibres=False,
+                                                             individual_orders=False)
+        all_rv.append(rv)
+
+    rvs_fudge_test['fudge_' + str(fudge)[:4]] = all_rv - np.array(all_bc)
+
+########################################################################################################################
+########################################################################################################################
+########################################################################################################################
+
 
 # plotting the CCFs on RV axis with and without BC applied
 
@@ -157,6 +200,7 @@ plt.figure()
 plt.title('tau Ceti - CCFs for 11 orders added up')
 plt.xlim(-2e4,2e4)
 plt.ylim(0.9980,1.0005)
+plt.xlabel('delta RV [m/s]')
 for i in range(len(files)):
     plt.plot(c * (np.arange(len(xcsums[i,:])) - (len(xcsums[i,:]) // 2)) * delta_log_wl,
              xcsums[i,:] / np.max(xcsums[i,:]), 'k.-')
@@ -164,6 +208,14 @@ for i in range(len(files)):
              xcsums[i,:] / np.max(xcsums[i,:]), 'r.-')
     plt.plot(c * (np.arange(len(xcsums[i,:])) - (len(xcsums[i,:]) // 2)) * delta_log_wl - all_bc[i],
              xcsums[i,:] / np.max(xcsums[i,:]), 'b.-')
+i=0
+plt.plot(c * (np.arange(len(xcsums[i,:])) - (len(xcsums[i,:]) // 2)) * delta_log_wl,
+         xcsums[i,:] / np.max(xcsums[i,:]), 'k.-', label='no BC')
+plt.plot(c * (np.arange(len(xcsums[i,:])) - (len(xcsums[i,:]) // 2)) * delta_log_wl + all_bc[i],
+         xcsums[i,:] / np.max(xcsums[i,:]), 'r.-', label='BC added')
+plt.plot(c * (np.arange(len(xcsums[i,:])) - (len(xcsums[i,:]) // 2)) * delta_log_wl - all_bc[i],
+         xcsums[i,:] / np.max(xcsums[i,:]), 'b.-', label='BC subtracted')
+plt.legend()
 
 ########################################################################################################################
 

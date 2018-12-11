@@ -11,7 +11,7 @@ import time
 import os
 import matplotlib.pyplot as plt
 
-from veloce_reduction.helper_functions import get_iterable, find_nearest, get_datestring
+from veloce_reduction.veloce_reduction.helper_functions import get_iterable, find_nearest, get_datestring
 
 #from matplotlib.cm import cmap_d
 from plotting_helpers import circles
@@ -166,13 +166,13 @@ def flux_ratios_from_seeing(seeing, verbose=False):
 #                 print
     
     
-    flux_ratios['seeing'] = np.array([])
-    flux_ratios['frac_ifu'] = np.array([])
-    flux_ratios['central'] = np.array([])
-    flux_ratios['inner'] = np.array([])
-    flux_ratios['outer'] = np.array([])
-    flux_ratios['outer1'] = np.array([])
-    flux_ratios['outer2'] = np.array([])
+    flux_ratios['seeing'] = []
+    flux_ratios['frac_ifu'] = []
+    flux_ratios['central'] = []
+    flux_ratios['inner'] = []
+    flux_ratios['outer'] = []
+    flux_ratios['outer1'] = []
+    flux_ratios['outer2'] = []
     
     #stupid python!!!
     for fwhm in get_iterable(seeing):
@@ -201,13 +201,13 @@ def flux_ratios_from_seeing(seeing, verbose=False):
         rfo2 = frac_o2 / ifu_frac
         
         #fill the output dictionary  
-        flux_ratios['seeing'] = np.append(flux_ratios['seeing'], fwhm)
-        flux_ratios['frac_ifu'] = np.append(flux_ratios['frac_ifu'], ifu_frac)
-        flux_ratios['central'] = np.append(flux_ratios['central'], rfc)
-        flux_ratios['inner'] = np.append(flux_ratios['inner'], rfi)
-        flux_ratios['outer'] = np.append(flux_ratios['outer'], rfo)
-        flux_ratios['outer1'] = np.append(flux_ratios['outer1'], rfo1)
-        flux_ratios['outer2'] = np.append(flux_ratios['outer2'], rfo2)
+        flux_ratios['seeing'].append(fwhm)
+        flux_ratios['frac_ifu'].append(ifu_frac)
+        flux_ratios['central'].append(rfc)
+        flux_ratios['inner'].append(rfi)
+        flux_ratios['outer'].append(rfo)
+        flux_ratios['outer1'].append(rfo1)
+        flux_ratios['outer2'].append(rfo2)
         
         if verbose:
             print('Total fraction of flux captured by IFU: '+str(np.round(ifu_frac * 100,1))+'%')

@@ -110,33 +110,37 @@ def get_relints_single_order(sc, sr, err_sc, ordpol, fppo, ordmask=None, nfib=19
                 #best_values = {'amp':-1., 'beta':-1., 'mu':-1., 'sigma':-1.}
         else:    
             #this is the NORMAL case, where the entire cutout lies on the chip
-            grid = np.array([])
-            #data = np.array([])
-            normdata = np.array([])
-            #errors = np.array([])
-            weights = np.array([])
+            grid = []
+            #data = []
+            normdata = []
+            #errors = []
+            weights = []
             refpos = ordpol(pix)
             for j in np.arange(np.max([0,pix-sampling_size]),np.min([npix-1,pix+sampling_size])+1):
-                grid = np.append(grid, sr[:,j] - ordpol(j) + refpos)
-                #data = np.append(data,sc[:,j])
-                normdata = np.append(normdata, sc[:,j] / np.sum(sc[:,j]))
+                grid.append(sr[:,j] - ordpol(j) + refpos)
+                #data.append(sc[:,j])
+                normdata.append(sc[:,j] / np.sum(sc[:,j]))
                 #assign weights for flux (and take care of NaNs and INFs)
                 #normerr = np.sqrt(sc[:,j] + RON**2) / np.sum(sc[:,j])
                 normerr = err_sc[:,j] / np.sum(sc[:,j])
                 pix_w = 1./(normerr*normerr)  
                 pix_w[np.isinf(pix_w)] = 0.
-                weights = np.append(weights, pix_w)    
+                weights.append(pix_w)    
                 ### initially I thought this was clearly rubbish as it down-weights the central parts
                 ### and that we really want to use the relative errors, ie w_i = 1/(relerr_i)**2
                 ### HOWEVER: this is not true, and the optimal extraction linalg routine requires absolute errors!!!    
-                #weights = np.append(weights, 1./((np.sqrt(sc[:,j] + RON**2)) / sc[:,j])**2)    
+                #weights.append(1./((np.sqrt(sc[:,j] + RON**2)) / sc[:,j])**2)    
                 if debug_level >= 2:
                     #plt.plot(sr[:,j] - ordpol(j),sc[:,j],'.')
                     plt.plot(sr[:,j] - ordpol(j),sc[:,j]/np.sum(sc[:,j]),'.')
                     #plt.xlim(-5,5)
                     plt.xlim(-sc.shape[0]/2,sc.shape[0]/2)
                 
-            #data = data[grid.argsort()]
+            # data = np.array(data)
+            normdata = np.array(normdata)
+            weights = np.array(weights)
+            grid = np.array(grid)
+            # data = data[grid.argsort()]
             normdata = normdata[grid.argsort()]
             weights = weights[grid.argsort()]
             grid = grid[grid.argsort()]
@@ -274,32 +278,36 @@ def old_get_relints_single_order(sc, sr, ordpol, fppo, ordmask=None, nfib=19, sl
                 #best_values = {'amp':-1., 'beta':-1., 'mu':-1., 'sigma':-1.}
         else:    
             #this is the NORMAL case, where the entire cutout lies on the chip
-            grid = np.array([])
-            #data = np.array([])
-            normdata = np.array([])
-            #errors = np.array([])
-            weights = np.array([])
+            grid = []
+            #data = []
+            normdata = []
+            #errors = []
+            weights = []
             refpos = ordpol(pix)
             for j in np.arange(np.max([0,pix-sampling_size]),np.min([npix-1,pix+sampling_size])+1):
-                grid = np.append(grid, sr[:,j] - ordpol(j) + refpos)
-                #data = np.append(data,sc[:,j])
-                normdata = np.append(normdata, sc[:,j] / np.sum(sc[:,j]))
+                grid.append(sr[:,j] - ordpol(j) + refpos)
+                #data.append(sc[:,j])
+                normdata.append(sc[:,j] / np.sum(sc[:,j]))
                 #assign weights for flux (and take care of NaNs and INFs)
                 normerr = np.sqrt(sc[:,j] + RON**2) / np.sum(sc[:,j])
                 pix_w = 1./(normerr*normerr)  
                 pix_w[np.isinf(pix_w)] = 0.
-                weights = np.append(weights, pix_w)    
+                weights.append(pix_w)    
                 ### initially I thought this was clearly rubbish as it down-weights the central parts
                 ### and that we really want to use the relative errors, ie w_i = 1/(relerr_i)**2
                 ### HOWEVER: this is not true, and the optimal extraction linalg routine requires absolute errors!!!
-                #weights = np.append(weights, 1./((np.sqrt(sc[:,j] + RON**2)) / sc[:,j])**2)        
+                #weights.append(1./((np.sqrt(sc[:,j] + RON**2)) / sc[:,j])**2)        
                 if debug_level >= 2:
                     #plt.plot(sr[:,j] - ordpol(j),sc[:,j],'.')
                     plt.plot(sr[:,j] - ordpol(j),sc[:,j]/np.sum(sc[:,j]),'.')
                     #plt.xlim(-5,5)
                     plt.xlim(-sc.shape[0]/2,sc.shape[0]/2)
                 
-            #data = data[grid.argsort()]
+            # data = np.array(data)
+            normdata = np.array(normdata)
+            weights = np.array(weights)
+            grid = np.array(grid)
+            # data = data[grid.argsort()]
             normdata = normdata[grid.argsort()]
             weights = weights[grid.argsort()]
             grid = grid[grid.argsort()]
@@ -443,15 +451,15 @@ def get_relints(P_id, stripes, err_stripes, mask=None, sampling_size=25, slit_he
             
     
     #get weighted mean of all relints (weights = SNRs)
-    allsnr = np.array([])
+    allsnr = []
     #allrelints = np.zeros([])
     for ord in sorted(snr.keys()):
-        allsnr = np.append(allsnr,snr[ord])
+        allsnr.append(snr[ord])
         try:
-            allrelints = np.vstack((allrelints,relints_norm[ord]))
+            allrelints = np.vstack((allrelints, relints_norm[ord]))
         except:
             allrelints = relints_norm[ord]
-    wm_relints = np.average(allrelints, axis=0, weights=allsnr, returned=False)
+    wm_relints = np.average(allrelints, axis=0, weights=np.array(allsnr), returned=False)
         
     
     if timit:
@@ -565,15 +573,15 @@ def get_relints_from_indices(P_id, img, err_img, stripe_indices, mask=None, samp
             
     
     #get weighted mean of all relints (weights = SNRs)
-    allsnr = np.array([])
+    allsnr = []
     #allrelints = np.zeros([])
     for ord in sorted(snr.keys()):
-        allsnr = np.append(allsnr,snr[ord])
+        allsnr.append(snr[ord])
         try:
             allrelints = np.vstack((allrelints,relints_norm[ord]))
         except:
             allrelints = relints_norm[ord]
-    wm_relints = np.average(allrelints, axis=0, weights=allsnr, returned=False)
+    wm_relints = np.average(allrelints, axis=0, weights=np.array(allsnr), returned=False)
             
     
     if timit:
@@ -682,32 +690,36 @@ def get_relints_single_order_gaussian(sc, sr, err_sc, ordpol, ordmask=None, nfib
             line_sigma_fitted = np.repeat(-1, nfib)
         else:
             # this is the NORMAL case, where the entire cutout lies on the chip
-            grid = np.array([])
-            # data = np.array([])
-            normdata = np.array([])
-            # errors = np.array([])
-            weights = np.array([])
+            grid = []
+            # data = []
+            normdata = []
+            # errors = []
+            weights = []
             refpos = ordpol(pix)
             for j in np.arange(np.max([0, pix - sampling_size]), np.min([npix - 1, pix + sampling_size]) + 1):
-                grid = np.append(grid, sr[:, j] - ordpol(j) + refpos)
-                # data = np.append(data,sc[:,j])
-                normdata = np.append(normdata, sc[:, j] / np.sum(sc[:, j]))
+                grid.append(sr[:, j] - ordpol(j) + refpos)
+                # data.append(sc[:,j])
+                normdata.append(sc[:, j] / np.sum(sc[:, j]))
                 # assign weights for flux (and take care of NaNs and INFs)
                 # normerr = np.sqrt(sc[:,j] + RON**2) / np.sum(sc[:,j])
                 normerr = err_sc[:, j] / np.sum(sc[:, j])
                 pix_w = 1. / (normerr * normerr)
                 pix_w[np.isinf(pix_w)] = 0.
-                weights = np.append(weights, pix_w)
+                weights.append(pix_w)
                 ### initially I thought this was clearly rubbish as it down-weights the central parts
                 ### and that we really want to use the relative errors, ie w_i = 1/(relerr_i)**2
                 ### HOWEVER: this is not true, and the optimal extraction linalg routine requires absolute errors!!!
-                # weights = np.append(weights, 1./((np.sqrt(sc[:,j] + RON**2)) / sc[:,j])**2)
+                # weights.append(1./((np.sqrt(sc[:,j] + RON**2)) / sc[:,j])**2)
                 if debug_level >= 2:
                     # plt.plot(sr[:,j] - ordpol(j),sc[:,j],'.')
                     plt.plot(sr[:, j] - ordpol(j), sc[:, j] / np.sum(sc[:, j]), '.')
                     # plt.xlim(-5,5)
                     plt.xlim(-sc.shape[0] / 2, sc.shape[0] / 2)
 
+            # data = np.array(data)
+            normdata = np.array(normdata)
+            weights = np.array(weights)
+            grid = np.array(grid)
             # data = data[grid.argsort()]
             normdata = normdata[grid.argsort()]
             weights = weights[grid.argsort()]
@@ -914,15 +926,15 @@ def get_relints_from_indices_gaussian(P_id, img, err_img, stripe_indices, mask=N
         #     model_grid[ord] = modgrid_ord
 
     # get weighted mean of all relints (weights = SNRs)
-    allsnr = np.array([])
+    allsnr = []
     # allrelints = np.zeros([])
     for ord in sorted(snr.keys()):
-        allsnr = np.append(allsnr, snr[ord])
+        allsnr.append(snr[ord])
         try:
             allrelints = np.vstack((allrelints, relints_norm[ord]))
         except:
             allrelints = relints_norm[ord]
-    wm_relints = np.average(allrelints, axis=0, weights=allsnr, returned=False)
+    wm_relints = np.average(allrelints, axis=0, weights=np.array(allsnr), returned=False)
 
     if timit:
         print('Time elapsed: ' + str(int(time.time() - start_time)) + ' seconds...')

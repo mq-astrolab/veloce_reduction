@@ -913,17 +913,17 @@ def get_mean_snr(flux, err=None, per_order=False):
             flux[o][mask1] = 0.
             err[o] = np.sqrt(flux[o])
             
-    snr_ord = np.array([])
+    snr_ord = []
     
     for o in sorted(flux.keys()):
         #can't have negative flux or zero error
         mask2 = np.logical_and(flux[o] >= 0., err[o] > 0.)
-        snr_ord = np.append(snr_ord, np.mean(flux[o][mask2] / err[o][mask2]))
+        snr_ord.append(np.mean(flux[o][mask2] / err[o][mask2]))
     
     snr =  np.mean(snr_ord)
     
     if per_order:
-        return snr_ord
+        return np.array(snr_ord)
     else:
         return snr
 
@@ -1082,5 +1082,47 @@ def quick_bg_fix(raw_data, npix=4112):
     data[left_xx] = raw_data[left_xx] - left_bg
     data[right_xx] = raw_data[right_xx] - right_bg
     return data
+
+
+
+def weighted_sample_variance(rv, rverr):
+    """
+    Finds the radial velocity uncertainty by calculating the weighted sample variance across each order
+    written by Brendan Orenstein
+    """
+
+    rv = rv[0]
+    rverr = rverr[0]
+
+    rv_mask = np.zeros(0)
+    rverr_mask = np.zeros(0)
+
+    for i in range(len(rv)):
+        if rv[i] != 0.0 and rverr[i] == rverr[i]:  # Ensure no nans
+            rv_mask = np.append(rv_mask, rv[i])
+            rverr_mask = np.append(rverr_mask, rverr[i])
+
+    n = len(rv_mask)
+    mean_rv = np.mean(rv_mask)
+
+    mult = 0
+    for i in range(n):
+        mult += rverr_mask[i] ** (-2)
+    mult = 1 / mult
+
+    val = 0
+    for i in range(n):
+        val += ((rv_mask[i] - mean_rv) ** 2 / rverr_mask[i] ** 2)
+
+    out = mult * 1 / (n - 1) * val
+    return out
+
+
+
+
+
+
+
+
 
 

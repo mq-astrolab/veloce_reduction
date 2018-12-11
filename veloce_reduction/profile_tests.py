@@ -136,32 +136,36 @@ def get_multiple_fibre_profiles_single_order(sc, sr, err_sc, ordpol, ordmask=Non
                 fibre_profiles_ord['offset'].append(-1.)
         else:
             # this is the NORMAL case, where the entire cutout lies on the chip
-            grid = np.array([])
-            # data = np.array([])
-            normdata = np.array([])
-            # errors = np.array([])
-            weights = np.array([])
+            grid = []
+            # data = []
+            normdata = []
+            # errors = []
+            weights = []
             refpos = ordpol(pix)
             for j in np.arange(np.max([0, pix - sampling_size]), np.min([npix - 1, pix + sampling_size]) + 1):
-                grid = np.append(grid, sr[:, j] - ordpol(j) + refpos)
-                # data = np.append(data,sc[:,j])
-                normdata = np.append(normdata, sc[:, j] / np.sum(sc[:, j]))
+                grid.append(sr[:, j] - ordpol(j) + refpos)
+                # data.append(sc[:,j])
+                normdata.append(sc[:, j] / np.sum(sc[:, j]))
                 # assign weights for flux (and take care of NaNs and INFs)
                 # normerr = np.sqrt(sc[:,j] + RON**2) / np.sum(sc[:,j])
                 normerr = err_sc[:, j] / np.sum(sc[:, j])
                 pix_w = 1. / (normerr * normerr)
                 pix_w[np.isinf(pix_w)] = 0.
-                weights = np.append(weights, pix_w)
+                weights.append(pix_w)
                 ### initially I thought this was clearly rubbish as it down-weights the central parts
                 ### and that we really want to use the relative errors, ie w_i = 1/(relerr_i)**2
                 ### HOWEVER: this is not true, and the optimal extraction linalg routine requires absolute errors!!!
-                # weights = np.append(weights, 1./((np.sqrt(sc[:,j] + RON**2)) / sc[:,j])**2)
+                # weights.append(1./((np.sqrt(sc[:,j] + RON**2)) / sc[:,j])**2)
                 if debug_level >= 3:
                     # plt.plot(sr[:,j] - ordpol(j),sc[:,j],'.')
                     plt.plot(sr[:, j] - ordpol(j), sc[:, j] / np.sum(sc[:, j]), '.')
                     # plt.xlim(-5,5)
                     plt.xlim(-sc.shape[0] / 2, sc.shape[0] / 2)
 
+            # data = np.array(data)
+            normdata = np.array(normdata)
+            weights = np.array(weights)
+            grid = np.array(grid)
             # data = data[grid.argsort()]
             normdata = normdata[grid.argsort()]
             weights = weights[grid.argsort()]
