@@ -1,7 +1,20 @@
+import glob
+import numpy as np
+import astropy.io.fits as pyfits
+import matplotlib.pyplot as plt
+
+from veloce_reduction.veloce_reduction.wavelength_solution import get_dispsol_for_all_fibs
+from veloce_reduction.veloce_reduction.get_radial_velocity import get_RV_from_xcorr_2, make_ccfs
+from veloce_reduction.veloce_reduction.barycentric_correction import get_barycentric_correction
+
+
 ########################################################################################################################
 # HOUSEKEEPING
-path = '/Users/christoph/data/reduced/tauceti/tauceti_with_LFC/'
+# path = '/Users/christoph/data/reduced/tauceti/tauceti_with_LFC/'
+path = '/Volumes/BERGRAID/data/veloce/reduced/tauceti/tauceti_with_LFC/'
+
 files = glob.glob(path + 'HD10700*')
+
 # sort list of files
 all_shortnames = []
 for i,filename in enumerate(files):
@@ -20,6 +33,9 @@ files = files[sortix]
 ########################################################################################################################
 
 # calculating BARYCORR
+
+# all_jd = readcol(path + 'tauceti_all_jds.dat')
+# all_bc = readcol(path + 'tauceti_all_bcs.dat')
 
 all_jd = []
 all_bc = []
@@ -81,21 +97,28 @@ for i,filename in enumerate(files):
 
 all_xc = []
 all_rv = []
+all_sumrv = []
 xcsums = []
+
+# TEMPLATE:
+f0 = pyfits.getdata(files[69], 0)   #that's the highest SNR observation
+# err0 = pyfits.getdata(files[69], 1)
+# wl0 = pyfits.getdata(files[69], 2)
+# wl0 = pyfits.getdata('/Users/christoph/OneDrive - UNSW/dispsol/individual_fibres_dispsol_poly7_21sep30019.fits')
+obsname_0 = '24sep30078'
+wldict0,wl0 = get_dispsol_for_all_fibs(obsname_0, fudge=fudge, signflip_shift=signflip_shift, signflip_slope=signflip_slope)
+
 for i,filename in enumerate(files):
     print('Processing RV for tau Ceti observation ' + str(i+1) + '/' + str(len(files)))
     f = pyfits.getdata(filename, 0)
     # err = pyfits.getdata(file, 1)
     wl = pyfits.getdata(filename, 2)
     # wl = pyfits.getdata('/Users/christoph/OneDrive - UNSW/dispsol/individual_fibres_dispsol_poly7_21sep30019.fits')
-    f0 = pyfits.getdata(files[69], 0)   #that's the highest SNR observation
-    # err0 = pyfits.getdata(files[69], 1)
-    wl0 = pyfits.getdata(files[69], 2)
-    # wl0 = pyfits.getdata('/Users/christoph/OneDrive - UNSW/dispsol/individual_fibres_dispsol_poly7_21sep30019.fits')
-    all_xc.append(get_RV_from_xcorr_combined_fibres(f, wl, f0, wl0, return_xcs=True, individual_fibres=False,
-                                                    individual_orders=False))
-    rv,rverr,xcsum = get_RV_from_xcorr_combined_fibres(f, wl, f0, wl0, return_xcs=False, individual_fibres=False,
-                                                    individual_orders=False)
+    all_xc.append(make_ccfs(f, wl, f0, wl0, mask=None, smoothed_flat=None, delta_log_wl=1e-6, relgrid=False,
+                            flipped=False, individual_fibres=False, debug_level=1, timit=False))
+    rv,rverr,xcsum = get_RV_from_xcorr_2(f, wl, f0, wl0, individual_fibres=False, individual_orders=True, debug_level=1)
+    sumrv,sumrverr,xcsum = get_RV_from_xcorr_2(f, wl, f0, wl0, individual_fibres=False, individual_orders=False, debug_level=1)
+    all_sumrv.append(sumrv)
     all_rv.append(rv)
     xcsums.append(xcsum)
 xcsums = np.array(xcsums)
@@ -126,9 +149,9 @@ for fudge in np.arange(0.75,1.26,0.025):
         f = pyfits.getdata(filename, 0)
         f0 = pyfits.getdata(files[69], 0)  # that's the highest SNR observation
         # wl0 = pyfits.getdata('/Users/christoph/OneDrive - UNSW/dispsol/individual_fibres_dispsol_poly7_21sep30019.fits')
-        # all_xc.append(get_RV_from_xcorr_combined_fibres(f, wl, f0, wl0, return_xcs=True, individual_fibres=False,
+        # all_xc.append(get_RV_from_xcorr_2(f, wl, f0, wl0, return_xcs=True, individual_fibres=False,
         #                                                 individual_orders=False))
-        rv, rverr, xcsum = get_RV_from_xcorr_combined_fibres(f, wl, f0, wl0, return_xcs=False, individual_fibres=False,
+        rv, rverr, xcsum = get_RV_from_xcorr_2(f, wl, f0, wl0, return_xcs=False, individual_fibres=False,
                                                              individual_orders=False)
         all_rv.append(rv)
 
@@ -140,6 +163,10 @@ for fudge in np.arange(0.75,1.26,0.025):
 
 
 # plotting the CCFs on RV axis with and without BC applied
+
+# speed of light in m/s
+c = 2.99792458e8
+delta_log_wl = 1e-6
 
 # WHEN THERE IS ONLY ONE CCF PER OBSERVATION
 

@@ -1085,7 +1085,7 @@ def quick_bg_fix(raw_data, npix=4112):
 
 
 
-def weighted_sample_variance(rv, rverr):
+def brendans_weighted_sample_variance(rv, rverr):
     """
     Finds the radial velocity uncertainty by calculating the weighted sample variance across each order
     written by Brendan Orenstein
@@ -1116,6 +1116,14 @@ def weighted_sample_variance(rv, rverr):
 
     out = mult * 1 / (n - 1) * val
     return out
+
+
+
+def wsv(data, err):
+    """
+    Finds the weighted sample variance of an array given it's uncertainties
+    """
+    return 1
 
 
 

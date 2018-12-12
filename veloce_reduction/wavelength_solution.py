@@ -1874,7 +1874,7 @@ def get_dispsol_for_all_fibs(obsname, relto='LFC', twod=False, degpol=7, deg_spe
     n_ord = len(np.unique(lfc_ord))
     xx = np.arange(nx)
     
-    # prepare output array
+    # prepare outputs
     wldict = {}
     # wl = np.zeros((n_ord, nfib, nx))
     wl = np.zeros((40, nfib, nx))

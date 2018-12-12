@@ -105,7 +105,10 @@ def get_obstype_lists_temp(path, pattern=None, weeding=True):
         unbinned = file_list
 
     # prepare output lists
-    acq_list = []
+    if weeding:
+        acq_list = binned[:]
+    else:
+        acq_list = []
     bias_list = []
     dark_list = []
     flat_list = []
@@ -122,7 +125,8 @@ def get_obstype_lists_temp(path, pattern=None, weeding=True):
         obj_type = pyfits.getval(file, 'OBJECT')
 
         if obj_type.lower() == 'acquire':
-            acq_list.append(file)
+            if not weeding:
+                acq_list.append(file)
         elif obj_type.lower().startswith('bias'):
             bias_list.append(file)
         elif obj_type.lower().startswith('dark'):
@@ -135,13 +139,13 @@ def get_obstype_lists_temp(path, pattern=None, weeding=True):
             domeflat_list.append(file)
         elif obj_type.lower().startswith('arc'):
             arc_list.append(file)
-        elif obj_type.lower() in ["thxe","thxe-only"]:
+        elif obj_type.lower() in ["thxe","thxe-only", "simth"]:
             thxe_list.append(file)
-        elif obj_type.lower() in ["lc","lc-only","lfc","lfc-only"]:
+        elif obj_type.lower() in ["lc","lc-only","lfc","lfc-only", "simlc"]:
             laser_list.append(file)
         elif obj_type.lower() in ["thxe+lfc","lfc+thxe","lc+simthxe","lc+thxe"]:
             laser_and_thxe_list.append(file)
-        elif obj_type.lower().startswith(("toi","tic","hd","gj","gl","ast","alpha","beta","gamma","delta","tau","ach")):
+        elif obj_type.lower().startswith(("toi","tic","hd","gj","gl","ast","alpha","beta","gamma","delta","tau","ach", '1', '2', '3', '4', '5', '6', '7', '8', '9')):
             stellar_list.append(file)
         else:
             unknown_list.append(file)

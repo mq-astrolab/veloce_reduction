@@ -320,14 +320,14 @@ pwl,wl = get_wavelength_solution(thflux, thflux2, poly_deg=5, laser=False, polyt
 
 
 
-#add wavelength solution to extracted spectra dictionaries
+# add wavelength solution to extracted spectra dictionaries
 for obsname in obsnames:
     quick_extracted_raw[obsname]['wl'] = wl
 quick_extracted_raw['MW']['wl'] = wl
 quick_extracted_raw['template']['wl'] = wl
 
 
-#if flat quick-extract or collapse-extract has been performed, do the flat-fielding in 1D now
+# if flat quick-extract or collapse-extract has been performed, do the flat-fielding in 1D now
 smoothed_flat, pix_sens = onedim_pixtopix_variations(quick_extracted_raw['MW']['flux'], filt='g', filter_width=25)
 #quick_extracted = quick_extracted_raw.copy()
 quick_extracted = copy.deepcopy(quick_extracted_raw)

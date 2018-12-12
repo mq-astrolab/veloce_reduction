@@ -289,25 +289,23 @@ def get_RV_from_xcorr(f, err, wl, f0, wl0, mask=None, smoothed_flat=None, osf=2,
 
 
 
-def get_RV_from_xcorr_combined_fibres(f, wl, f0, wl0, mask=None, smoothed_flat=None, osf=2, delta_log_wl=1e-6,
-                                      relgrid=False, addrange=40, fitrange=10, return_xcs=False, flipped=False,
-                                      individual_fibres=True, individual_orders=True, debug_level=0, timit=False):
+def get_RV_from_xcorr_2(f, wl, f0, wl0, mask=None, smoothed_flat=None, delta_log_wl=1e-6, relgrid=False, osf=2, addrange=40, 
+                        fitrange=10, flipped=False, individual_fibres=True, individual_orders=True, debug_level=0, timit=False):
     """
     This routine calculates the radial velocity of an observed spectrum relative to a template using cross-correlation.
     Note that input spectra should be de-blazed already!!!
     If the mask from "find_stripes" has gaps, do the filtering for each segment independently. If no mask is provided, create a simple one on the fly.
 
     INPUT:
-    'f'             : dictionary containing the observed flux (keys = orders)
-    'err'           : dictionary containing the uncertainties in the observed flux (keys = orders)
-    'wl'            : dictionary containing the wavelengths of the observed spectrum (keys = orders)
-    'f0'            : dictionary containing the template (keys = orders) (errors assumed to be negligible)
-    'wl0'           : dictionary containing the wavelengths of the template spectrum (keys = orders)
+    'f'             : numpy array containing the observed flux (n_ord, n_fib, n_pix)
+    'wl'            : numpy array containing the wavelengths of the observed spectrum (n_ord, n_fib, n_pix)
+    'f0'            : numpy array containing the flux of the template spectrum (n_ord, n_fib, n_pix)
+    'wl0'           : numpy array containing the wavelengths of the template spectrum (n_ord, n_fib, n_pix)
     'mask'          : mask-dictionary from "find_stripes" (keys = orders)
     'smoothed_flat' : if no mask is provided, need to provide the smoothed_flat, so that a mask can be created on the fly
-    'osf'           : oversampling factor for the logarithmic wavelength rebinning (only used if 'relgrid' is TRUE)
     'delta_log_wl'  : stepsize of the log-wl grid (only used if 'relgrid' is FALSE)
-    'relgrid'       : boolean - do you want to use an absolute stepsize of the log-wl grid, or relative using 'osf'?
+    'relgrid'       : boolean - do you want to use an absolute stepsize of the log-wl grid (DEFAULT), or relative using 'osf'?
+    'osf'           : oversampling factor for the logarithmic wavelength rebinning (only used if 'relgrid' is TRUE)
     'filter_width'  : width of smoothing filter in pixels; needed b/c of edge effects of the smoothing; number of pixels to disregard should be >~ 2 * width of smoothing kernel
     'bad_threshold' : if no mask is provided, create a mask that requires the flux in the extracted white to be larger than this fraction of the maximum flux in that order
     'simu'          : boolean - are you using ES simulated spectra? (only used if mask is not provided)
@@ -336,7 +334,7 @@ def get_RV_from_xcorr_combined_fibres(f, wl, f0, wl0, mask=None, smoothed_flat=N
         wl[-1, :, :] = 1.
         wl0[0, :, :] = 1.
         wl0[-1, :, :] = 1.
-    if wl.shape[0] == 39:
+    elif wl.shape[0] == 39:
         wl[0, :, :] = 1.
         wl0[0, :, :] = 1.
 
@@ -344,11 +342,7 @@ def get_RV_from_xcorr_combined_fibres(f, wl, f0, wl0, mask=None, smoothed_flat=N
     # make cross-correlation functions (list of length n_orders used)
     xcs = make_ccfs(f, wl, f0, wl0, mask=None, smoothed_flat=None, delta_log_wl=delta_log_wl, relgrid=False,
                     flipped=flipped, individual_fibres=individual_fibres, debug_level=debug_level, timit=timit)
-    if return_xcs:
-        return xcs
 
-    if debug_level >= 1:
-        print('Order ' + str(o+1).zfill(2))
 
     # now fit Gaussian to central section of CCF for that order
     if relgrid:
@@ -358,41 +352,80 @@ def get_RV_from_xcorr_combined_fibres(f, wl, f0, wl0, mask=None, smoothed_flat=N
         # fitrangesize = int(np.round(0.0036 * len(xc) / 2. - 1, 0))  # this factor was simply eye-balled
         fitrangesize = fitrange
 
-    # make array only containing the central parts of the CCFs (which can have different total lengths) for fitting
-    xcarr = np.zeros((len(xcs), 2 * addrange + 1))
-    for i in range(xcarr.shape[0]):
-        dum = np.array(xcs[i])
-        xcarr[i,:] = dum[len(dum) // 2 - addrange : len(dum) // 2 + addrange + 1]
 
     if individual_fibres:
+        
+        # make array only containing the central parts of the CCFs (which can have different total lengths) for fitting
+        xcarr = np.zeros((len(xcs), len(xcs[0]), 2 * addrange + 1))
+        for i in range(xcarr.shape[0]):
+            for j in range(xcarr.shape[1]):
+                dum = np.array(xcs[i][j])
+                xcarr[i,j,:] = dum[len(dum) // 2 - addrange : len(dum) // 2 + addrange + 1]
+        
         if individual_orders:
-            print('giggidy indfib and indord')
+            if debug_level >= 1:
+                print('Calculating independent RVs for each order and for each fibre...')
+            xcsum = np.sum(np.sum(xcarr, axis=0), axis=0)
         else:
-            print('giggidy indfib and sumord')
-    else:
-        if individual_orders:
-            print('giggidy sumfib and indord')
-        else:
+            if debug_level >= 1:
+                print('Calculating one RV for each fibre (summing up CCFs over individual orders)...')
             # sum up the CCFs for all orders
+            xcarr = np.sum(xcarr, axis=0)
+            xcarr = xcarr[np.newaxis,:]   # need that extra dimension for the for-loop below
             xcsum = np.sum(xcarr, axis=0)
-
-            xrange = np.arange(np.argmax(xcsum) - fitrangesize, np.argmax(xcsum) + fitrangesize + 1, 1)
+                
+        # format is (n_ord, n_fib)
+        rv = np.zeros((xcarr.shape[0], xcarr.shape[1]))
+        rverr = np.zeros((xcarr.shape[0], xcarr.shape[1]))
+        for o in range(xcarr.shape[0]):
+            for f in range(xcarr.shape[1]):
+                xc = xcarr[o,f,:]
+                xrange = np.arange(np.argmax(xc) - fitrangesize, np.argmax(xc) + fitrangesize + 1, 1)
+                # parameters: mu, sigma, amp, beta, offset, slope
+                guess = np.array((np.argmax(xc), 10, (xc[np.argmax(xc)] - xc[np.argmax(xc) - fitrangesize]), 2.,
+                                  xc[np.argmax(xc) - fitrangesize], 0.))
+                popt, pcov = op.curve_fit(gausslike_with_amp_and_offset_and_slope, xrange, xc[xrange], p0=guess)
+                mu = popt[0]
+                mu_err = pcov[0, 0]
+    
+                # convert to RV in m/s
+                rv[o,f] = c * (mu - (len(xc) // 2)) * delta_log_wl
+                rverr[o,f] = c * mu_err * delta_log_wl
+                
+    else:
+        
+        # make array only containing the central parts of the CCFs (which can have different total lengths) for fitting
+        xcarr = np.zeros((len(xcs), 2 * addrange + 1))
+        for i in range(xcarr.shape[0]):
+            dum = np.array(xcs[i])
+            xcarr[i,:] = dum[len(dum) // 2 - addrange : len(dum) // 2 + addrange + 1]
+        
+        if individual_orders:
+            if debug_level >= 1:
+                print('Calculating one RV for each order (summing up CCFs over individual fibres)...')
+        else:
+            if debug_level >= 1:
+                print('Calculating one RV (summing up CCFs over individual fibres and over individual orders)')
+            # sum up the CCFs for all orders
+            xcarr = np.sum(xcarr, axis=0)
+            xcarr = xcarr[np.newaxis,:]   # need that extra dimension for the for-loop below
+            
+        xcsum = np.sum(xcarr, axis=0)
+        rv = np.zeros(xcarr.shape[0])
+        rverr = np.zeros(xcarr.shape[0])
+        for o in range(xcarr.shape[0]):
+            xc = xcarr[o,:]
+            xrange = np.arange(np.argmax(xc) - fitrangesize, np.argmax(xc) + fitrangesize + 1, 1)
             # parameters: mu, sigma, amp, beta, offset, slope
-            guess = np.array((np.argmax(xcsum), 10, (xcsum[np.argmax(xcsum)] - xcsum[np.argmax(xcsum) - fitrangesize]), 2.,
-                              xcsum[np.argmax(xcsum) - fitrangesize], 0.))
-            # guess = np.array((np.argmax(xc), 5., (xc[np.argmax(xc)]-xc[np.argmax(xc)-fitrangesize]), 2., xc[np.argmax(xc)-fitrangesize], 0.))
-            # guess = np.array((np.argmax(xc), 10., (xc[np.argmax(xc)]-xc[np.argmax(xc)-fitrangesize])/np.max(xc), 2., xc[np.argmax(xc)-fitrangesize]/np.max(xc), 0.))
-            # popt, pcov = op.curve_fit(gaussian_with_offset_and_slope, xrange, xc[np.argmax(xc)-fitrangesize : np.argmax(xc)+fitrangesize+1]/np.max(xc[xrange]), p0=guess)
-            # popt, pcov = op.curve_fit(gausslike_with_amp_and_offset_and_slope, xrange, xc[xrange]/np.max(xc[xrange]), p0=guess)
-            popt, pcov = op.curve_fit(gausslike_with_amp_and_offset_and_slope, xrange, xcsum[xrange], p0=guess)
+            guess = np.array((np.argmax(xc), 10, (xc[np.argmax(xc)] - xc[np.argmax(xc) - fitrangesize]), 2.,
+                              xc[np.argmax(xc) - fitrangesize], 0.))
+            popt, pcov = op.curve_fit(gausslike_with_amp_and_offset_and_slope, xrange, xc[xrange], p0=guess)
             mu = popt[0]
             mu_err = pcov[0, 0]
 
             # convert to RV in m/s
-            rv = c * (mu - (len(xcsum) // 2)) * delta_log_wl
-            rverr = c * mu_err * delta_log_wl
-
-
+            rv[o] = c * (mu - (len(xc) // 2)) * delta_log_wl
+            rverr[o] = c * mu_err * delta_log_wl
             # # plot a single fit for debugging
             # plot_osf = 10
             # plot_os_grid = np.linspace(xrange[0], xrange[-1], plot_osf * (len(xrange)-1) + 1)
@@ -409,51 +442,55 @@ def get_RV_from_xcorr_combined_fibres(f, wl, f0, wl0, mask=None, smoothed_flat=N
         delta_t = time.time() - start_time
         print('Time taken for calculating RV: ' + str(np.round(delta_t, 2)) + ' seconds')
 
-    return np.array(rv), np.array(rverr), np.array(xcsum)
+    if individual_fibres:
+        if individual_orders:
+            return rv, rverr, np.array(xcsum)
+        else:
+            return rv, rverr, np.array(xcsum)
+    else:
+        if individual_orders:
+            return rv, rverr, np.array(xcsum)
+        else:
+            return rv, rverr, np.array(xcsum)
+    
 
 
 
 
 
-def make_ccfs(f, wl, f0, wl0, mask=None, smoothed_flat=None, osf=2, delta_log_wl=1e-6, relgrid=False,
+def make_ccfs(f, wl, f0, wl0, mask=None, smoothed_flat=None, delta_log_wl=1e-6, relgrid=False, osf=2,
              filter_width=25, bad_threshold=0.05, flipped=False, individual_fibres=True, debug_level=0, timit=False):
     """
-    This routine calculates the radial velocity of an observed spectrum relative to a template using cross-correlation.
+    This routine calculates the CCFs of an observed spectrum and a template spectrum for each order.
     Note that input spectra should be de-blazed already!!!
     If the mask from "find_stripes" has gaps, do the filtering for each segment independently. If no mask is provided, create a simple one on the fly.
 
     INPUT:
-    'f'             : dictionary containing the observed flux (keys = orders)
-    'err'           : dictionary containing the uncertainties in the observed flux (keys = orders)
-    'wl'            : dictionary containing the wavelengths of the observed spectrum (keys = orders)
-    'f0'            : dictionary containing the template (keys = orders) (errors assumed to be negligible)
-    'wl0'           : dictionary containing the wavelengths of the template spectrum (keys = orders)
-    'mask'          : mask-dictionary from "find_stripes" (keys = orders)
-    'smoothed_flat' : if no mask is provided, need to provide the smoothed_flat, so that a mask can be created on the fly
-    'osf'           : oversampling factor for the logarithmic wavelength rebinning (only used if 'relgrid' is TRUE)
-    'delta_log_wl'  : stepsize of the log-wl grid (only used if 'relgrid' is FALSE)
-    'relgrid'       : boolean - do you want to use an absolute stepsize of the log-wl grid, or relative using 'osf'?
-    'filter_width'  : width of smoothing filter in pixels; needed b/c of edge effects of the smoothing; number of pixels to disregard should be >~ 2 * width of smoothing kernel
-    'bad_threshold' : if no mask is provided, create a mask that requires the flux in the extracted white to be larger than this fraction of the maximum flux in that order
-    'simu'          : boolean - are you using ES simulated spectra? (only used if mask is not provided)
-    'debug_level'   : boolean - for debugging...
-    'timit'         : boolean - for timing the execution run time...
+    'f'                  : numpy array containing the observed flux (n_ord, n_fib, n_pix)
+    'wl'                 : numpy array containing the wavelengths of the observed spectrum (n_ord, n_fib, n_pix)
+    'f0'                 : numpy array containing the flux of the template spectrum (n_ord, n_fib, n_pix)
+    'wl0'                : numpy array containing the wavelengths of the template spectrum (n_ord, n_fib, n_pix)
+    'mask'               : mask-dictionary from "find_stripes" (keys = orders)
+    'smoothed_flat'      : if no mask is provided, need to provide the smoothed_flat, so that a mask can be created on the fly
+    'delta_log_wl'       : stepsize of the log-wl grid (only used if 'relgrid' is FALSE)
+    'relgrid'            : boolean - do you want to use an absolute stepsize of the log-wl grid (DEFAULT), or relative using 'osf'?
+    'osf'                : oversampling factor for the logarithmic wavelength rebinning (only used if 'relgrid' is TRUE)
+    'filter_width'       : width of smoothing filter in pixels; needed b/c of edge effects of the smoothing; number of pixels to disregard should be >~ 2 * width of smoothing kernel
+    'bad_threshold'      : if no mask is provided, create a mask that requires the flux in the extracted white to be larger than this fraction of the maximum flux in that order
+    'flipped'            : boolean - reverse order of inputs to xcorr routine?
+    'individual_fibres'  : boolean - do you want to return the CCFs for individual fibres? (if FALSE, then the sum of the ind. fib. CCFs is returned)
+    'debug_level'        : for debugging...
+    'timit'              : boolean - do you want to measure execution run time?
 
     OUTPUT:
-    'rv'         : dictionary with the measured RVs for each order
-    'rverr'      : dictionary with the uncertainties in the measured RVs for each order
+    'xcs'   : list containing the ind. fib. CCFs / sum of ind. fib. CCFs for each order (len = n_ord)
 
     MODHIST:
-    Dec 2017 - CMB create
-    04/06/2018 - CMB fixed bug when turning around arrays (need to use new variable)
-    28/06/2018 - CMB fixed bug with interpolation of log wls
+    Nov 2018 - CMB create
     """
 
     if timit:
         start_time = time.time()
-
-    # speed of light in m/s
-    c = 2.99792458e8
 
     # the dummy wavelengths for orders 'order_01' and 'order_40' cannot be zero as we're taking a log!!!
     if wl.shape[0] == 40:
@@ -473,7 +510,7 @@ def make_ccfs(f, wl, f0, wl0, mask=None, smoothed_flat=None, osf=2, delta_log_wl
     # for o in [4,5,6,25,26,33,34,35]:
     for o in [5, 6, 17, 25, 26, 27, 31, 34, 35, 36, 37]:
 
-        if debug_level >= 1:
+        if debug_level >= 2:
             print('Order ' + str(o+1).zfill(2))
 
         # # only use pixels that have enough signal
@@ -528,7 +565,11 @@ def make_ccfs(f, wl, f0, wl0, mask=None, smoothed_flat=None, osf=2, delta_log_wl
             if debug_level >= 2:
                 print(ord, ' :  delta_log_wl = ', delta_log_wl)
         else:
-            logwlgrid = np.arange(np.min(logwl[-1,ordmask]), np.max(logwl[-1,ordmask]), delta_log_wl)
+            #logwlgrid = np.arange(np.min(logwl[-1,ordmask]), np.max(logwl[-1,ordmask]), delta_log_wl)
+            # use range from the maximum of the indfib-minima to the minimum of the indfib-maxima (also across wl and wl0) - use list comprehensions...
+            logwlgrid = np.arange(np.max([np.min(logwl[fib,ordmask]) for fib in range(logwl.shape[0])] + [np.min(logwl0[fib,ordmask]) for fib in range(logwl0.shape[0])]), 
+                                  np.min([np.max(logwl[fib,ordmask]) for fib in range(logwl.shape[0])] + [np.max(logwl0[fib,ordmask]) for fib in range(logwl0.shape[0])]), 
+                                  delta_log_wl)
 
         # wavelength array must be increasing for "InterpolatedUnivariateSpline" to work --> turn arrays around if necessary!!!
         if (np.diff(logwl) < 0).any():
@@ -557,27 +598,23 @@ def make_ccfs(f, wl, f0, wl0, mask=None, smoothed_flat=None, osf=2, delta_log_wl
             rebinned_f[i,:] = spl_ref_f(logwlgrid)
 
         if individual_fibres:
-            print('not yet implemented')
+            ord_xcs = []
+            for fib in range(nfib):
+                if not flipped:
+                    xc = np.correlate(rebinned_f0[fib,:], rebinned_f[fib,:], mode='full')
+                else:
+                    xc = np.correlate(rebinned_f[fib,:], rebinned_f0[fib,:], mode='full')
+                ord_xcs.append(xc)
+            xcs.append(ord_xcs)
         else:
             rebinned_f = np.sum(rebinned_f, axis=0)
             rebinned_f0 = np.sum(rebinned_f0, axis=0)
-
-        # do we want to cross-correlate the entire order???
-        # xc = np.correlate(rebinned_f0 - np.median(rebinned_f0), rebinned_f - np.median(rebinned_f), mode='same')
-        #     #now this is slightly dodgy, but cutting off the edges works better because the division by the normflat introduces artefacts there
-        #     if ord == 'order_01':
-        #         xcorr_region = np.arange(2500,16000,1)
-        #     else:
-        #         xcorr_region = np.arange(2500,17500,1)
-
-        # xc = np.correlate(rebinned_f0 - np.median(rebinned_f0), rebinned_f - np.median(rebinned_f), mode='full')
-        if not flipped:
-            xc = np.correlate(rebinned_f0, rebinned_f, mode='full')
-        else:
-            xc = np.correlate(rebinned_f, rebinned_f0, mode='full')
-
-        xcs.append(xc)
-
+            # xc = np.correlate(rebinned_f0 - np.median(rebinned_f0), rebinned_f - np.median(rebinned_f), mode='full')
+            if not flipped:
+                xc = np.correlate(rebinned_f0, rebinned_f, mode='full')
+            else:
+                xc = np.correlate(rebinned_f, rebinned_f0, mode='full')
+            xcs.append(xc)
 
     if timit:
         delta_t = time.time() - start_time
@@ -587,6 +624,133 @@ def make_ccfs(f, wl, f0, wl0, mask=None, smoothed_flat=None, osf=2, delta_log_wl
 
 
 
+def make_self_indfib_ccfs(f, wl, relto=9, mask=None, smoothed_flat=None, delta_log_wl=1e-6, filter_width=25, bad_threshold=0.05, debug_level=0, timit=False):
+    """
+    This routine calculates the CCFs of all fibres with respect to one user-specified (default = central) fibre for a given observation.
+    If the mask from "find_stripes" has gaps, do the filtering for each segment independently. If no mask is provided, create a simple one on the fly.
+
+    INPUT:
+    'f'                  : numpy array containing the observed flux (n_ord, n_fib, n_pix)
+    'wl'                 : numpy array containing the wavelengths of the observed spectrum (n_ord, n_fib, n_pix)
+    'relto'              : which fibre do you want to use as the reference fibre [0, 1, ... , 18]
+    'mask'               : mask-dictionary from "find_stripes" (keys = orders)
+    'smoothed_flat'      : if no mask is provided, need to provide the smoothed_flat, so that a mask can be created on the fly
+    'delta_log_wl'       : stepsize of the log-wl grid (only used if 'relgrid' is FALSE)
+    'filter_width'       : width of smoothing filter in pixels; needed b/c of edge effects of the smoothing; number of pixels to disregard should be >~ 2 * width of smoothing kernel
+    'bad_threshold'      : if no mask is provided, create a mask that requires the flux in the extracted white to be larger than this fraction of the maximum flux in that order
+    'debug_level'        : for debugging...
+    'timit'              : boolean - do you want to measure execution run time?
+
+    OUTPUT:
+    'xcs'   : list containing the ind. fib. CCFs / sum of ind. fib. CCFs for each order (len = n_ord)
+
+    MODHIST:
+    Dec 2018 - CMB create (clone of "make_ccfs") 
+    """
+
+    assert relto in np.arange(19), 'reference fibre not recognized (must be in [0, 1, ... , 18])'
+
+    if timit:
+        start_time = time.time()
+
+    # the dummy wavelengths for orders 'order_01' and 'order_40' cannot be zero as we're taking a log!!!
+    if wl.shape[0] == 40:
+        wl[0, :, :] = 1.
+        wl[-1, :, :] = 1.
+    if wl.shape[0] == 39:
+        wl[0, :, :] = 1.
+
+    xcs = []
+
+    # loop over orders
+    # for ord in sorted(f.iterkeys()):
+    # for o in range(wl.shape[0]):
+    # for o in [4,5,6,25,26,33,34,35]:
+    for o in [5, 6, 17, 25, 26, 27, 31, 34, 35, 36, 37]:
+
+        if debug_level >= 2:
+            print('Order ' + str(o+1).zfill(2))
+
+        # # only use pixels that have enough signal
+        # if mask is None:
+        #     normflat = smoothed_flat[ord] / np.max(smoothed_flat[ord])
+        #     ordmask = np.ones(len(normflat), dtype=bool)
+        #     if np.min(normflat) < bad_threshold:
+        #         ordmask[normflat < bad_threshold] = False
+        #         # once the blaze function falls below a certain value, exclude what's outside of that pixel column, even if it's above the threshold again, ie we want to only use a single consecutive region
+        #         leftmask = ordmask[: len(ordmask) // 2]
+        #         leftkill_index = [i for i, x in enumerate(leftmask) if not x]
+        #         try:
+        #             ordmask[: leftkill_index[0]] = False
+        #         except:
+        #             pass
+        #         rightmask = ordmask[len(ordmask) // 2:]
+        #         rightkill_index = [i for i, x in enumerate(rightmask) if not x]
+        #         if ord == 'order_01' and simu:
+        #             try:
+        #                 # if not flipped then the line below must go in the leftkillindex thingy
+        #                 # ordmask[: leftkill_index[-1] + 100] = False
+        #                 ordmask[len(ordmask) // 2 + rightkill_index[0] - 100:] = False
+        #             except:
+        #                 pass
+        #         else:
+        #             try:
+        #                 ordmask[len(mask) // 2 + rightkill_index[-1] + 1:] = False
+        #             except:
+        #                 pass
+        # else:
+        #     # ordmask  = mask[ord][::-1]
+        #     ordmask = mask[ord]
+
+        ordmask = np.ones(4112, dtype=bool)
+        ordmask[:200] = False
+        ordmask[4000:] = False
+
+
+        # either way, disregard #(edge_cut) pixels at either end; this is slightly dodgy, but the gaussian filtering above introduces edge effects due to mode='reflect'
+        ordmask[:2 * int(filter_width)] = False
+        ordmask[-2 * int(filter_width):] = False
+
+        # f0_unblazed = f0[ord] / np.max(f0[ord]) / normflat   #see COMMENT above
+        # f_unblazed = f[ord] / np.max(f[ord]) / normflat
+
+        # create logarithmic wavelength grid
+        logwl = np.log(wl[o,:,:])
+        # use range from the maximum of the indfib-minima to the minimum of the indfib-maxima - use list comprehensions...
+        logwlgrid = np.arange(np.max([np.min(logwl[fib,ordmask]) for fib in range(logwl.shape[0])]), 
+                              np.min([np.max(logwl[fib,ordmask]) for fib in range(logwl.shape[0])]), 
+                              delta_log_wl)
+
+        # wavelength array must be increasing for "InterpolatedUnivariateSpline" to work --> turn arrays around if necessary!!!
+        if (np.diff(logwl) < 0).any():
+            logwl_sorted = logwl[:, ::-1].copy()
+            ordmask_sorted = ordmask[::-1].copy()
+            ord_f_sorted = f[o,:,::-1].copy()
+        else:
+            logwl_sorted = logwl.copy()
+            ordmask_sorted = ordmask.copy()
+            ord_f_sorted = f[ord].copy()
+
+        # rebin spectra onto logarithmic wavelength grid
+        nfib = ord_f_sorted.shape[0]
+        rebinned_f = np.zeros((nfib, len(logwlgrid)))
+        for i in range(nfib):
+            spl_ref_f = interp.InterpolatedUnivariateSpline(logwl_sorted[i,ordmask_sorted], ord_f_sorted[i,ordmask_sorted], k=3)  # slightly slower than linear, but best performance for cubic spline
+            rebinned_f[i,:] = spl_ref_f(logwlgrid)
+
+        
+        ord_xcs = []
+        for fib in range(nfib):
+            xc = np.correlate(rebinned_f[fib,:], rebinned_f[relto,:], mode='full')
+            ord_xcs.append(xc)
+        xcs.append(ord_xcs)
+        
+
+    if timit:
+        delta_t = time.time() - start_time
+        print('Time taken for creating CCFs: ' + str(np.round(delta_t, 2)) + ' seconds')
+
+    return xcs
 
 
 
