@@ -45,6 +45,7 @@ path = '/Users/christoph/data/raw_goodonly/20180919/'
 # stellar_list = glob.glob(path + 'Light*.fits')
 ###END TEMP###
 acq_list, bias_list, dark_list, flat_list, skyflat_list, domeflat_list, arc_list, thxe_list, laser_list, laser_and_thxe_list, stellar_list, unknown_list = get_obstype_lists_temp(path)
+assert len(unknown_list) == 0, "WARNING: unknown files encountered!!!"
 obsnames = short_filenames(stellar_list)
 dumimg = crop_overscan_region(correct_orientation(pyfits.getdata(stellar_list[0])))
 ny,nx = dumimg.shape
@@ -79,7 +80,7 @@ gain = [1., 1.095, 1.125, 1.]   # eye-balled from extracted flat fields
 # (i) BIAS 
 # get offsets and read-out noise
 #either from bias frames (units: [offsets] = ADUs; [RON] = e-)
-medbias,coeffs,offsets,rons = get_bias_and_readnoise_from_bias_frames(sorted(bias_list), degpol=5, clip=5., gain=gain, save_medimg=True, debug_level=1, timit=True)
+medbias,coeffs,offsets,rons = get_bias_and_readnoise_from_bias_frames(sorted(bias_list)[0:9], degpol=5, clip=5., gain=gain, save_medimg=True, debug_level=1, timit=True)
 #or from the overscan regions
 
 # create MASTER BIAS frame and read-out noise mask (units = ADUs)
@@ -95,8 +96,8 @@ MB = make_master_bias_from_coeffs(coeffs, nx, ny, savefile=True, path=path, timi
 # (ii) DARKS
 # create (bias-subtracted) MASTER DARK frame (units = electrons)
 # MD = make_master_dark(dark_list, MB=MB, gain=gain, scalable=False, savefile=True, path=path, timit=True)
-# MDS = make_master_dark(dark_list, MB=medbias, gain=gain, scalable=True, savefile=True, path=path, debug_level=1, timit=True)
-MDS = np.zeros(MB.shape)
+MDS = make_master_dark(dark_list, MB=medbias, gain=gain, scalable=True, savefile=True, path=path, debug_level=1, timit=True)
+# MDS = np.zeros(MB.shape)
 
 # (iii) WHITES 
 #create (bias- & dark-subtracted) MASTER WHITE frame and corresponding error array (units = electrons)
@@ -117,8 +118,13 @@ P_id = copy.deepcopy(P_id_dum)
 for o in P_id.keys():
     P_id[o][0] -= 2.
 np.save(path + 'P_id.npy', P_id)
+
 # extract stripes of user-defined width from the science image, centred on the polynomial fits defined in step (1)
-# MW_stripes,MW_indices = extract_stripes(MW, P_id, return_indices=True, slit_height=30)
+MW_stripes,MW_indices = extract_stripes(MW, P_id, return_indices=True, slit_height=30)
+pix,flux,err = extract_spectrum_from_indices(MW, err_MW, MW_indices, method='quick', slit_height=30, RON=ronmask,
+                                             savefile=True, filetype='fits', obsname='master_white', path=path, timit=True)
+pix,flux,err = extract_spectrum_from_indices(MW, err_MW, MW_indices, method='optimal', slope=True, offset=True, fibs='all', slit_height=30,
+                                             RON=ronmask, savefile=True, filetype='fits', obsname='master_white', path=path, timit=True)
 #####################################################################################################################################################
 
 
@@ -143,8 +149,10 @@ np.save(path + 'P_id.npy', P_id)
 
 
 # (4) PROCESS SCIENCE IMAGES
+dum = process_science_images(arc_list, P_id, mask=mask, sampling_size=25, slit_height=30, gain=gain, MB=medbias, ronmask=ronmask, MD=MDS, scalable=True,
+                             saveall=False, path=path, ext_method='optimal', offset='True', slope='True', fibs='all', from_indices=True, timit=True)
 dum = process_science_images(stellar_list, P_id, mask=mask, sampling_size=25, slit_height=24, gain=gain, MB=medbias, ronmask=ronmask, MD=MDS, scalable=True, 
-                             saveall=True, path=path, ext_method='optimal', offset='True', slope='True', fibs='stellar', from_indices=True, timit=True)
+                             saveall=False, path=path, ext_method='optimal', offset='True', slope='True', fibs='stellar', from_indices=True, timit=True)
 
 
 

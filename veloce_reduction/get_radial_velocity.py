@@ -289,7 +289,7 @@ def get_RV_from_xcorr(f, err, wl, f0, wl0, mask=None, smoothed_flat=None, osf=2,
 
 
 
-def get_RV_from_xcorr_2(f, wl, f0, wl0, mask=None, smoothed_flat=None, delta_log_wl=1e-6, relgrid=False, osf=2, addrange=40, 
+def get_RV_from_xcorr_2(f, wl, f0, wl0, mask=None, smoothed_flat=None, delta_log_wl=1e-6, relgrid=False, osf=5, addrange=40, 
                         fitrange=10, flipped=False, individual_fibres=True, individual_orders=True, debug_level=0, timit=False):
     """
     This routine calculates the radial velocity of an observed spectrum relative to a template using cross-correlation.
@@ -306,9 +306,11 @@ def get_RV_from_xcorr_2(f, wl, f0, wl0, mask=None, smoothed_flat=None, delta_log
     'delta_log_wl'  : stepsize of the log-wl grid (only used if 'relgrid' is FALSE)
     'relgrid'       : boolean - do you want to use an absolute stepsize of the log-wl grid (DEFAULT), or relative using 'osf'?
     'osf'           : oversampling factor for the logarithmic wavelength rebinning (only used if 'relgrid' is TRUE)
-    'filter_width'  : width of smoothing filter in pixels; needed b/c of edge effects of the smoothing; number of pixels to disregard should be >~ 2 * width of smoothing kernel
-    'bad_threshold' : if no mask is provided, create a mask that requires the flux in the extracted white to be larger than this fraction of the maximum flux in that order
-    'simu'          : boolean - are you using ES simulated spectra? (only used if mask is not provided)
+    'addrange'      : the central (2*addrange + 1) pixels of the CCFs will be added
+    'fitrange'      : a Gauss-like function will be fitted to the central (2*fitrange + 1) pixels
+    'flipped'       : boolean - reverse order of inputs to xcorr routine?
+    'individual_fibres'  : boolean - do you want to return the RVs for individual fibres? (if FALSE, then the RV is calculated from the sum of the ind. fib. CCFs)
+    'individual_orders'  : boolean - do you want to return the RVs for individual orders? (if FALSE, then the RV is calculated from the sum of the ind. ord. CCFs)
     'debug_level'   : boolean - for debugging...
     'timit'         : boolean - for timing the execution run time...
 
@@ -379,14 +381,20 @@ def get_RV_from_xcorr_2(f, wl, f0, wl0, mask=None, smoothed_flat=None, delta_log
         rverr = np.zeros((xcarr.shape[0], xcarr.shape[1]))
         for o in range(xcarr.shape[0]):
             for f in range(xcarr.shape[1]):
+                if debug_level >= 3:
+                    print('order = ',o,' ; fibre = ',f)
                 xc = xcarr[o,f,:]
                 xrange = np.arange(np.argmax(xc) - fitrangesize, np.argmax(xc) + fitrangesize + 1, 1)
                 # parameters: mu, sigma, amp, beta, offset, slope
-                guess = np.array((np.argmax(xc), 10, (xc[np.argmax(xc)] - xc[np.argmax(xc) - fitrangesize]), 2.,
-                                  xc[np.argmax(xc) - fitrangesize], 0.))
-                popt, pcov = op.curve_fit(gausslike_with_amp_and_offset_and_slope, xrange, xc[xrange], p0=guess)
-                mu = popt[0]
-                mu_err = pcov[0, 0]
+                guess = np.array((np.argmax(xc), 15, np.max(xc) - np.min(xc), 2., np.min(xc), 0.))
+                try:
+                    popt, pcov = op.curve_fit(gausslike_with_amp_and_offset_and_slope, xrange, xc[xrange], p0=guess, maxfev=1000000)
+                    mu = popt[0]
+                    mu_err = pcov[0, 0]
+                except:
+                    popt, pcov = (np.nan, np.nan)
+                    mu = np.nan
+                    mu_err = np.nan
     
                 # convert to RV in m/s
                 rv[o,f] = c * (mu - (len(xc) // 2)) * delta_log_wl
@@ -458,7 +466,7 @@ def get_RV_from_xcorr_2(f, wl, f0, wl0, mask=None, smoothed_flat=None, delta_log
 
 
 
-def make_ccfs(f, wl, f0, wl0, mask=None, smoothed_flat=None, delta_log_wl=1e-6, relgrid=False, osf=2,
+def make_ccfs(f, wl, f0, wl0, mask=None, smoothed_flat=None, delta_log_wl=1e-6, relgrid=False, osf=5,
              filter_width=25, bad_threshold=0.05, flipped=False, individual_fibres=True, debug_level=0, timit=False):
     """
     This routine calculates the CCFs of an observed spectrum and a template spectrum for each order.
@@ -507,6 +515,9 @@ def make_ccfs(f, wl, f0, wl0, mask=None, smoothed_flat=None, delta_log_wl=1e-6, 
     # loop over orders
     # for ord in sorted(f.iterkeys()):
     # for o in range(wl.shape[0]):
+    # from Brendan's plots/table:
+    # for o in [5, 6, 7, 17, 26, 27, 34, 35, 36, 37]:
+    # Duncan's suggestion
     # for o in [4,5,6,25,26,33,34,35]:
     for o in [5, 6, 17, 25, 26, 27, 31, 34, 35, 36, 37]:
 

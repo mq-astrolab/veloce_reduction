@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 from veloce_reduction.veloce_reduction.wavelength_solution import get_dispsol_for_all_fibs
 from veloce_reduction.veloce_reduction.get_radial_velocity import get_RV_from_xcorr_2, make_ccfs
 from veloce_reduction.veloce_reduction.barycentric_correction import get_barycentric_correction
+from veloce_reduction.veloce_reduction.helper_functions import get_mean_snr
 
 
 ########################################################################################################################
@@ -27,7 +28,8 @@ for i,filename in enumerate(files):
 sortix = np.argsort(all_shortnames)
 files = np.array(files)
 files = files[sortix]
-
+all_obsnames = np.array(all_shortnames)
+all_obsnames = all_obsnames[sortix]
 ########################################################################################################################
 ########################################################################################################################
 ########################################################################################################################
@@ -75,18 +77,37 @@ for i,filename in enumerate(files):
 ########################################################################################################################
 ########################################################################################################################
 
+# get mean SNR per collapsed pixel
+all_snr = []
+for i,file in enumerate(files):
+    print('Estimating mean SNR for tau Ceti observation ' + str(i+1) + '/' + str(len(files)))
+    flux = pyfits.getdata(file, 0)
+    err = pyfits.getdata(file, 1)
+    all_snr.append(get_mean_snr(flux, err))
+
+########################################################################################################################
+########################################################################################################################
+########################################################################################################################
+
 # calculate wl-solution for all fibres, including the LFC shifts and slopes; also append to reduced spectrum FITS file
 signflip_shift = True
 signflip_slope = True
-fudge = 1.25
+fudge = 1.0
+maxdiff= []
 for i,filename in enumerate(files):
     print('Processing wl-solution for tau Ceti observation ' + str(i+1) + '/' + str(len(files)))
     dum = filename.split('/')
     dum2 = dum[-1].split('.')
     dum3 = dum2[0].split('_')
     obsname = dum3[1]
-    wldict,wl = get_dispsol_for_all_fibs(obsname, fudge=fudge, signflip_shift=signflip_shift, signflip_slope=signflip_slope)
-    pyfits.append(filename, wl, clobber=True)
+    old_wldict, old_wl = get_dispsol_for_all_fibs(obsname, fudge=fudge, signflip_shift=signflip_shift, signflip_slope=signflip_slope, refit=True)
+    new_wldict, new_wl = get_dispsol_for_all_fibs(obsname, fudge=fudge, signflip_shift=signflip_shift, signflip_slope=signflip_slope, refit=False)
+    new_wl[0, :, :] = 1.
+    new_wl[-1, :, :] = 1.
+    old_wl[0, :, :] = 1.
+    old_wl[-1, :, :] = 1.
+    maxdiff.append(np.max(3.e8 * (old_wl.flatten() - new_wl.flatten()) / new_wl.flatten()))
+    # pyfits.append(filename, wl, clobber=True)
 
 ########################################################################################################################
 ########################################################################################################################
@@ -96,9 +117,9 @@ for i,filename in enumerate(files):
 # (either with or without the LFC shifts applied, comment out the 'wl' and 'wl0' you don't want)
 
 all_xc = []
-all_rv = []
-all_sumrv = []
-xcsums = []
+all_rv = np.zeros((len(files), 11, 19))
+all_sumrv = np.zeros(len(files))
+xcsums = np.zeros((len(files), 81))
 
 # TEMPLATE:
 f0 = pyfits.getdata(files[69], 0)   #that's the highest SNR observation
@@ -116,11 +137,11 @@ for i,filename in enumerate(files):
     # wl = pyfits.getdata('/Users/christoph/OneDrive - UNSW/dispsol/individual_fibres_dispsol_poly7_21sep30019.fits')
     all_xc.append(make_ccfs(f, wl, f0, wl0, mask=None, smoothed_flat=None, delta_log_wl=1e-6, relgrid=False,
                             flipped=False, individual_fibres=False, debug_level=1, timit=False))
-    rv,rverr,xcsum = get_RV_from_xcorr_2(f, wl, f0, wl0, individual_fibres=False, individual_orders=True, debug_level=1)
+    rv,rverr,xcsum = get_RV_from_xcorr_2(f, wl, f0, wl0, individual_fibres=True, individual_orders=True, debug_level=1)
     sumrv,sumrverr,xcsum = get_RV_from_xcorr_2(f, wl, f0, wl0, individual_fibres=False, individual_orders=False, debug_level=1)
-    all_sumrv.append(sumrv)
-    all_rv.append(rv)
-    xcsums.append(xcsum)
+    all_rv[i,:,:] = rv
+    all_sumrv[i] = sumrv
+    xcsums[i,:] = xcsum
 xcsums = np.array(xcsums)
 
 ########################################################################################################################

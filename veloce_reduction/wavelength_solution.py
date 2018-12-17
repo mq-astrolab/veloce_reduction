@@ -1844,8 +1844,8 @@ def define_pixel_offsets_between_fibres(relto='S1', savedict=False, saveplots=Fa
 
 
 
-def get_dispsol_for_all_fibs(obsname, relto='LFC', twod=False, degpol=7, deg_spectral=7, deg_spatial=7, fibs='stellar',
-                             polytype='chebyshev', nx=4112, debug_level=0, timit=False, fudge=1., signflip_shift=False, signflip_slope=False):
+def get_dispsol_for_all_fibs(obsname, relto='LFC', twod=False, degpol=7, deg_spectral=7, deg_spatial=7, fibs='stellar', nx=4112,
+                             polytype='chebyshev', refit=False, debug_level=0, timit=False, fudge=1., signflip_shift=False, signflip_slope=False):
 
     if timit:
         start_time = time.time()
@@ -1853,7 +1853,7 @@ def get_dispsol_for_all_fibs(obsname, relto='LFC', twod=False, degpol=7, deg_spe
     # laod default coefficients
     pixfit_coeffs = np.load('/Users/christoph/OneDrive - UNSW/dispsol_tests/20180917/pixfit_coeffs_relto_' + relto + '_as_of_2018-11-14.npy').item()
     
-    # fibslot = [0,1, 3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21, 23,24,25]
+    # fibslot = [0,1,   3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,   23,24,25]
     fibname = ['S5', 'S2', '07', '18', '17', '06', '16', '15', '05', '14', '13', '01', '12', '11', '04', '10', '09', '03', '08', '19', '02', 'S4', 'S3', 'S1']
     
     nfib = len(fibname)
@@ -1888,27 +1888,45 @@ def get_dispsol_for_all_fibs(obsname, relto='LFC', twod=False, degpol=7, deg_spe
             wldict[ord] = {}
             ix = np.argwhere(lfc_ord == o).flatten()
             x0 = lfc_pix[ix]
-            # FFFFUUUUU, broke my brain turning that around, but don't need to, b/c DW's LFC spectra are flipped (left-right) wrt to CBs
-            # # now apply the shift to the pixel positions
-            # diff = - lfc_shift[o-1] + lfc_slope[o-1] * x0     # signs are confusing here, but comparison to DW's results suggests this is correct
-            # x = x0 + diff - np.max(diff) + np.min(diff)       # signs are confusing here, but comparison to DW's results suggests this is correctly
-            diff = lfc_shift[o-1] + lfc_slope[o-1] * x0
-            x = x0 - fudge * diff
             lam = lfc_wl[ix]
-            # master_lfc_fit = np.poly1d(np.polyfit(x0, lam, degpol))
-            lfc_fit = np.poly1d(np.polyfit(x, lam, degpol))
-            wldict[ord]['laser'] = lfc_fit(xx)[::-1]     # need to turn around, b/c b/c DW's LFC spectra are flipped (left-right) wrt to CBs
-
-            # need to flip x now, because the pixfit_coeffs are using CMB layout
-            x_flipped = nx - 1 - x
-
-            # loop over all fibres
-            for i,fib in enumerate(fibname):
-                xfib = x_flipped + pixfit_coeffs[ord]['fibre_'+fib](x_flipped)
-                fib_fit = np.poly1d(np.polyfit(xfib, lam, degpol))
-                wldict[ord][fib] = fib_fit(xx)
-                wl[o,i,:] = fib_fit(xx)
+            master_lfc_fit = np.poly1d(np.polyfit(x0, lam, degpol))
             
+            # either perform a new fit using the new x-values
+            if refit:
+                # FFFFUUUUU, broke my brain turning that around, but don't need to, b/c DW's LFC spectra are flipped (left-right) wrt to CBs
+                # # now apply the shift to the pixel positions
+                # diff = - lfc_shift[o-1] + lfc_slope[o-1] * x0     # signs are confusing here, but comparison to DW's results suggests this is correct
+                # x = x0 + diff - np.max(diff) + np.min(diff)       # signs are confusing here, but comparison to DW's results suggests this is correctly
+                diff = lfc_shift[o-1] + lfc_slope[o-1] * x0         # need the o-1 here because Duncan's indices start with 1
+                x = x0 - fudge * diff
+                lfc_fit = np.poly1d(np.polyfit(x, lam, degpol))
+                newly_fit_dispsol = lfc_fit(xx)
+                wldict[ord]['laser'] = newly_fit_dispsol[::-1]     # need to turn around, b/c DW's LFC spectra are flipped (left-right) wrt to CBs
+                # need to flip x now, because the pixfit_coeffs are using CMB layout
+                x_flipped = (nx - 1) - x
+                # loop over all fibres
+                for i,fib in enumerate(fibname):
+                    xfib = x_flipped + pixfit_coeffs[ord]['fibre_'+fib](x_flipped)
+                    fib_fit = np.poly1d(np.polyfit(xfib, lam, degpol))
+                    wldict[ord][fib] = fib_fit(xx)
+                    wl[o,i,:] = fib_fit(xx)
+            # or re-evaluate the master fit at new x-values (better b/c less margin for fitting variations and hence more constancy)
+            else:
+                xx_prime = xx + (lfc_shift[o-1] + lfc_slope[o-1] * xx)
+                eval_xprime_dispsol = master_lfc_fit(xx_prime)
+                wldict[ord]['laser'] = eval_xprime_dispsol[::-1]   # need to turn around, b/c DW's LFC spectra are flipped (left-right) wrt to CBs
+                # need to flip x now, because the pixfit_coeffs are using CMB layout
+                x0_flipped = (nx - 1) - x0
+                # loop over all fibres
+                for i,fib in enumerate(fibname):
+                    xfib_flipped = x0_flipped + pixfit_coeffs[ord]['fibre_'+fib](x0_flipped)
+                    xfib = (nx - 1) - xfib_flipped   # and flip it back --> can't think right now, can I combine those two flips???
+                    master_lfc_fit_fib = np.poly1d(np.polyfit(xfib, lam, degpol))
+                    xx_prime_fib = xx + (lfc_shift[o-1] + lfc_slope[o-1] * xx)
+                    eval_xprime_dispsol_fib = master_lfc_fit_fib(xx_prime_fib)
+                    wldict[ord][fib] = eval_xprime_dispsol_fib[::-1]
+                    wl[o,i,:] = eval_xprime_dispsol_fib[::-1]
+       
     else:
 
         print('THIS IS STILL WRONG (needs to be flipped) - USE THE 1-DIM VERSION FOR NOW!!!')
@@ -1986,6 +2004,7 @@ def get_dispsol_for_all_fibs(obsname, relto='LFC', twod=False, degpol=7, deg_spe
         wl = wl[:,2:21,:]
 
     return wldict,wl
+
 
 
 

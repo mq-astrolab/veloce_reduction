@@ -145,7 +145,7 @@ def get_obstype_lists_temp(path, pattern=None, weeding=True):
             laser_list.append(file)
         elif obj_type.lower() in ["thxe+lfc","lfc+thxe","lc+simthxe","lc+thxe"]:
             laser_and_thxe_list.append(file)
-        elif obj_type.lower().startswith(("toi","tic","hd","gj","gl","ast","alpha","beta","gamma","delta","tau","ach", '1', '2', '3', '4', '5', '6', '7', '8', '9')):
+        elif obj_type.lower().startswith(("toi","tic","hd","gj","gl","ast","alpha","beta","gamma","delta","tau","ach","zeta","ek",'1', '2', '3', '4', '5', '6', '7', '8', '9')):
             stellar_list.append(file)
         else:
             unknown_list.append(file)

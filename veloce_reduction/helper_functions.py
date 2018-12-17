@@ -18,6 +18,7 @@ from scipy import special, signal
 from numpy.polynomial import polynomial
 from scipy.integrate import quad, fixed_quad
 from scipy import ndimage
+from json.decoder import _decode_uXXXX
 
 
 
@@ -887,15 +888,16 @@ def get_datestring():
 
 def get_mean_snr(flux, err=None, per_order=False):
     """ 
-    Calculate the mean SNR of the extracted 1-dim spectrum.
+    Calculate the mean SNR of the quick-extracted 1-dim spectrum.
+    Treat all negative flux values as zero for the purpose of this.
     
     INPUT:
-    'flux'      : dictionary of the 1-dim extracted spectrum (keys = orders)
-    'err'       : dictionary of the corresponding uncertainties (if not provided, the SQRT of the flux is used by default)
+    'flux'      : dictionary of the 1-dim extracted spectrum (keys = orders); or numpy array
+    'err'       : dictionary of the corresponding uncertainties (if not provided, the SQRT of the flux is used by default); or numpy array
     'per_order' : boolean - do you want to return the mean SNR of each order? 
     
     OUTPUT:
-    'snr_ord' : he mean snr (per 'super-pixel' / collapsed pixel) per order
+    'snr_ord' : the mean snr (per 'super-pixel' / collapsed pixel) per order
     'snr'     : the mean snr (per 'super-pixel' / collapsed pixel) of the input spectrum
     
     MODHIST:
@@ -903,24 +905,44 @@ def get_mean_snr(flux, err=None, per_order=False):
     30/05/2018 - CMB added 'per_order' keyword
     """
     
-    #calculate errors if not provided
-    if err is None:
-        print('WARNING: error-array not provided! Using SQRT(flux) as an estimate instead...')
-        print
-        err = {}
+    # data in the form of numpy array (ie from fits files)
+    if flux.__class__ == np.ndarray:
+        
+        #estimate errors if not provided
+        if err is None:
+            print('WARNING: error-array not provided! Using SQRT(flux) as an estimate instead...')
+            print
+            err = np.sqrt(np.maximum(10., flux))   # RON is sth like 3 e-/pix, so use 10. as a minimum value for the variance
+        
+        if per_order:
+            snr_ord = []
+            for o in range(flux.shape[0]):
+                snr_ord.append(np.mean(np.maximum(0., flux[o,:] / np.maximum(np.sqrt(10.), err[o,:]))))
+        else:
+            snr = np.mean(np.maximum(0., flux)/np.maximum(np.sqrt(10.), err))    
+    
+    # data in the form of a dictionary
+    elif flux.__class__ == dict:
+        
+        #estimate errors if not provided
+        if err is None:
+            print('WARNING: error-array not provided! Using SQRT(flux) as an estimate instead...')
+            print
+            err = {}
+            for o in sorted(flux.keys()):
+                mask1 = flux[o] < 0.
+                flux[o][mask1] = 0.
+                err[o] = np.sqrt(np.maximum(10.,flux[o]))
+                
+        snr_ord = []
+        
         for o in sorted(flux.keys()):
-            mask1 = flux[o] < 0.
-            flux[o][mask1] = 0.
-            err[o] = np.sqrt(flux[o])
-            
-    snr_ord = []
-    
-    for o in sorted(flux.keys()):
-        #can't have negative flux or zero error
-        mask2 = np.logical_and(flux[o] >= 0., err[o] > 0.)
-        snr_ord.append(np.mean(flux[o][mask2] / err[o][mask2]))
-    
-    snr =  np.mean(snr_ord)
+            snr_ord.append(np.mean(np.maximum(0., flux[o] / np.maximum(np.sqrt(10.), err[o]))))
+        
+        snr =  np.mean(snr_ord)
+    else:
+        print('ERROR: data type / variable class not recognized')
+        return
     
     if per_order:
         return np.array(snr_ord)
