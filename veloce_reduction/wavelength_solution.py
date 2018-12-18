@@ -1912,7 +1912,7 @@ def get_dispsol_for_all_fibs(obsname, relto='LFC', twod=False, degpol=7, deg_spe
                     wl[o,i,:] = fib_fit(xx)
             # or re-evaluate the master fit at new x-values (better b/c less margin for fitting variations and hence more constancy)
             else:
-                xx_prime = xx + (lfc_shift[o-1] + lfc_slope[o-1] * xx)
+                xx_prime = xx + fudge * (lfc_shift[o-1] + lfc_slope[o-1] * xx)
                 eval_xprime_dispsol = master_lfc_fit(xx_prime)
                 wldict[ord]['laser'] = eval_xprime_dispsol[::-1]   # need to turn around, b/c DW's LFC spectra are flipped (left-right) wrt to CBs
                 # need to flip x now, because the pixfit_coeffs are using CMB layout
@@ -1922,7 +1922,7 @@ def get_dispsol_for_all_fibs(obsname, relto='LFC', twod=False, degpol=7, deg_spe
                     xfib_flipped = x0_flipped + pixfit_coeffs[ord]['fibre_'+fib](x0_flipped)
                     xfib = (nx - 1) - xfib_flipped   # and flip it back --> can't think right now, can I combine those two flips???
                     master_lfc_fit_fib = np.poly1d(np.polyfit(xfib, lam, degpol))
-                    xx_prime_fib = xx + (lfc_shift[o-1] + lfc_slope[o-1] * xx)
+                    xx_prime_fib = xx + fudge * (lfc_shift[o-1] + lfc_slope[o-1] * xx)
                     eval_xprime_dispsol_fib = master_lfc_fit_fib(xx_prime_fib)
                     wldict[ord][fib] = eval_xprime_dispsol_fib[::-1]
                     wl[o,i,:] = eval_xprime_dispsol_fib[::-1]

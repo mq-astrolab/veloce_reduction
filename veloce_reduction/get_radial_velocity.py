@@ -427,9 +427,15 @@ def get_RV_from_xcorr_2(f, wl, f0, wl0, mask=None, smoothed_flat=None, delta_log
             # parameters: mu, sigma, amp, beta, offset, slope
             guess = np.array((np.argmax(xc), 10, (xc[np.argmax(xc)] - xc[np.argmax(xc) - fitrangesize]), 2.,
                               xc[np.argmax(xc) - fitrangesize], 0.))
-            popt, pcov = op.curve_fit(gausslike_with_amp_and_offset_and_slope, xrange, xc[xrange], p0=guess)
-            mu = popt[0]
-            mu_err = pcov[0, 0]
+            try:
+                popt, pcov = op.curve_fit(gausslike_with_amp_and_offset_and_slope, xrange, xc[xrange], p0=guess, maxfev=1000000)
+                mu = popt[0]
+                mu_err = pcov[0, 0]
+            except:
+                popt, pcov = (np.nan, np.nan)
+                mu = np.nan
+                mu_err = np.nan
+            
 
             # convert to RV in m/s
             rv[o] = c * (mu - (len(xc) // 2)) * delta_log_wl

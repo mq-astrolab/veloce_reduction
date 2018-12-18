@@ -150,7 +150,16 @@ xcsums = np.array(xcsums)
 
 # tests to determine the best fudge factor...
 rvs_fudge_test = {}
-for fudge in np.arange(0.75,1.26,0.025):
+# TEMPLATE:
+f0 = pyfits.getdata(files[69], 0)   #that's the highest SNR observation
+# err0 = pyfits.getdata(files[69], 1)
+# wl0 = pyfits.getdata(files[69], 2)
+# wl0 = pyfits.getdata('/Users/christoph/OneDrive - UNSW/dispsol/individual_fibres_dispsol_poly7_21sep30019.fits')
+obsname_0 = '24sep30078'
+wldict0,wl0 = get_dispsol_for_all_fibs(obsname_0, fudge=fudge, signflip_shift=signflip_shift, signflip_slope=signflip_slope)
+
+for fudge in np.arange(0.5,1.26,0.025):
+    print('FUDGE = ', fudge)
     signflip_shift = True
     signflip_slope = True
 
@@ -163,20 +172,13 @@ for fudge in np.arange(0.75,1.26,0.025):
         dum3 = dum2[0].split('_')
         obsname = dum3[1]
         wldict, wl = get_dispsol_for_all_fibs(obsname, fudge=fudge, signflip_shift=signflip_shift,
-                                              signflip_slope=signflip_slope)
-        obsname0 = '24sep30078'
-        wldict0, wl0 = get_dispsol_for_all_fibs(obsname0, fudge=fudge, signflip_shift=signflip_shift,
-                                              signflip_slope=signflip_slope)
+                                              signflip_slope=signflip_slope, refit=False)
         f = pyfits.getdata(filename, 0)
-        f0 = pyfits.getdata(files[69], 0)  # that's the highest SNR observation
-        # wl0 = pyfits.getdata('/Users/christoph/OneDrive - UNSW/dispsol/individual_fibres_dispsol_poly7_21sep30019.fits')
-        # all_xc.append(get_RV_from_xcorr_2(f, wl, f0, wl0, return_xcs=True, individual_fibres=False,
-        #                                                 individual_orders=False))
-        rv, rverr, xcsum = get_RV_from_xcorr_2(f, wl, f0, wl0, return_xcs=False, individual_fibres=False,
-                                                             individual_orders=False)
-        all_rv.append(rv)
+        # all_xc.append(get_RV_from_xcorr_2(f, wl, f0, wl0, individual_fibres=False, individual_orders=False))
+        sumrv, sumrverr, xcsum = get_RV_from_xcorr_2(f, wl, f0, wl0,  individual_fibres=False, individual_orders=False, debug_level=1, fitrange=6)
+        all_rv.append(sumrv)
 
-    rvs_fudge_test['fudge_' + str(fudge)[:4]] = all_rv - np.array(all_bc)
+    rvs_fudge_test['fudge_' + str(fudge)[:5]] = all_rv - np.array(all_bc)
 
 ########################################################################################################################
 ########################################################################################################################
