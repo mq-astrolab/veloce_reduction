@@ -147,7 +147,7 @@ def find_laser_peaks_2D(img, err_img, boxwidth=11, bg_thresh=1., count_thresh=20
 
 
 
-def find_affine_transformation_matrix(peakshapes1, peakshapes2):
+def find_affine_transformation_matrix_test(peakshapes1, peakshapes2):
     
     peaks1_xy = np.array([peakshapes1['x0'],peakshapes1['y0']])
     #go to homogeneous coordinates (ie add a z-component equal to 1, so that we can include translation into the matrix)
