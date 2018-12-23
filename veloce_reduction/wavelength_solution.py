@@ -20,7 +20,8 @@ import astropy.io.fits as pyfits
 
 from veloce_reduction.veloce_reduction.helper_functions import fibmodel_with_amp, CMB_pure_gaussian, multi_fibmodel_with_amp, CMB_multi_gaussian, offset_pseudo_gausslike
 from veloce_reduction.veloce_reduction.helper_functions import fit_poly_surface_2D, single_sigma_clip, find_nearest, gaussian_with_offset_and_slope, fibmodel_with_amp_and_offset
-from veloce_reduction.utils.linelists import make_gaussmask_from_linelist 
+from veloce_reduction.utils.linelists import make_gaussmask_from_linelist
+from veloce_reduction.veloce_reduction.lfc_peaks import find_affine_transformation_matrix
 from numpy.fft import using_mklfft
 
 
@@ -1845,7 +1846,9 @@ def define_pixel_offsets_between_fibres(relto='S1', savedict=False, saveplots=Fa
 
 
 def get_dispsol_for_all_fibs(obsname, relto='LFC', twod=False, degpol=7, deg_spectral=7, deg_spatial=7, fibs='stellar', nx=4112,
-                             polytype='chebyshev', refit=False, debug_level=0, timit=False, fudge=1., signflip_shift=False, signflip_slope=False):
+                             polytype='chebyshev', refit=False, debug_level=0, timit=False, fudge=1., signflip_shift=True, signflip_slope=True):
+
+    '''using Duncan's xcorrs to measure LFC shifts'''
 
     if timit:
         start_time = time.time()
@@ -2007,6 +2010,101 @@ def get_dispsol_for_all_fibs(obsname, relto='LFC', twod=False, degpol=7, deg_spe
 
 
 
+
+
+def get_dispsol_for_all_fibs_2(obsname, relto='LFC', degpol=7, fibs='stellar', nx=4112,
+                               fudge=1., debug_level=0, timit=False):
+    '''using CGT's DAOPHOT results to measure LFC shifts'''
+
+    if timit:
+        start_time = time.time()
+
+    # laod default coefficients
+    pixfit_coeffs = np.load('/Users/christoph/OneDrive - UNSW/dispsol_tests/20180917/pixfit_coeffs_relto_' + relto + '_as_of_2018-11-14.npy').item()
+
+    # fibslot = [0,1,   3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,   23,24,25]
+    fibname = ['S5', 'S2', '07', '18', '17', '06', '16', '15', '05', '14', '13', '01', '12', '11', '04', '10', '09',
+               '03', '08', '19', '02', 'S4', 'S3', 'S1']
+    offsets = 1.97 * np.array(range(3) + range(4,23) + range(24,26))[::-1]   # 1.97 pix is the median fib-to-fib separation
+
+    nfib = len(fibname)
+
+    # read master LFC linelist
+    lfc_ord, lfc_pix, lfc_wl = readcol('/Users/christoph/OneDrive - UNSW/dispsol/laser_dispsol_20181015/PeakPos.txt',
+                                       twod=False)
+    lfc_pix -= 1.  # b/c DW is using Matlab, which starts indexing at 1 not at 0!!!!!!!
+
+    # read file containing LFC peak positions of observation
+    _, yref, xref, _, _, _, _, _, _, _, _ = readcol('/Users/christoph/data/lfc_peaks/21sep30019olc.nst', twod=False, skipline=2)
+    _, y, x, _, _, _, _, _, _, _, _ = readcol('/Users/christoph/data/lfc_peaks/' + obsname + 'olc.nst', twod=False, skipline=2)
+    del _
+    xref = 4112. - xref
+    x = 4112. - x
+    yref = yref - 54.   # or 53??? but does not matter for getting the transformation matrix
+    y = y - 54.         # or 53??? but does not matter for getting the transformation matrix
+    # ref_peaks = divide_lfc_peaks_into_orders(xref, yref)
+    # peaks = divide_lfc_peaks_into_orders(x, y)
+
+    # some housekeeping...
+    xx = np.arange(nx)
+
+    # get affine transformation matrix
+    #     if   x' = x * M
+    # # then   x  = x' * M_inv
+    Minv = find_affine_transformation_matrix(xref, yref, x, y, timit=True)
+
+    # prepare outputs
+    wldict = {}
+    # wl = np.zeros((n_ord, nfib, nx))
+    wl = np.zeros((40, nfib, nx))
+
+    # loop over all orders
+    for o in np.unique(lfc_ord)[:-1]:
+        ord = 'order_' + str(o + 1).zfill(2)  # DW's order numbers are offset by one to CB's
+        wldict[ord] = {}
+        ix = np.argwhere(lfc_ord == o).flatten()
+        x0 = lfc_pix[ix]
+        lam = lfc_wl[ix]
+        master_lfc_fit = np.poly1d(np.polyfit(x0, lam, degpol))
+
+        # now get shifted coordinates
+        coords = np.array([xx, pid[ord](xx), np.ones(nx)]).T
+        shifted_coords = np.dot(coords, Minv)
+        xx_prime = shifted_coords[:,0]
+
+        # now re-evaluate the master fit at new x-values
+        eval_xprime_dispsol = master_lfc_fit(xx_prime)
+
+        wldict[ord]['laser'] = eval_xprime_dispsol[::-1]  # need to turn around, b/c DW's LFC spectra are flipped (left-right) wrt to CBs
+        # need to flip x now, because the pixfit_coeffs are using CMB layout
+        x0_flipped = (nx - 1) - x0
+
+        # loop over all fibres
+        for i, fib in enumerate(fibname):
+            xfib_flipped = x0_flipped + pixfit_coeffs[ord]['fibre_' + fib](x0_flipped)
+            xfib = (nx - 1) - xfib_flipped  # and flip it back --> can't think right now, can I combine those two flips???
+            master_lfc_fit_fib = np.poly1d(np.polyfit(xfib, lam, degpol))
+
+            # TODO :
+            # coords_fib = np.array([xx, fibre_traces[fib](xx), np.ones(nx)]).T
+            coords_fib = np.array([xx, pid[ord](xx) - offsets[i], np.ones(nx)]).T
+            shifted_coords_fib = np.dot(coords_fib, Minv)
+            xx_prime_fib = shifted_coords_fib[:,0]
+
+            eval_xprime_dispsol_fib = master_lfc_fit_fib(xx_prime_fib)
+            wldict[ord][fib] = eval_xprime_dispsol_fib[::-1]
+            wl[o, i, :] = eval_xprime_dispsol_fib[::-1]
+
+    if timit:
+        print('Time elapsed: ' + str(np.round(time.time() - start_time, 1)) + ' seconds')
+
+    if fibs not in ['all', 'stellar']:
+        print('ERROR: "fibs" not valid!!!')
+        return
+    elif fibs == 'stellar':
+        wl = wl[:, 2:21, :]
+
+    return wldict, wl
 
 
 
