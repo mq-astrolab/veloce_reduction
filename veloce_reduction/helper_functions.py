@@ -18,7 +18,7 @@ from scipy import special, signal
 from numpy.polynomial import polynomial
 from scipy.integrate import quad, fixed_quad
 from scipy import ndimage
-from json.decoder import _decode_uXXXX
+# from json.decoder import _decode_uXXXX
 
 
 

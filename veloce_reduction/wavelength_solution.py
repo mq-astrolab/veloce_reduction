@@ -2037,7 +2037,10 @@ def get_dispsol_for_all_fibs_2(obsname, relto='LFC', degpol=7, fibs='stellar', n
 
     # read file containing LFC peak positions of observation
     _, yref, xref, _, _, _, _, _, _, _, _ = readcol(lfc_path + '21sep30019olc.nst', twod=False, skipline=2)
-    _, y, x, _, _, _, _, _, _, _, _ = readcol(lfc_path + 'tauceti/' + obsname + 'olc.nst', twod=False, skipline=2)
+    try:
+        _, y, x, _, _, _, _, _, _, _, _ = readcol(lfc_path + 'tauceti/' + obsname + 'olc.nst', twod=False, skipline=2)
+    except:
+        _, y, x, _, _, _, _, _, _ = readcol(lfc_path + 'tauceti/' + obsname + 'olc.nst', twod=False, skipline=2)
     del _
     xref = nx - xref
     x = nx - x
@@ -2104,7 +2107,6 @@ def get_dispsol_for_all_fibs_2(obsname, relto='LFC', degpol=7, fibs='stellar', n
 
         else:
             # now get shifted coordinates
-
             coords = np.array([xx, pid[ord](xx), np.ones(nx)]).T
             shifted_coords = np.dot(coords, Minv)
             xx_prime = shifted_coords[:,0]
