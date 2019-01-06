@@ -3,8 +3,8 @@ import numpy as np
 import astropy.io.fits as pyfits
 import matplotlib.pyplot as plt
 
-from veloce_reduction.veloce_reduction.wavelength_solution import get_dispsol_for_all_fibs
-from veloce_reduction.veloce_reduction.get_radial_velocity import get_RV_from_xcorr_2, make_ccfs
+from veloce_reduction.veloce_reduction.wavelength_solution import get_dispsol_for_all_fibs, get_dispsol_for_all_fibs_2
+from veloce_reduction.veloce_reduction.get_radial_velocity import get_RV_from_xcorr, get_RV_from_xcorr_2, make_ccfs
 from veloce_reduction.veloce_reduction.barycentric_correction import get_barycentric_correction
 from veloce_reduction.veloce_reduction.helper_functions import get_mean_snr
 
@@ -14,7 +14,7 @@ from veloce_reduction.veloce_reduction.helper_functions import get_mean_snr
 # path = '/Users/christoph/data/reduced/tauceti/tauceti_with_LFC/'
 path = '/Volumes/BERGRAID/data/veloce/reduced/tauceti/tauceti_with_LFC/'
 
-files = glob.glob(path + 'HD10700*')
+files = glob.glob(path + '*10700*')
 
 # sort list of files
 all_shortnames = []
@@ -41,14 +41,14 @@ all_obsnames = all_obsnames[sortix]
 
 all_jd = []
 all_bc = []
-# outfn = '/Users/christoph/data/reduced/tauceti/tauceti_with_LFC/tauceti_all_info.dat'
-# outfile = open(outfn, 'w')
-# outfn_jd = '/Users/christoph/data/reduced/tauceti/tauceti_with_LFC/tauceti_all_jds.dat'
-# outfile_jd = open(outfn_jd, 'w')
-# outfn_bc = '/Users/christoph/data/reduced/tauceti/tauceti_with_LFC/tauceti_all_bcs.dat'
-# outfile_bc = open(outfn_bc, 'w')
-# outfn_names = '/Users/christoph/data/reduced/tauceti/tauceti_with_LFC/tauceti_all_obsnames.dat'
-# outfile_names = open(outfn_names, 'w')
+outfn = path + 'tauceti_all_info.dat'
+outfile = open(outfn, 'w')
+outfn_jd = path + 'tauceti_all_jds.dat'
+outfile_jd = open(outfn_jd, 'w')
+outfn_bc = path + 'tauceti_all_bcs.dat'
+outfile_bc = open(outfn_bc, 'w')
+outfn_names = path + 'tauceti_all_obsnames.dat'
+outfile_names = open(outfn_names, 'w')
 
 for i,filename in enumerate(files):
     print('Processing BCs for tau Ceti observation '+str(i+1)+'/'+str(len(files)))
@@ -63,15 +63,15 @@ for i,filename in enumerate(files):
     all_bc.append(bc[0])
     jd = pyfits.getval(filename, 'UTMJD') + 2.4e6 + 0.5
     all_jd.append(jd)
-    # outfile_names.write(shortname + ' \n')
-    # outfile_jd.write('%14.6f \n' % (jd))
-    # outfile_bc.write('%14.6f \n' % (bc))
-    # outfile.write(shortname + '     %14.6f     %14.6f \n' % (jd, bc))
+    outfile_names.write(shortname + ' \n')
+    outfile_jd.write('%14.6f \n' % (jd))
+    outfile_bc.write('%14.6f \n' % (bc))
+    outfile.write(shortname + '     %14.6f     %14.6f \n' % (jd, bc))
 
-# outfile.close()
-# outfile_jd.close()
-# outfile_bc.close()
-# outfile_names.close()
+outfile.close()
+outfile_jd.close()
+outfile_bc.close()
+outfile_names.close()
 
 ########################################################################################################################
 ########################################################################################################################
@@ -100,12 +100,15 @@ for i,filename in enumerate(files):
     dum2 = dum[-1].split('.')
     dum3 = dum2[0].split('_')
     obsname = dum3[1]
-    old_wldict, old_wl = get_dispsol_for_all_fibs(obsname, fudge=fudge, signflip_shift=signflip_shift, signflip_slope=signflip_slope, refit=True)
-    new_wldict, new_wl = get_dispsol_for_all_fibs(obsname, fudge=fudge, signflip_shift=signflip_shift, signflip_slope=signflip_slope, refit=False)
-    new_wl[0, :, :] = 1.
-    new_wl[-1, :, :] = 1.
-    old_wl[0, :, :] = 1.
-    old_wl[-1, :, :] = 1.
+    # old_wldict, old_wl = get_dispsol_for_all_fibs(obsname, fudge=fudge, signflip_shift=signflip_shift, signflip_slope=signflip_slope, refit=True)
+    # new_wldict, new_wl = get_dispsol_for_all_fibs(obsname, fudge=fudge, signflip_shift=signflip_shift, signflip_slope=signflip_slope, refit=False)
+    new_wldict, new_wl = get_dispsol_for_all_fibs_2(obsname, fudge=fudge)
+    # new_wl[0, :, :] = 1.
+    # new_wl[-1, :, :] = 1.
+    # old_wl[0, :, :] = 1.
+    # old_wl[-1, :, :] = 1.
+    wl[0, :, :] = 1.
+    wl[-1, :, :] = 1.
     maxdiff.append(np.max(3.e8 * (old_wl.flatten() - new_wl.flatten()) / new_wl.flatten()))
     # pyfits.append(filename, wl, clobber=True)
 
@@ -122,12 +125,17 @@ all_sumrv = np.zeros(len(files))
 xcsums = np.zeros((len(files), 81))
 
 # TEMPLATE:
-f0 = pyfits.getdata(files[69], 0)   #that's the highest SNR observation
+# f0 = pyfits.getdata(files[69], 0)   # that's the highest SNR observation for Sep 18
+# f0 = pyfits.getdata(files[2], 0)   # that's the highest SNR observation for Nov 18
+f0 = pyfits.getdata(files[37], 0)   # that's the 2nd highest SNR observation for Nov 18
 # err0 = pyfits.getdata(files[69], 1)
 # wl0 = pyfits.getdata(files[69], 2)
 # wl0 = pyfits.getdata('/Users/christoph/OneDrive - UNSW/dispsol/individual_fibres_dispsol_poly7_21sep30019.fits')
-obsname_0 = '24sep30078'
-wldict0,wl0 = get_dispsol_for_all_fibs(obsname_0, fudge=fudge, signflip_shift=signflip_shift, signflip_slope=signflip_slope)
+# obsname_0 = '24sep30078'     # that's the highest SNR observation for Sep 18
+# obsname_0 = '16nov30128'     # that's the highest SNR observation for Nov 18
+obsname_0 = '25nov30084'     # that's the highest SNR observation for Nov 18
+# wldict0,wl0 = get_dispsol_for_all_fibs(obsname_0, fudge=fudge, signflip_shift=signflip_shift, signflip_slope=signflip_slope)
+wldict0,wl0 = get_dispsol_for_all_fibs_2(obsname_0)
 
 for i,filename in enumerate(files):
     print('Processing RV for tau Ceti observation ' + str(i+1) + '/' + str(len(files)))

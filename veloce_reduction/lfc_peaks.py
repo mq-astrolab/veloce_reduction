@@ -14,27 +14,27 @@ from readcol import readcol
 
 
 
-path = '/Volumes/BERGRAID/data/veloce/lfc_peaks/'
-path = '/Users/christoph/data/lfc_peaks/'
-
-files = glob.glob(path + '*olc.nst')
-
-id, y0, x0, mag, err_mag, skymod, niter, chi, sharp, y_err, x_err = readcol(files[0], twod=False, skipline=2)
-id, y, x, mag, err_mag, skymod, niter, chi, sharp, y_err, x_err = readcol(files[1], twod=False, skipline=2)
-x0 = 4112. - x0   # flipped
-x = 4112. - x
-y0 = y0 - 54.     # 53 overscan pixels either side and DAOPHOT counting from 1?
-y = y - 54.
-
-test_x0 = x0[(x0 > 1500) & (x0 < 1800) & (y0 > 1500) & (y0 < 1800)]
-test_y0 = y0[(x0 > 1500) & (x0 < 1800) & (y0 > 1500) & (y0 < 1800)]
-test_x = x[(x > 1500) & (x < 1800) & (y > 1500) & (y < 1800)]
-test_y = y[(x > 1500) & (x < 1800) & (y > 1500) & (y < 1800)]
-
-x0 = test_x0.copy()
-x = test_x.copy()
-y0 = test_y0.copy()
-y = test_y.copy()
+# path = '/Volumes/BERGRAID/data/veloce/lfc_peaks/'
+# path = '/Users/christoph/data/lfc_peaks/'
+#
+# files = glob.glob(path + '*olc.nst')
+#
+# id, y0, x0, mag, err_mag, skymod, niter, chi, sharp, y_err, x_err = readcol(files[0], twod=False, skipline=2)
+# id, y, x, mag, err_mag, skymod, niter, chi, sharp, y_err, x_err = readcol(files[1], twod=False, skipline=2)
+# x0 = 4112. - x0   # flipped
+# x = 4112. - x
+# y0 = y0 - 54.     # 53 overscan pixels either side and DAOPHOT counting from 1?
+# y = y - 54.
+#
+# test_x0 = x0[(x0 > 1500) & (x0 < 1800) & (y0 > 1500) & (y0 < 1800)]
+# test_y0 = y0[(x0 > 1500) & (x0 < 1800) & (y0 > 1500) & (y0 < 1800)]
+# test_x = x[(x > 1500) & (x < 1800) & (y > 1500) & (y < 1800)]
+# test_y = y[(x > 1500) & (x < 1800) & (y > 1500) & (y < 1800)]
+#
+# x0 = test_x0.copy()
+# x = test_x.copy()
+# y0 = test_y0.copy()
+# y = test_y.copy()
 
 
 
