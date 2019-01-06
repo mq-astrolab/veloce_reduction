@@ -41,14 +41,14 @@ all_obsnames = all_obsnames[sortix]
 
 all_jd = []
 all_bc = []
-outfn = path + 'tauceti_all_info.dat'
-outfile = open(outfn, 'w')
-outfn_jd = path + 'tauceti_all_jds.dat'
-outfile_jd = open(outfn_jd, 'w')
-outfn_bc = path + 'tauceti_all_bcs.dat'
-outfile_bc = open(outfn_bc, 'w')
-outfn_names = path + 'tauceti_all_obsnames.dat'
-outfile_names = open(outfn_names, 'w')
+# outfn = path + 'tauceti_all_info.dat'
+# outfile = open(outfn, 'w')
+# outfn_jd = path + 'tauceti_all_jds.dat'
+# outfile_jd = open(outfn_jd, 'w')
+# outfn_bc = path + 'tauceti_all_bcs.dat'
+# outfile_bc = open(outfn_bc, 'w')
+# outfn_names = path + 'tauceti_all_obsnames.dat'
+# outfile_names = open(outfn_names, 'w')
 
 for i,filename in enumerate(files):
     print('Processing BCs for tau Ceti observation '+str(i+1)+'/'+str(len(files)))
@@ -63,15 +63,15 @@ for i,filename in enumerate(files):
     all_bc.append(bc[0])
     jd = pyfits.getval(filename, 'UTMJD') + 2.4e6 + 0.5
     all_jd.append(jd)
-    outfile_names.write(shortname + ' \n')
-    outfile_jd.write('%14.6f \n' % (jd))
-    outfile_bc.write('%14.6f \n' % (bc))
-    outfile.write(shortname + '     %14.6f     %14.6f \n' % (jd, bc))
+    # outfile_names.write(shortname + ' \n')
+    # outfile_jd.write('%14.6f \n' % (jd))
+    # outfile_bc.write('%14.6f \n' % (bc))
+    # outfile.write(shortname + '     %14.6f     %14.6f \n' % (jd, bc))
 
-outfile.close()
-outfile_jd.close()
-outfile_bc.close()
-outfile_names.close()
+# outfile.close()
+# outfile_jd.close()
+# outfile_bc.close()
+# outfile_names.close()
 
 ########################################################################################################################
 ########################################################################################################################
