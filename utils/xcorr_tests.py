@@ -92,7 +92,7 @@ for i,file in enumerate(files):
 # calculate wl-solution for all fibres, including the LFC shifts and slopes; also append to reduced spectrum FITS file
 signflip_shift = True
 signflip_slope = True
-fudge = 1.0
+fudge = 1.
 maxdiff= []
 for i,filename in enumerate(files):
     print('Processing wl-solution for tau Ceti observation ' + str(i+1) + '/' + str(len(files)))
