@@ -2016,7 +2016,6 @@ def get_dispsol_for_all_fibs_2(obsname, relto='LFC', degpol=7, fibs='stellar', n
     '''using CGT's DAOPHOT results to measure LFC shifts'''
 
     lfc_path = '/Users/christoph/OneDrive - UNSW/lfc_peaks/'
-    print(lfc_path)
 
     if timit:
         start_time = time.time()

@@ -68,8 +68,10 @@ def find_affine_transformation_matrix(x, y, x0, y0, eps=0.5, timit=False):
         if np.sum(distance < eps) > 0:
             if np.sum(distance < eps) > 1:
                 print('FUGANDA: ',refpeak)
-            good_ref_peaks.append(refpeak)
-            good_obs_peaks.append((obs_peaks_xy[0,distance < eps], obs_peaks_xy[1,distance < eps]))
+                print('There is probably a cosmic really close to an LFC peak - skipping this peak...')
+            else:
+                good_ref_peaks.append(refpeak)
+                good_obs_peaks.append((obs_peaks_xy[0,distance < eps], obs_peaks_xy[1,distance < eps]))
 
         # print(n, refpeak, np.sum(distance < eps))
 
@@ -78,7 +80,7 @@ def find_affine_transformation_matrix(x, y, x0, y0, eps=0.5, timit=False):
     good_obs_peaks_xyz = np.hstack((np.squeeze(np.array(good_obs_peaks)), np.expand_dims(np.repeat(1, len(good_obs_peaks)), axis=1)))
     
     # np.linalg.lstsq(r1,r2) solves matrix equation M*r1 = r2  (note that linalg.lstsq wants row-vectors)
-    # i.e.: good_obs_peaks_xyz ~= np.dot(good_ref_peaks_xyz, Mtest)
+    # i.e.: good_obs_peaks_xyz ~= np.dot(good_ref_peaks_xyz, M)
     M, res, rank, s = np.linalg.lstsq(good_ref_peaks_xyz, good_obs_peaks_xyz, rcond=None)
 
     if timit:
@@ -97,7 +99,8 @@ def find_affine_transformation_matrix(x, y, x0, y0, eps=0.5, timit=False):
 def divide_lfc_peaks_into_orders(x, y, tol=5):
 
     # read rough LFC traces
-    pid = np.load('/Users/christoph/data/lfc_peaks/lfc_P_id.npy').item()
+    lfc_path = '/Users/christoph/OneDrive - UNSW/lfc_peaks/'
+    pid = np.load(lfc_path + 'lfc_P_id.npy').item()
 
     peaks = {}
 

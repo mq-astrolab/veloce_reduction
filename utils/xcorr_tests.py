@@ -2,11 +2,13 @@ import glob
 import numpy as np
 import astropy.io.fits as pyfits
 import matplotlib.pyplot as plt
+from readcol import readcol
 
 from veloce_reduction.veloce_reduction.wavelength_solution import get_dispsol_for_all_fibs, get_dispsol_for_all_fibs_2
 from veloce_reduction.veloce_reduction.get_radial_velocity import get_RV_from_xcorr, get_RV_from_xcorr_2, make_ccfs
-from veloce_reduction.veloce_reduction.barycentric_correction import get_barycentric_correction
 from veloce_reduction.veloce_reduction.helper_functions import get_mean_snr
+from veloce_reduction.veloce_reduction.flat_fielding import onedim_pixtopix_variations, deblaze_orders
+from veloce_reduction.veloce_reduction.barycentric_correction import get_barycentric_correction
 
 
 ########################################################################################################################
@@ -77,6 +79,8 @@ for i,filename in enumerate(files):
 ########################################################################################################################
 ########################################################################################################################
 
+# all_snr = readcol(path + 'tauceti_all_snr.dat')
+
 # get mean SNR per collapsed pixel
 all_snr = []
 for i,file in enumerate(files):
@@ -127,7 +131,7 @@ xcsums = np.zeros((len(files), 81))
 # TEMPLATE:
 # f0 = pyfits.getdata(files[69], 0)   # that's the highest SNR observation for Sep 18
 # f0 = pyfits.getdata(files[2], 0)   # that's the highest SNR observation for Nov 18
-f0 = pyfits.getdata(files[37], 0)   # that's the 2nd highest SNR observation for Nov 18
+f0 = pyfits.getdata(files[35], 0)   # that's the 2nd highest SNR observation for Nov 18
 # err0 = pyfits.getdata(files[69], 1)
 # wl0 = pyfits.getdata(files[69], 2)
 # wl0 = pyfits.getdata('/Users/christoph/OneDrive - UNSW/dispsol/individual_fibres_dispsol_poly7_21sep30019.fits')
@@ -156,22 +160,76 @@ xcsums = np.array(xcsums)
 ########################################################################################################################
 ########################################################################################################################
 
-# tests to determine the best fudge factor...
-rvs_fudge_test = {}
+# WITH PRE-NORMALIZING FLATS
+
+# calculating the CCFs for one order / 11 orders
+# (either with or without the LFC shifts applied, comment out the 'wl' and 'wl0' you don't want)
+
+all_xc = []
+all_rv = np.zeros((len(files), 11, 19))
+all_sumrv = np.zeros(len(files))
+xcsums = np.zeros((len(files), 81))
+
 # TEMPLATE:
-f0 = pyfits.getdata(files[69], 0)   #that's the highest SNR observation
+# f0 = pyfits.getdata(files[69], 0)   # that's the highest SNR observation for Sep 18
+# f0 = pyfits.getdata(files[2], 0)   # that's the highest SNR observation for Nov 18
+f0 = pyfits.getdata(files[35], 0)   # that's the 2nd highest SNR observation for Nov 18
 # err0 = pyfits.getdata(files[69], 1)
 # wl0 = pyfits.getdata(files[69], 2)
 # wl0 = pyfits.getdata('/Users/christoph/OneDrive - UNSW/dispsol/individual_fibres_dispsol_poly7_21sep30019.fits')
-obsname_0 = '24sep30078'
-wldict0,wl0 = get_dispsol_for_all_fibs(obsname_0, fudge=fudge, signflip_shift=signflip_shift, signflip_slope=signflip_slope)
+# obsname_0 = '24sep30078'     # that's the highest SNR observation for Sep 18
+# obsname_0 = '16nov30128'     # that's the highest SNR observation for Nov 18
+obsname_0 = '25nov30084'     # that's the highest SNR observation for Nov 18
+# wldict0,wl0 = get_dispsol_for_all_fibs(obsname_0, fudge=fudge, signflip_shift=signflip_shift, signflip_slope=signflip_slope)
+wldict0,wl0 = get_dispsol_for_all_fibs_2(obsname_0)
 
-for fudge in np.arange(0.5,1.26,0.025):
+smoothed_flat_0, pix_sens_0 = onedim_pixtopix_variations(flat_0, filt='g', filter_width=25)
+f0_dblz = deblaze_orders(f0, wl0, smoothed_flat_0, mask_0, err=None)
+
+for i,filename in enumerate(files):
+    print('Processing RV for tau Ceti observation ' + str(i+1) + '/' + str(len(files)))
+    f = pyfits.getdata(filename, 0)
+    # err = pyfits.getdata(file, 1)
+    wl = pyfits.getdata(filename, 2)
+    # wl = pyfits.getdata('/Users/christoph/OneDrive - UNSW/dispsol/individual_fibres_dispsol_poly7_21sep30019.fits')
+    
+    smoothed_flat, pix_sens = onedim_pixtopix_variations(flat, filt='g', filter_width=25)
+    f_dblz = deblaze_orders(f, wl, smoothed_flat, mask, err=None)
+    
+    all_xc.append(make_ccfs(f, wl, f0, wl0, mask=None, smoothed_flat=None, delta_log_wl=1e-6, relgrid=False,
+                            flipped=False, individual_fibres=False, debug_level=1, timit=False))
+    rv,rverr,xcsum = get_RV_from_xcorr_2(f, wl, f0, wl0, individual_fibres=True, individual_orders=True, debug_level=1)
+    sumrv,sumrverr,xcsum = get_RV_from_xcorr_2(f, wl, f0, wl0, individual_fibres=False, individual_orders=False, debug_level=1)
+    all_rv[i,:,:] = rv
+    all_sumrv[i] = sumrv
+    xcsums[i,:] = xcsum
+xcsums = np.array(xcsums) 
+
+########################################################################################################################
+########################################################################################################################
+########################################################################################################################
+
+# tests to determine the best fudge factor...
+rvs_fudge_test = {}
+# TEMPLATE:
+# f0 = pyfits.getdata(files[69], 0)   #that's the highest SNR observation
+f0 = pyfits.getdata(files[35], 0)   # that's the 2nd highest SNR observation for Nov 18
+# err0 = pyfits.getdata(files[69], 1)
+# wl0 = pyfits.getdata(files[69], 2)
+# wl0 = pyfits.getdata('/Users/christoph/OneDrive - UNSW/dispsol/individual_fibres_dispsol_poly7_21sep30019.fits')
+# obsname_0 = '24sep30078'
+obsname_0 = '25nov30084'     # that's the highest SNR observation for Nov 18
+
+
+for fudge in np.arange(0.5,1.26,0.05):
     print('FUDGE = ', fudge)
     signflip_shift = True
     signflip_slope = True
 
-    all_rv = []
+    wldict0, wl0 = get_dispsol_for_all_fibs(obsname_0, fudge=fudge, signflip_shift=signflip_shift,
+                                            signflip_slope=signflip_slope, refit=True)
+
+    all_sumrv = []
 
     for i, filename in enumerate(files):
         print('Processing tau Ceti observation ' + str(i + 1) + '/' + str(len(files)))
@@ -180,13 +238,13 @@ for fudge in np.arange(0.5,1.26,0.025):
         dum3 = dum2[0].split('_')
         obsname = dum3[1]
         wldict, wl = get_dispsol_for_all_fibs(obsname, fudge=fudge, signflip_shift=signflip_shift,
-                                              signflip_slope=signflip_slope, refit=False)
+                                              signflip_slope=signflip_slope, refit=True)
         f = pyfits.getdata(filename, 0)
         # all_xc.append(get_RV_from_xcorr_2(f, wl, f0, wl0, individual_fibres=False, individual_orders=False))
         sumrv, sumrverr, xcsum = get_RV_from_xcorr_2(f, wl, f0, wl0,  individual_fibres=False, individual_orders=False, debug_level=1, fitrange=6)
-        all_rv.append(sumrv)
+        all_sumrv.append(sumrv)
 
-    rvs_fudge_test['fudge_' + str(fudge)[:5]] = all_rv - np.array(all_bc)
+    rvs_fudge_test['fudge_' + str(fudge)[:5]] = all_sumrv - np.array(all_bc)
 
 ########################################################################################################################
 ########################################################################################################################

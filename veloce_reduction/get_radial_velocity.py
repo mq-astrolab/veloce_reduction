@@ -526,9 +526,11 @@ def make_ccfs(f, wl, f0, wl0, mask=None, smoothed_flat=None, delta_log_wl=1e-6, 
     # Duncan's suggestion
     # for o in [4,5,6,25,26,33,34,35]:
     for o in [5, 6, 17, 25, 26, 27, 31, 34, 35, 36, 37]:
-
+        
         if debug_level >= 2:
             print('Order ' + str(o+1).zfill(2))
+            
+        ord = 'order_' + str(o+1).zfill(2)    
 
         # # only use pixels that have enough signal
         # if mask is None:
