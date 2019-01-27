@@ -20,11 +20,19 @@ def define_target_dict(starnames):
     px = 277.516215785613
     rv = -16.68e3
 
+    # for TOI129
+    ra = 0.187097
+    dec = -54.830506
+    pmra = -202.8150572
+    pmdec = -71.51751871
+    px = 16.15604552
+    rv = 21.04070239e3
+
     return target_dict
 
 
 
-def get_barycentric_correction(fn, h=0.01, w=0.01):
+def get_barycentric_correction(fn, starname='tauceti', h=0.01, w=0.01):
 
     # wrapper routine for using barycorrpy with Gaia DR2 coordinates
 
@@ -34,8 +42,21 @@ def get_barycentric_correction(fn, h=0.01, w=0.01):
     utmjd = pyfits.getval(fn, 'UTMJD') + 2.4e6 + 0.5   # the fits header has 2,400,000.5 subtracted!!!!!
     # ra = pyfits.getval(fn, 'MEANRA')
     # dec = pyfits.getval(fn, 'MEANDEC')
-    ra = 26.00930287666994
-    dec = -15.933798650941204
+    if starname.lower() == 'tauceti':
+        ra = 26.00930287666994
+        dec = -15.933798650941204
+        rv = -16.68e3
+        h=0.01
+        w=0.01
+    elif starname.lower() == 'toi129':
+        ra = 0.187097
+        dec = -54.830506
+        rv = 21.04070239e3
+        h=0.005
+        w=0.005
+    else:
+        fu=1
+        assert fu != 1, 'ERROR: need to implement thjat first...'
 
     coord = SkyCoord(ra=ra, dec=dec, unit=(u.degree, u.degree), frame='icrs')
     width = u.Quantity(w, u.deg)
@@ -44,7 +65,7 @@ def get_barycentric_correction(fn, h=0.01, w=0.01):
     gaia_data = Gaia.query_object_async(coordinate=coord, width=width, height=height)
 
     bc = barycorrpy.get_BC_vel(JDUTC=utmjd, ra=ra, dec=dec, pmra=gaia_data['pmra'], pmdec=gaia_data['pmdec'],
-                               px=gaia_data['parallax'], rv=-16.68e3, epoch=epoch, obsname='AAO', ephemeris='de430')
+                               px=gaia_data['parallax'], rv=rv, epoch=epoch, obsname='AAO', ephemeris='de430')
     # bc = barycorrpy.get_BC_vel(JDUTC=utmjd, ra=ra, dec=dec, pmra=gaia_data['pmra'], pmdec=gaia_data['pmdec'],
     #                            px=gaia_data['parallax'], rv=gaia_data['radial_velocity']*1e3, obsname='AAO', ephemeris='de430')
     # bc = barycorrpy.get_BC_vel(JDUTC=utmjd, ra=ra, dec=dec, pmra=pmra, pmdec=pmdec,

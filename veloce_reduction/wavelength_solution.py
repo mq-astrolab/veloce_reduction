@@ -2015,6 +2015,8 @@ def get_dispsol_for_all_fibs(obsname, relto='LFC', twod=False, degpol=7, deg_spe
 def get_dispsol_for_all_fibs_2(obsname, relto='LFC', degpol=7, fibs='stellar', nx=4112, eps=0.5, fudge=1., refit=False, debug_level=0, timit=False):
     '''using CGT's DAOPHOT results to measure LFC shifts'''
 
+    # TODO: instead of reading P_id for the LFC, do a divide into orders and fit new x-y-traces
+
     lfc_path = '/Users/christoph/OneDrive - UNSW/lfc_peaks/'
 
     if timit:
@@ -2038,9 +2040,9 @@ def get_dispsol_for_all_fibs_2(obsname, relto='LFC', degpol=7, fibs='stellar', n
     # read file containing LFC peak positions of observation
     _, yref, xref, _, _, _, _, _, _, _, _ = readcol(lfc_path + '21sep30019olc.nst', twod=False, skipline=2)
     try:
-        _, y, x, _, _, _, _, _, _, _, _ = readcol(lfc_path + 'tauceti/' + obsname + 'olc.nst', twod=False, skipline=2)
+        _, y, x, _, _, _, _, _, _, _, _ = readcol(lfc_path + 'all/' + obsname + 'olc.nst', twod=False, skipline=2)
     except:
-        _, y, x, _, _, _, _, _, _ = readcol(lfc_path + 'tauceti/' + obsname + 'olc.nst', twod=False, skipline=2)
+        _, y, x, _, _, _, _, _, _ = readcol(lfc_path + 'all/' + obsname + 'olc.nst', twod=False, skipline=2)
     del _
     xref = nx - xref
     x = nx - x
@@ -2060,7 +2062,7 @@ def get_dispsol_for_all_fibs_2(obsname, relto='LFC', degpol=7, fibs='stellar', n
         #     if   x' = x * M
         # # then   x  = x' * M_inv
         Minv = find_affine_transformation_matrix(xref, yref, x, y, timit=True, eps=2.)
-        # also get the rough tracve of the LFC fibre (neede below)
+        # also get the rough trace of the LFC fibre (needed below)
         pid = np.load(lfc_path + 'lfc_P_id.npy').item()
 
     # prepare outputs

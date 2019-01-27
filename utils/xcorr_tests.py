@@ -129,15 +129,15 @@ all_sumrv = np.zeros(len(files))
 xcsums = np.zeros((len(files), 81))
 
 # TEMPLATE:
-# f0 = pyfits.getdata(files[69], 0)   # that's the highest SNR observation for Sep 18
+f0 = pyfits.getdata(files[69], 0)   # that's the highest SNR observation for Sep 18
 # f0 = pyfits.getdata(files[2], 0)   # that's the highest SNR observation for Nov 18
-f0 = pyfits.getdata(files[35], 0)   # that's the 2nd highest SNR observation for Nov 18
+# f0 = pyfits.getdata(files[35], 0)   # that's the 2nd highest SNR observation for Nov 18
 # err0 = pyfits.getdata(files[69], 1)
 # wl0 = pyfits.getdata(files[69], 2)
 # wl0 = pyfits.getdata('/Users/christoph/OneDrive - UNSW/dispsol/individual_fibres_dispsol_poly7_21sep30019.fits')
-# obsname_0 = '24sep30078'     # that's the highest SNR observation for Sep 18
+obsname_0 = '24sep30078'     # that's the highest SNR observation for Sep 18
 # obsname_0 = '16nov30128'     # that's the highest SNR observation for Nov 18
-obsname_0 = '25nov30084'     # that's the highest SNR observation for Nov 18
+# obsname_0 = '25nov30084'     # that's the 2nd highest SNR observation for Nov 18
 # wldict0,wl0 = get_dispsol_for_all_fibs(obsname_0, fudge=fudge, signflip_shift=signflip_shift, signflip_slope=signflip_slope)
 wldict0,wl0 = get_dispsol_for_all_fibs_2(obsname_0)
 
@@ -212,13 +212,13 @@ xcsums = np.array(xcsums)
 # tests to determine the best fudge factor...
 rvs_fudge_test = {}
 # TEMPLATE:
-# f0 = pyfits.getdata(files[69], 0)   #that's the highest SNR observation
-f0 = pyfits.getdata(files[35], 0)   # that's the 2nd highest SNR observation for Nov 18
+f0 = pyfits.getdata(files[69], 0)   #that's the highest SNR observation for Sep 18
+# f0 = pyfits.getdata(files[35], 0)   # that's the 2nd highest SNR observation for Nov 18
 # err0 = pyfits.getdata(files[69], 1)
 # wl0 = pyfits.getdata(files[69], 2)
 # wl0 = pyfits.getdata('/Users/christoph/OneDrive - UNSW/dispsol/individual_fibres_dispsol_poly7_21sep30019.fits')
-# obsname_0 = '24sep30078'
-obsname_0 = '25nov30084'     # that's the highest SNR observation for Nov 18
+obsname_0 = '24sep30078'
+# obsname_0 = '25nov30084'     # that's the highest SNR observation for Nov 18
 
 
 for fudge in np.arange(0.5,1.26,0.05):
