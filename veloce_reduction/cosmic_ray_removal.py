@@ -7,15 +7,30 @@ Created on 4 Oct. 2017
 from scipy import ndimage
 import numpy as np
 import time
-from click._compat import raw_input
 import scipy.interpolate as ipol
 import astropy.io.fits as pyfits
+from scipy.signal import medfilt
 
 # imgname = '/Users/christoph/UNSW/cosmics/image.fit'
 # img = pyfits.getdata(imgname)
 # 
 # xcenname = '/Users/christoph/UNSW/cosmics/xcen.fit'
 # xcen = pyfits.getdata(xcenname)
+
+
+def onedim_medfilt_cosmic_ray_removal(f, err, w=15, thresh=5., debug_level=0):
+    f_clean = f.copy()
+    f_sm = medfilt(f, w)
+    err_sm = medfilt(err, w)
+    badix = (f - f_sm) / err_sm > thresh
+    if debug_level >= 1:
+        print('Number of bad pixels found: ',np.sum(badix))
+        plt.plot(badix * 1e5, color='orange')
+        plt.plot(f - f_sm, 'b-')
+    f_clean[badix] = f_sm[badix]
+    return f_clean
+
+
 
 
 def remove_cosmics(img, ronmask, obsname, path, Flim=3.0, siglim=5.0, maxiter=20, savemask=True, savefile=False, save_err=False, verbose=False, timit=False):
