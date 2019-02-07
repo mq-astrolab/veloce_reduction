@@ -345,8 +345,8 @@ def fit_multiple_profiles(P_id, stripes, err_stripes, mask=None, slit_height=25,
 
 
 
-def fit_multiple_profiles_from_indices(P_id, img, err_img, stripe_indices, mask=None, stacking=True, slit_height=25,
-                                       model='gausslike', return_stats=False, timit=False):
+def fit_multiple_profiles_from_indices(P_id, img, err_img, stripe_indices, mask=None,  slit_height=25,
+                                       varbeta=True, offset=True, debug_level=0, timit=False):
     """
     This routine determines the profiles of the fibres in spatial direction. This is an extremely crucial step, as the
     pre-defined profiles are then used during the optimal extraction, as well as during the determination of the
@@ -359,10 +359,10 @@ def fit_multiple_profiles_from_indices(P_id, img, err_img, stripe_indices, mask=
     'img'           : 2-dim input array/image
     'err_img'       : estimated uncertainties in the 2-dim input array/image
     'mask'          : dictionary of boolean masks (keys = orders) from "find_stripes" (masking out regions of very low signal)
-    'stacking'      : boolean - do you want to stack the profiles from multiple pixel-columns (in order to achieve sub-pixel sampling)?
     'slit_height'   : height of the extraction slit (ie the pixel columns are 2*slit_height pixels long)
-    'model'         : the name of the mathematical model used to describe the profile of an individual fibre profile
-    'return_stats'  : boolean - do you want to include some goodness-of-fit statistics in the output (ie AIC, BIC, CHISQ and REDCHISQ)?
+    'varbeta'       : boolean - if set to TRUE, use Gauss-like function for fitting, if set to FALSE use plain Gaussian
+    'offset'        : boolean - do you want to fit an offset as well?
+    'debug_level'   : for debugging...
     'timit'         : boolean - do you want to measure execution run time?
 
     OUTPUT:
