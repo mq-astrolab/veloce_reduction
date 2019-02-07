@@ -19,11 +19,26 @@ from veloce_reduction.veloce_reduction.order_tracing import find_stripes, make_P
 
 # fp_in = np.load('/Users/christoph/OneDrive - UNSW/fibre_profiles/individual_fibre_profiles_20180924.npy').item()
 
-def make_real_fibparms_by_ord(fp_in, savefile=True, degpol=7):
+def make_real_fibparms_by_ord(fp_in, degpol=7, savefile=True, date=None):
+    
+    '''
+    PURPOSE:
+    Take the fitted values at the 25 pixel intervals and smooth them, and save them in the format that 
+    "make_norm_profiles_5" can digest when calculating the normalized fibre profiles during optimal extraction.
+    
+    INPUT:
+    'fp_in'    : dictionary containing the fibre profiles and traces from "fit_multiple_profiles(_from_indices)"
+    'degpol'   : degree of the polynomial for fitting the fibre traces
+    'savefile  : boolean - do you want to save the resulting output dictionary to file? 
+    'date'     : date for the output filename - should be in standard string format 'YYYYMMDD'
+    
+    OUTPUT:
+    'fibparms' : dictionary containing the smoothed fibre profiles and traces in the right format for "make_norm_profiles_5"
+    '''
     
     xx = np.arange(4112)
 
-    path = '/Users/christoph/OneDrive - UNSW/fibre_profiles/'
+    path = '/Users/christoph/OneDrive - UNSW/fibre_profiles/archive/'
 
     fibparms = {}
 
@@ -51,8 +66,7 @@ def make_real_fibparms_by_ord(fp_in, savefile=True, degpol=7):
                    'fibre_11', 'fibre_12', 'fibre_13', 'fibre_14', 'fibre_15', 'fibre_16', 'fibre_17', 'fibre_18',
                    'fibre_19', 'fibre_20', 'fibre_21', 'fibre_22', 'fibre_23', 'fibre_24', 'fibre_26', 'fibre_27']
 
-        # loop over 24 fibres (19 stellar + 5 sky)
-        # for i in range(24):
+        # loop over 24 fibres (19 stellar + 5 sky) - NOTE the flipping - has to be that way!!!
         for i,fib in enumerate(allfibs[::-1]):
 
             fibparms[ord][fib] = {}
@@ -96,7 +110,7 @@ def make_real_fibparms_by_ord(fp_in, savefile=True, degpol=7):
 
             # TODO: add nice plots if debug_level>2 or sth
 
-            # save fit parameters to dictionary - they will be used by "make_norm_profiles_3" to create the
+            # save fit parameters to dictionary - they will be used by "make_norm_profiles_5" to create the
             # normalized profiles during optimal extraction
             fibparms[ord][fib]['mu_fit'] = mu_fit(xx)
             fibparms[ord][fib]['sigma_fit'] = sigma_fit(xx)
@@ -106,8 +120,10 @@ def make_real_fibparms_by_ord(fp_in, savefile=True, degpol=7):
 
 
     if savefile:
-        now = datetime.datetime.now()
-        np.save(path + 'fibre_profile_fits_'+str(now)[:10].replace('-','')+'.npy', fibparms)
+        if date is None:
+            now = datetime.datetime.now()
+            date = str(now)[:10].replace('-','')
+        np.save(path + 'fibre_profile_fits_' + date + '.npy', fibparms)
 
     return fibparms
 

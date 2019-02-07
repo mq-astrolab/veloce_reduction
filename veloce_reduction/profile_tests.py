@@ -55,6 +55,7 @@ def get_multiple_fibre_profiles_single_order(sc, sr, err_sc, ordpol, ordmask=Non
         print('Fitting fibre profiles for one order...')
 
     npix = sc.shape[1]
+    xx = np.arange(npix)
 
     if ordmask is None:
         ordmask = np.ones(npix, dtype='bool')
@@ -163,9 +164,9 @@ def get_multiple_fibre_profiles_single_order(sc, sr, err_sc, ordpol, ordmask=Non
                     plt.xlim(-sc.shape[0] / 2, sc.shape[0] / 2)
 
             # data = np.array(data)
-            normdata = np.array(normdata)
-            weights = np.array(weights)
-            grid = np.array(grid)
+            normdata = np.array(normdata).flatten()
+            weights = np.array(weights).flatten()
+            grid = np.array(grid).flatten()
             # data = data[grid.argsort()]
             normdata = normdata[grid.argsort()]
             weights = weights[grid.argsort()]
@@ -309,7 +310,7 @@ def fit_multiple_profiles(P_id, stripes, err_stripes, mask=None, slit_height=25,
 
     # loop over all orders
     #for ord in sorted(P_id.iterkeys()):
-    for ord in sorted(P_id.keys())[31:]:
+    for ord in sorted(P_id.keys()):
         print('OK, now processing ' + str(ord))
 
         ordpol = P_id[ord]

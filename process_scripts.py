@@ -263,7 +263,7 @@ def process_science_images(imglist, P_id, mask=None, sampling_size=25, slit_heig
         #                                      exclude_top_and_bottom=True, verbose=True, timit=True)   # [e-]
         # bg_corrected_img = remove_background(img, P_id, obsname, path, degpol=5, slit_height=slit_height, save_bg=False, savefile=True, save_err=False,
         #                                      exclude_top_and_bottom=True, verbose=True, timit=True)   # [e-]
-        #adjust errors?
+        # adjust errors?
 
         # (4) remove pixel-to-pixel sensitivity variations (2-dim)
         #XXXXXXXXXXXXXXXXXXXXXXXXXXX

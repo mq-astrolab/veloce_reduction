@@ -18,7 +18,7 @@ from scipy.signal import medfilt
 # xcen = pyfits.getdata(xcenname)
 
 
-def onedim_medfilt_cosmic_ray_removal(f, err, w=15, thresh=5., debug_level=0):
+def onedim_medfilt_cosmic_ray_removal(f, err, w=15, thresh=8., debug_level=0):
     f_clean = f.copy()
     f_sm = medfilt(f, w)
     err_sm = medfilt(err, w)

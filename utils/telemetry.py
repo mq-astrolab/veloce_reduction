@@ -183,7 +183,8 @@ def check_tauceti_shifts_with_telemetry():
 def check_all_shifts_with_telemetry(nx=4112, save_M=False, save_shifts=False, verbose=False):
     
     peak_path = '/Volumes/BERGRAID/data/veloce/lfc_peaks/all/'
-    data_path = '/Volumes/BERGRAID/data/veloce/raw_goodonly/'
+    # data_path = '/Volumes/BERGRAID/data/veloce/raw_goodonly/'
+    data_path = '/Volumes/BERGRAID/data/veloce/raw/'
     
     peak_files_sep = glob.glob(peak_path + '*sep*olc.nst')
     peak_files_nov = glob.glob(peak_path + '*nov*olc.nst')
@@ -208,7 +209,8 @@ def check_all_shifts_with_telemetry(nx=4112, save_M=False, save_shifts=False, ve
     obsnums = [file[-17:-7] for file in files] 
     day = [file[-17:-15] for file in files]
     num_month = list(np.repeat('09',len(peak_files_sep))) + list(np.repeat('11',len(peak_files_nov)))
-    nicedate = ['2018'+x+y for x,y in zip(num_month, day)]
+#     nicedate = ['2018'+x+y for x,y in zip(num_month, day)]
+    nicedate = ['18'+x+y for x,y in zip(num_month, day)]
     
     # prepare lists for telemetry data from FITS headers
     temp_int = []
@@ -223,6 +225,9 @@ def check_all_shifts_with_telemetry(nx=4112, save_M=False, save_shifts=False, ve
     hmd_int = []
     hmd_rm = []
     utmjd = []
+    heater_load = []
+    cryotemp = []
+    det_temp = []
     # prepare lists for peak shifts
     good_peakfiles = []
     M_list = []
@@ -233,7 +238,8 @@ def check_all_shifts_with_telemetry(nx=4112, save_M=False, save_shifts=False, ve
         if verbose:
             print('Searching for file ' + str(i+1) + '/' + str(len(files)))
         # check if corresponding raw FITS file exists
-        fn = data_path + nicedate[i] + '/' + obsnums[i] + '.fits'
+        # fn = data_path + nicedate[i] + '/' + obsnums[i] + '.fits'
+        fn = data_path + nicedate[i] + '/ccd_3/' + obsnums[i] + '.fits'
         if os.path.isfile(fn):
 #         files_found = glob.glob(data_path + nicedate[i] + '/' + '*' + obsnums[i] + '*optimal*')
 #             if len(files_found) == 1:
@@ -251,12 +257,15 @@ def check_all_shifts_with_telemetry(nx=4112, save_M=False, save_shifts=False, ve
             hmd_int.append(h['HMDINT'])
             hmd_ext.append(h['HMDEXT'])
             hmd_rm.append(h['HMDRM'])
+            det_temp.append(h['DETTEMP'])
+            cryotemp.append(h['CRYOTEMP'])
+            heater_load.append(h['DETHTLD'])
             
             # keep track of which files could be cross-matched
             good_peakfiles.append(file)
             
         else:
-            print('No reduced spectrum found for ' + obsnums[i])
+            print('No raw spectrum found for ' + obsnums[i])
             
         # read in reference LFC peaks
         _, yref, xref, _, _, _, _, _, _, _, _ = readcol(peak_path + '21sep30019olc.nst', twod=False, skipline=2)    
