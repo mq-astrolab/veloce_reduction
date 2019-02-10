@@ -182,8 +182,8 @@ def get_multiple_fibre_profiles_single_order(sc, sr, err_sc, ordpol, ordmask=Non
             if debug_level >=1 :
                 print('Number of fibres found: ',len(goodpeaks))
 
-            # if len(goodpeaks) != nfib :
-            if (len(allpeaks) != nfib) and (len(goodpeaks) != nfib):
+            if len(goodpeaks) != nfib :
+            # if (len(allpeaks) != nfib) and (len(goodpeaks) != nfib):
                 print('ERROR: not all peaks found!!!')
                 print('pix = ', pix)
 
@@ -207,7 +207,7 @@ def get_multiple_fibre_profiles_single_order(sc, sr, err_sc, ordpol, ordmask=Non
                 upper_bounds = []
                 for n in range(npeaks):
                     if varbeta:
-                        guess.append(np.array([peaks[n], 1., normdata[goodpeaks[n]], 2.]))
+                        guess.append(np.array([peaks[n], 0.7, normdata[goodpeaks[n]], 2.]))
                         lower_bounds.append([peaks[n] - 1, 0, 0, 1])
                         upper_bounds.append([peaks[n] + 1, np.inf, np.inf, 4])
                     else:
