@@ -835,7 +835,7 @@ def optimal_extraction_from_indices(img, stripe_indices, err_img=None, RON=0., s
 
 
 def extract_spectrum(stripes, err_stripes, ron_stripes, method='optimal', individual_fibres=True, combined_profiles=False, integrate_profiles=False, slope=False,
-                     offset=False, fibs='all', slit_height=25, RON=0., savefile=False, filetype='fits', obsname=None, path=None, simu=False, verbose=False, timit=False, debug_level=0):
+                     offset=False, fibs='all', slit_height=25, RON=0., savefile=False, filetype='fits', obsname=None, date=None, path=None, simu=False, verbose=False, timit=False, debug_level=0):
     """
     This routine is simply a wrapper code for the different extraction methods. There are a total FIVE (1,2,3a,3b,3c) different extraction methods implemented, 
     which can be selected by a combination of the 'method', individual_fibres', and 'combined_profile' keyword arguments.
@@ -880,6 +880,7 @@ def extract_spectrum(stripes, err_stripes, ron_stripes, method='optimal', indivi
     'savefile'           : boolean - do you want to save the extracted spectrum to a file? 
     'filetype'           : if 'savefile' is set to TRUE: do you want to save it as a 'fits' file, or as a 'dict' (python disctionary), or 'both'
     'obsname'            : (short) name of observation file
+    'date'               : the date of the observations to be extracted in format 'YYYYMMDD' (needed for the optimal extraction routine to select the right fibre profiles/traces)
     'path'               : directory to the destination of the output file
     'simu'               : boolean - are you using ES-simulated spectra???
     'verbose'            : boolean - for debugging...
@@ -911,7 +912,7 @@ def extract_spectrum(stripes, err_stripes, ron_stripes, method='optimal', indivi
         #pix,flux,err = collapse_extract(stripes, err_stripes, tramlines, slit_height=slit_height, verbose=verbose, timit=timit, debug_level=debug_level)
     elif method.lower() == 'optimal':
         pix,flux,err = optimal_extraction(stripes, err_stripes=err_stripes, ron_stripes=ron_stripes, RON=RON, slit_height=slit_height, individual_fibres=individual_fibres,
-                                          combined_profiles=combined_profiles, integrate_profiles=integrate_profiles, slope=slope, offset=offset, fibs=fibs, simu=simu, timit=timit, debug_level=debug_level) 
+                                          combined_profiles=combined_profiles, integrate_profiles=integrate_profiles, slope=slope, offset=offset, fibs=fibs, date=date, simu=simu, timit=timit, debug_level=debug_level)
     else:
         print('ERROR: Nightmare! That should never happen  --  must be an error in the Matrix...')
         return    
@@ -1000,7 +1001,7 @@ def extract_spectrum(stripes, err_stripes, ron_stripes, method='optimal', indivi
 
 
 def extract_spectrum_from_indices(img, err_img, stripe_indices, method='optimal', individual_fibres=True, combined_profiles=False, integrate_profiles=False, slope=False,
-                                  offset=False, fibs='all', slit_height=25, RON=0., savefile=False, filetype='fits', obsname=None, path=None, simu=False, verbose=False, timit=False, debug_level=0):
+                                  offset=False, fibs='all', slit_height=25, RON=0., savefile=False, filetype='fits', obsname=None, date=None, path=None, simu=False, verbose=False, timit=False, debug_level=0):
     """
     CLONE OF 'extract_spectrum'!
     This routine is simply a wrapper code for the different extraction methods. There are a total FIVE (1,2,3a,3b,3c) different extraction methods implemented, 
@@ -1046,6 +1047,7 @@ def extract_spectrum_from_indices(img, err_img, stripe_indices, method='optimal'
     'savefile'           : boolean - do you want to save the extracted spectrum to a file? 
     'filetype'           : if 'savefile' is set to TRUE: do you want to save it as a 'fits' file, or as a 'dict' (python disctionary)
     'obsname'            : (short) name of observation file
+    'date'               : the date of the observations to be extracted in format 'YYYYMMDD' (needed for the optimal extraction routine to select the right fibre profiles/traces)
     'path'               : directory to the destination of the output file
     'simu'               : boolean - are you using ES-simulated spectra???
     'verbose'            : boolean - for debugging...
@@ -1077,7 +1079,7 @@ def extract_spectrum_from_indices(img, err_img, stripe_indices, method='optimal'
     elif method.lower() == 'optimal':
         pix,flux,err = optimal_extraction_from_indices(img, stripe_indices, err_img=err_img, RON=RON, slit_height=slit_height, individual_fibres=individual_fibres,
                                                        combined_profiles=combined_profiles, integrate_profiles=integrate_profiles, slope=slope, offset=offset, fibs=fibs, 
-                                                       simu=simu, timit=timit, debug_level=debug_level) 
+                                                       date=date, simu=simu, timit=timit, debug_level=debug_level)
     else:
         print('ERROR: Nightmare! That should never happen  --  must be an error in the Matrix...')
         return    

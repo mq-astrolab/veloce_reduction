@@ -191,7 +191,7 @@ def process_whites(white_list, MB=None, ronmask=None, MD=None, gain=None, scalab
 
 
 def process_science_images(imglist, P_id, mask=None, sampling_size=25, slit_height=25, gain=[1.,1.,1.,1.], MB=None, ronmask=None, MD=None, scalable=False, saveall=False, path=None, ext_method='optimal', 
-                           from_indices=True, slope=True, offset=True, fibs='all', timit=False):
+                           from_indices=True, slope=True, offset=True, fibs='all', date=None, timit=False):
     """
     Process all science images. This includes:
     
@@ -280,12 +280,12 @@ def process_science_images(imglist, P_id, mask=None, sampling_size=25, slit_heig
         # (6) perform extraction of 1-dim spectrum
         if from_indices:
             pix,flux,err = extract_spectrum_from_indices(final_img, err_img, stripe_indices, method='quick', slit_height=slit_height, RON=ronmask, savefile=True,
-                                                         filetype='fits', obsname=obsname, path=path, timit=True)
+                                                         filetype='fits', obsname=obsname, date=date, path=path, timit=True)
             pix,flux,err = extract_spectrum_from_indices(final_img, err_img, stripe_indices, method=ext_method, slope=slope, offset=offset, fibs=fibs, slit_height=slit_height, 
-                                                         RON=ronmask, savefile=True, filetype='fits', obsname=obsname, path=path, timit=True)
+                                                         RON=ronmask, savefile=True, filetype='fits', obsname=obsname, date=date, path=path, timit=True)
         else:
             pix2,flux2,err2 = extract_spectrum(stripes, err_stripes=err_stripes, ron_stripes=ron_stripes, method=ext_method, slope=slope, offset=offset, fibs=fibs, 
-                                               slit_height=slit_height, RON=ronmask, savefile=False, filetype='fits', obsname=obsname, path=path, timit=True)
+                                               slit_height=slit_height, RON=ronmask, savefile=False, filetype='fits', obsname=obsname, date=date, path=path, timit=True)
     
 #         # (7) get relative intensities of different fibres
 #         if from_indices:

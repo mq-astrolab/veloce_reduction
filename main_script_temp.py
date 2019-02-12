@@ -23,14 +23,15 @@ from veloce_reduction.veloce_reduction.calibration import get_bias_and_readnoise
 from veloce_reduction.veloce_reduction.order_tracing import find_stripes, make_P_id, make_mask_dict, extract_stripes #, find_tramlines
 from veloce_reduction.veloce_reduction.spatial_profiles import fit_profiles, fit_profiles_from_indices
 from veloce_reduction.veloce_reduction.extraction import *
-from veloce_reduction.process_scripts import process_whites, process_science_images
+from veloce_reduction.veloce_reduction.process_scripts import process_whites, process_science_images
 
 
+date = '20180917'
 
 # desktop:
-path = '/Volumes/BERGRAID/data/veloce/raw_goodonly/20180918/'
+# path = '/Volumes/BERGRAID/data/veloce/raw_goodonly/' + date + '/'
 # laptop:
-path = '/Users/christoph/data/raw_goodonly/20180919/'
+path = '/Users/christoph/data/raw_goodonly/' + date + '/'
 
 
 
@@ -80,7 +81,11 @@ gain = [1., 1.095, 1.125, 1.]   # eye-balled from extracted flat fields
 # (i) BIAS 
 # get offsets and read-out noise
 #either from bias frames (units: [offsets] = ADUs; [RON] = e-)
-medbias,coeffs,offsets,rons = get_bias_and_readnoise_from_bias_frames(sorted(bias_list)[0:9], degpol=5, clip=5., gain=gain, save_medimg=True, debug_level=1, timit=True)
+if len(bias_list) > 9:
+    bias_list = sorted(bias_list)[0:9]
+else:
+    bias_list = sorted(bias_list)
+medbias,coeffs,offsets,rons = get_bias_and_readnoise_from_bias_frames(bias_list, degpol=5, clip=5., gain=gain, save_medimg=True, debug_level=1, timit=True)
 #or from the overscan regions
 
 # create MASTER BIAS frame and read-out noise mask (units = ADUs)
@@ -96,8 +101,8 @@ MB = make_master_bias_from_coeffs(coeffs, nx, ny, savefile=True, path=path, timi
 # (ii) DARKS
 # create (bias-subtracted) MASTER DARK frame (units = electrons)
 # MD = make_master_dark(dark_list, MB=MB, gain=gain, scalable=False, savefile=True, path=path, timit=True)
-MDS = make_master_dark(dark_list, MB=medbias, gain=gain, scalable=True, savefile=True, path=path, debug_level=1, timit=True)
-# MDS = np.zeros(MB.shape)
+# MDS = make_master_dark(dark_list, MB=medbias, gain=gain, scalable=True, savefile=True, path=path, debug_level=1, timit=True)
+MDS = np.zeros(MB.shape)
 
 # (iii) WHITES 
 #create (bias- & dark-subtracted) MASTER WHITE frame and corresponding error array (units = electrons)
@@ -112,6 +117,7 @@ MW,err_MW = process_whites(flat_list, MB=medbias, ronmask=ronmask, MD=MDS, gain=
 #P,tempmask = find_stripes(MW, deg_polynomial=2, min_peak=0.05, gauss_filter_sigma=3., simu=False)
 P,tempmask = find_stripes(MW, deg_polynomial=2, min_peak=0.05, gauss_filter_sigma=10., simu=False, maskthresh = 400)
 # assign physical diffraction order numbers (this is only a dummy function for now) to order-fit polynomials and bad-region masks
+assert len(P_id_dum) == 39, 'ERROR: not exactly 39 orders found!!!'
 P_id_dum = make_P_id(P)
 mask = make_mask_dict(tempmask)
 P_id = copy.deepcopy(P_id_dum)
@@ -122,9 +128,9 @@ np.save(path + 'P_id.npy', P_id)
 # extract stripes of user-defined width from the science image, centred on the polynomial fits defined in step (1)
 MW_stripes,MW_indices = extract_stripes(MW, P_id, return_indices=True, slit_height=30)
 pix,flux,err = extract_spectrum_from_indices(MW, err_MW, MW_indices, method='quick', slit_height=30, RON=ronmask,
-                                             savefile=True, filetype='fits', obsname='master_white', path=path, timit=True)
+                                             savefile=True, filetype='fits', obsname='master_white', date=date, path=path, timit=True)
 pix,flux,err = extract_spectrum_from_indices(MW, err_MW, MW_indices, method='optimal', slope=True, offset=True, fibs='all', slit_height=30,
-                                             RON=ronmask, savefile=True, filetype='fits', obsname='master_white', path=path, timit=True)
+                                             RON=ronmask, savefile=True, filetype='fits', obsname='master_white', date=date, path=path, timit=True)
 #####################################################################################################################################################
 
 
