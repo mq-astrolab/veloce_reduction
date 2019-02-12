@@ -310,12 +310,15 @@ def collapse_extract_from_indices(img, err_img, stripe_indices, tramlines, slit_
 
 def optimal_extraction(stripes, err_stripes=None, ron_stripes=None, RON=0., slit_height=25, phi_onthefly=False,
                        timit=False, simu=False, individual_fibres=True, combined_profiles=False, integrate_profiles=False, 
-                       slope=False, offset=False, fibs='all', relints=None, collapse=False, debug_level=0):
+                       slope=False, offset=False, fibs='all', date=None, relints=None, collapse=False, debug_level=0):
     # if error array is not provided, then RON and gain must be provided (but this is bad because that way we don't
     # know about large errors for cosmic-corrected pixels etc)
 
     if timit:
         start_time = time.time()
+
+    if date is None:
+        date = raw_input("Please enter date of observations 'YYYYMMDD': ")
 
     if err_stripes is None:
         print('WARNING: errors not provided! Using sqrt(RON**2 + flux) as an estimate...')
@@ -341,7 +344,8 @@ def optimal_extraction(stripes, err_stripes=None, ron_stripes=None, RON=0., slit
         # fibparms = np.load('/Users/christoph/OneDrive - UNSW/fibre_profiles/real/first_real_veloce_test_fps.npy').item()
         # fibparms = np.load('/Users/christoph/OneDrive - UNSW/fibre_profiles/real/from_master_white_40orders.npy').item()
         # fibparms = np.load('/Users/christoph/OneDrive - UNSW/fibre_profiles/fibre_profile_fits_20180925.npy').item()
-        fibparms = np.load('/Users/christoph/OneDrive - UNSW/fibre_profiles/fibre_profile_fits_20181107.npy').item()
+        # fibparms = np.load('/Users/christoph/OneDrive - UNSW/fibre_profiles/fibre_profile_fits_20181107.npy').item()
+        fibparms = np.load('/Users/christoph/OneDrive - UNSW/fibre_profiles/archive/fibre_profile_fits_' + date + '.npy').item()
 
     flux = {}
     err = {}
@@ -567,12 +571,15 @@ def optimal_extraction(stripes, err_stripes=None, ron_stripes=None, RON=0., slit
 def optimal_extraction_from_indices(img, stripe_indices, err_img=None, RON=0., slit_height=25,
                                     phi_onthefly=False, timit=False, simu=False, individual_fibres=True,
                                     combined_profiles=False, integrate_profiles=False, slope=False, offset=False,
-                                    fibs='all', relints=None, collapse=False, debug_level=0):
+                                    fibs='all', date=None, relints=None, collapse=False, debug_level=0):
     # if error array is not provided, then RON and gain must be provided (but this is bad because that way we don't
     # know about large errors for cosmic-correctdd pixels etc)
 
     if timit:
         start_time = time.time()
+
+    if date is None:
+        date = raw_input("Please enter date of observations 'YYYYMMDD': ")
 
     if err_img is None:
         print('WARNING: errors not provided! Using sqrt(flux + RON**2) as an estimate...')
@@ -598,8 +605,8 @@ def optimal_extraction_from_indices(img, stripe_indices, err_img=None, RON=0., s
         # fibparms = np.load('/Users/christoph/OneDrive - UNSW/fibre_profiles/real/first_real_veloce_test_fps.npy').item()
         # fibparms = np.load('/Users/christoph/OneDrive - UNSW/fibre_profiles/real/from_master_white_40orders.npy').item()
         # fibparms = np.load('/Users/christoph/OneDrive - UNSW/fibre_profiles/fibre_profile_fits_20180925.npy').item()
-        print('Oha! Loading NEWest fibre profile parameters...')
-        fibparms = np.load('/Users/christoph/OneDrive - UNSW/fibre_profiles/fibre_profile_fits_20181107.npy').item()
+        # fibparms = np.load('/Users/christoph/OneDrive - UNSW/fibre_profiles/fibre_profile_fits_20181107.npy').item()
+        fibparms = np.load('/Users/christoph/OneDrive - UNSW/fibre_profiles/archive/fibre_profile_fits_' + date + '.npy').item()
 
     flux = {}
     err = {}
