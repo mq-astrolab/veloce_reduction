@@ -128,7 +128,7 @@ np.save(path + 'P_id.npy', P_id)
 # extract stripes of user-defined width from the science image, centred on the polynomial fits defined in step (1)
 MW_stripes,MW_indices = extract_stripes(MW, P_id, return_indices=True, slit_height=30)
 pix,flux,err = extract_spectrum_from_indices(MW, err_MW, MW_indices, method='quick', slit_height=30, RON=ronmask,
-                                             savefile=True, filetype='fits', obsname='master_white', date=date, path=path, timit=True)
+                                             savefile=True, filetype='fits', obsname='master_white', path=path, timit=True)
 pix,flux,err = extract_spectrum_from_indices(MW, err_MW, MW_indices, method='optimal', slope=True, offset=True, fibs='all', slit_height=30,
                                              RON=ronmask, savefile=True, filetype='fits', obsname='master_white', date=date, path=path, timit=True)
 #####################################################################################################################################################

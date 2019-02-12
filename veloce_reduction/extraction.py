@@ -346,6 +346,7 @@ def optimal_extraction(stripes, err_stripes=None, ron_stripes=None, RON=0., slit
         # fibparms = np.load('/Users/christoph/OneDrive - UNSW/fibre_profiles/fibre_profile_fits_20180925.npy').item()
         # fibparms = np.load('/Users/christoph/OneDrive - UNSW/fibre_profiles/fibre_profile_fits_20181107.npy').item()
         fibparms = np.load('/Users/christoph/OneDrive - UNSW/fibre_profiles/archive/fibre_profile_fits_' + date + '.npy').item()
+        print('OK, loading fibre profiles for ' + date + '...')
 
     flux = {}
     err = {}
@@ -607,6 +608,7 @@ def optimal_extraction_from_indices(img, stripe_indices, err_img=None, RON=0., s
         # fibparms = np.load('/Users/christoph/OneDrive - UNSW/fibre_profiles/fibre_profile_fits_20180925.npy').item()
         # fibparms = np.load('/Users/christoph/OneDrive - UNSW/fibre_profiles/fibre_profile_fits_20181107.npy').item()
         fibparms = np.load('/Users/christoph/OneDrive - UNSW/fibre_profiles/archive/fibre_profile_fits_' + date + '.npy').item()
+        print('OK, loading fibre profiles for ' + date + '...')
 
     flux = {}
     err = {}
