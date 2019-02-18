@@ -38,8 +38,13 @@ def get_barycentric_correction(fn, starname='tauceti', h=0.01, w=0.01):
 
     # use 2015.5 as an epoch (Gaia DR2)
     epoch = 2457206.375
-
+    
+    # get UT obs start time
     utmjd = pyfits.getval(fn, 'UTMJD') + 2.4e6 + 0.5   # the fits header has 2,400,000.5 subtracted!!!!!
+    # add half the exposure time in days
+    texp = pyfits.getval(fn, 'TOTALEXP')
+    utmjd = utmjd + (texp/2.)/86400.
+    
     # ra = pyfits.getval(fn, 'MEANRA')
     # dec = pyfits.getval(fn, 'MEANDEC')
     if starname.lower() == 'tauceti':
@@ -56,7 +61,7 @@ def get_barycentric_correction(fn, starname='tauceti', h=0.01, w=0.01):
         w=0.005
     else:
         fu=1
-        assert fu != 1, 'ERROR: need to implement thjat first...'
+        assert fu != 1, 'ERROR: need to implement that first...'
 
     coord = SkyCoord(ra=ra, dec=dec, unit=(u.degree, u.degree), frame='icrs')
     width = u.Quantity(w, u.deg)

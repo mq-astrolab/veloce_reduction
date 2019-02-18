@@ -1362,8 +1362,10 @@ def define_arc_mask(lamptype, n_ord):
     if lamptype.lower() == 'thar':
         mask[1, 3060:3140] = True
         mask[2, 2340:2590] = True
+        mask[6, 1100:1230] = True
         mask[7, 1650:1870] = True
         mask[7, 3550:3670] = True
+        mask[7, 3850:3945] = True
         mask[8, 1180:1450] = True
         mask[8, 1560:1830] = True
         mask[9, 2260:2420] = True
@@ -1384,7 +1386,25 @@ def define_arc_mask(lamptype, n_ord):
         mask[23, 1850:2050] = True
         mask[24, 1390:1765] = True
     elif lamptype.lower() == 'thxe':
-        print('WARNING: masks for ThXe lamp are not defined yet!!!!!')
+        mask[2, 1520:1800] = True
+        mask[3, 1240:1360] = True
+        mask[3, 3060:3155] = True
+        mask[4, 240:390] = True
+        mask[4, 850:920] = True
+        mask[4, 1390:1445] = True
+        mask[4, 2340:2430] = True
+        mask[4, 3020:3212] = True
+        mask[5, 300:540] = True
+        mask[5, 2260:2350] = True
+        mask[8, 1630:1750] = True
+        mask[8, 2935:3000] = True
+        mask[9, 1880:2105] = True
+        mask[9, 2900:3100] = True
+        mask[10, 350:550] = True
+        mask[11, 2080:2180] = True
+        mask[15, 2335:2445] = True
+        mask[16, 1450:1570] = True
+        mask[21, 2120:2180] = True
     else:
         print('ERROR: lamp type must either be "ThAr" or "ThXe"!!!')
         return -1
@@ -1550,6 +1570,9 @@ def get_dispsol_from_known_lines(thflux, fibre=None, fitwidth=4, satmask=None, l
                                  sigma_0=0.85, minamp=0., maxamp=np.inf, return_all_pars=False, deg_spectral=7, deg_spatial=7,
                                  polytype='chebyshev', return_full=True, savetable=True, outpath=None, debug_level=0, timit=False):
 
+    if timit:
+        start_time = time.time()
+
     #read master table
     linenum, order, m, pix, wlref, vac_wlref, _, _, _, _ = readcol('/Users/christoph/OneDrive - UNSW/linelists/thar_lines_used_in_7x7_fit_as_of_2018-10-19.dat', twod=False, skipline=2)
     del _
@@ -1704,6 +1727,9 @@ def get_dispsol_from_known_lines(thflux, fibre=None, fitwidth=4, satmask=None, l
             outfile.write("   %3d             %2d                 %3d           %11.6f     %11.6f     %11.6f \n" #     %11.6f       %11.6f    %11.6f    %11.6f\n" 
                          %(i+1, all_order_correct_format[i]+1, all_order_correct_format[i]+65, x[i], lam[i], vac_lam[i])) #, model_wl_air[i], model_wl_vac[i], resid_air[i], resid_vac[i]))
         outfile.close()                                                                                                                                                                     
+
+    if timit:
+        print('Time elapsed: ',time.time() - start_time,' seconds')
 
     # evaluate for every pixel along each order
     if return_full:
@@ -2146,6 +2172,8 @@ def get_dispsol_for_all_fibs_2(obsname, relto='LFC', degpol=7, fibs='stellar', n
         wl = wl[:, 2:21, :]
 
     return wldict, wl
+
+
 
 
 

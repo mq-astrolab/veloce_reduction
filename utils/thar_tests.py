@@ -558,8 +558,35 @@ for i in range(24):
 ####################################################################################################################################
 
     
+#######
+
+# finding ThAr / ThXe regions to mask out
+spec_fn = '/Volumes/BERGRAID/data/veloce/reduced/20181115/ARC - ThAr_15nov30003_optimal3a_extracted.fits'
+thxespec = pyfits.getdata(thxespec_fn)
+thxeflux = np.sum(thxespec, axis=1)
+
+tharspec_fn = '/Users/christoph/OneDrive - UNSW/dispsol_tests/20180917/ARC_ThAr_17sep30080_optimal3a_extracted_with_slope_and_offset.fits'
+tharspec = pyfits.getdata(tharspec_fn)
+tharflux = np.sum(spec, axis=1)
+
+linenum, order, m, pix, wlref, vac_wlref, _, _, _, _ = readcol('/Users/christoph/OneDrive - UNSW/linelists/thar_lines_used_in_7x7_fit_as_of_2018-10-19.dat', twod=False, skipline=2)
+
+i=0
+
+i += 1
+
+mord = (i+1) + 64
+ix = np.argwhere(m == mord).flatten()
+ord_pix = pix[ix]
+
+plt.plot(tharflux[i,:], 'r', label='ThAr')
+plt.plot(thxeflux[i,:], 'b', label='ThXe')
+plt.title('Order_'+str(i+1).zfill(2) + '   (i='+str(i)+')')
+plt.legend()
+for p in ord_pix:
+    plt.axvline(p, color='gray', linestyle=':')
     
-    
+#######
     
     
 

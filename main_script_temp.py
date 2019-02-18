@@ -156,9 +156,9 @@ pix,flux,err = extract_spectrum_from_indices(MW, err_MW, MW_indices, method='opt
 
 # (4) PROCESS SCIENCE IMAGES
 dum = process_science_images(arc_list, P_id, mask=mask, sampling_size=25, slit_height=30, gain=gain, MB=medbias, ronmask=ronmask, MD=MDS, scalable=True,
-                             saveall=False, path=path, ext_method='optimal', offset='True', slope='True', fibs='all', from_indices=True, timit=True)
+                             saveall=False, path=path, ext_method='optimal', offset='True', slope='True', fibs='all', date=date, from_indices=True, timit=True)
 dum = process_science_images(stellar_list, P_id, mask=mask, sampling_size=25, slit_height=24, gain=gain, MB=medbias, ronmask=ronmask, MD=MDS, scalable=True, 
-                             saveall=False, path=path, ext_method='optimal', offset='True', slope='True', fibs='stellar', from_indices=True, timit=True)
+                             saveall=False, path=path, ext_method='optimal', offset='True', slope='True', fibs='stellar', date=date, from_indices=True, timit=True)
 
 
 
