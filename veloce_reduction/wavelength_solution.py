@@ -17,6 +17,8 @@ from lmfit.models import DampedOscillatorModel, DampedHarmonicOscillatorModel, E
 from readcol import readcol 
 import datetime
 import astropy.io.fits as pyfits
+import os
+import glob
 
 from veloce_reduction.veloce_reduction.helper_functions import fibmodel_with_amp, CMB_pure_gaussian, multi_fibmodel_with_amp, CMB_multi_gaussian, offset_pseudo_gausslike
 from veloce_reduction.veloce_reduction.helper_functions import fit_poly_surface_2D, single_sigma_clip, find_nearest, gaussian_with_offset_and_slope, fibmodel_with_amp_and_offset
@@ -1566,7 +1568,7 @@ def xcorr_thflux(thflux, thflux2, scale=300., masking=True, satmask=None, lampty
 
 
 
-def get_dispsol_from_known_lines(thflux, fibre=None, fitwidth=4, satmask=None, lamptype='thar', minsigma=0.4, maxsigma=2.,
+def get_dispsol_from_known_lines(thflux, fibre=None, fitwidth=4, search_width=None, satmask=None, lamptype='thar', minsigma=0.4, maxsigma=2.,
                                  sigma_0=0.85, minamp=0., maxamp=np.inf, return_all_pars=False, deg_spectral=7, deg_spatial=7,
                                  polytype='chebyshev', return_full=True, savetable=True, outpath=None, debug_level=0, timit=False):
 
@@ -1593,16 +1595,18 @@ def get_dispsol_from_known_lines(thflux, fibre=None, fitwidth=4, satmask=None, l
         n_ord = thflux.shape[0]
         satmask = define_arc_mask(lamptype, n_ord)
    
+    if search_width is None:
+        search_width = fitwidth 
    
     # loop over all orders
     for ord in range(thflux.shape[0]):
-    
+        
         # order numbers for output file
         ordnum = str(ord+1).zfill(2)
         mord = (ord+1) + 64
     
         if debug_level >= 1:
-            print('Order ' + ordnum)
+            print('Processing Order_' + ordnum)
         
         #define raw 1-dim data
         raw_data = thflux[ord,:]
@@ -1636,18 +1640,21 @@ def get_dispsol_from_known_lines(thflux, fibre=None, fitwidth=4, satmask=None, l
             if debug_level >= 2:
                 print(xguess)
             peaks = np.r_[int(np.round(xguess, 0))] 
-            xrange = xx[np.max([0,peaks[0] - fitwidth]) : np.min([peaks[-1] + fitwidth + 1,len(data)-1])] 
+            search_range = xx[np.max([0,peaks[0] - fitwidth]) : np.min([peaks[-1] + fitwidth + 1,len(data)-1])] 
 #             guess = np.array([xguess, sigma_0, data[int(np.round(xguess, 0))], np.min(data[xrange]), 0.])
 #             popt, pcov = op.curve_fit(gaussian_with_offset_and_slope, xrange, data[xrange], p0=guess, bounds=([xguess-2,minsigma,minamp,-np.inf,-np.inf],[xguess+2,maxsigma,maxamp,np.inf,np.inf]))
+            
+            peak_found = search_range[np.argmax(data[search_range])]
+            xrange = xx[np.max([0,peak_found - fitwidth]) : np.min([peak_found + fitwidth + 1,len(data)-1])] 
             # shift the peak to roughly zero, so that offset has sensible values 
-            guess = np.array([xguess - peaks, sigma_0, np.max(data[xrange]), np.min(data[xrange]), 0.])
+            guess = np.array([0, sigma_0, np.max(data[xrange]), np.min(data[xrange]), 0.])
             try:
-                popt, pcov = op.curve_fit(gaussian_with_offset_and_slope, xrange - peaks, data[xrange], p0=guess, 
-                                          bounds=([xguess-peaks-2,minsigma,minamp,-np.inf,-np.inf], [xguess-peaks+2,maxsigma,maxamp,np.inf,np.inf]))
+                popt, pcov = op.curve_fit(gaussian_with_offset_and_slope, xrange - peak_found, data[xrange], p0=guess, 
+                                          bounds=([-2,minsigma,minamp,-np.inf,-np.inf], [2,maxsigma,maxamp,np.inf,np.inf]))
                 
                 # remove rubbish fits (very low signal)
                 if popt[2] > 50 and np.max(data[xrange]) > 30:
-                    new_ord_pix.append(popt[0] + peaks)
+                    new_ord_pix.append(popt[0] + peak_found)
                     new_ord_wl.append(wl)
                     new_ord_vac_wl.append(vac_wl)
                     new_ord_order.append(ord)
@@ -1657,16 +1664,18 @@ def get_dispsol_from_known_lines(thflux, fibre=None, fitwidth=4, satmask=None, l
                         new_ord_offset.append(popt[3])
                         new_ord_slope.append(popt[4])
                 else:
-                    print('WARNING: not enough signal to fit a good peak at location', xguess)
+                    if debug_level >= 1:
+                        print('WARNING: not enough signal to fit a good peak at location', xguess)
                     
             except RuntimeError:
-                print('WARNING: failed to fit a peak at location', xguess)
+                if debug_level >= 1:
+                    print('WARNING: failed to fit a peak at location', xguess)
                 
 #             # plot a single fit for debugging
 #             plot_osf = 10
-#             plot_os_grid = np.linspace((xrange-peaks)[0], (xrange-peaks)[-1], plot_osf * (len(xrange)-1) + 1)
-#             plt.plot(xx-peaks, data,'b.-')
-#             plt.plot(xrange-peaks, data[xrange],'y.-')
+#             plot_os_grid = np.linspace((xrange-peak_found)[0], (xrange-peak_found)[-1], plot_osf * (len(xrange)-1) + 1)
+#             plt.plot(xx-peak_found, data,'b.-')
+#             plt.plot(xrange-peak_found, data[xrange],'y.-')
 #             plt.xlim(-10,10)
 #             plt.ylim(np.min(data[xrange]) - 0.25 * (np.max(data[xrange] - np.min(data[xrange]))), np.max(data[xrange]) + 0.25 * (np.max(data[xrange] - np.min(data[xrange])))) 
 #             plt.plot(plot_os_grid, gaussian_with_offset_and_slope(plot_os_grid, *guess),'r--', label='initial guess')
@@ -2172,6 +2181,96 @@ def get_dispsol_for_all_fibs_2(obsname, relto='LFC', degpol=7, fibs='stellar', n
         wl = wl[:, 2:21, :]
 
     return wldict, wl
+
+
+
+
+def make_master_fibth(date=None):
+    
+    # make sure we have an existing date
+    if date is None:
+        ok=0
+        while ok == 0:
+            date = raw_input("Please enter date of observations (YYYYMMDD): ")
+            # check if file directory exists
+            if os.path.isdir("/Volumes/BERGRAID/data/veloce/reduced/" + date + "/"):
+                ok = 1
+    
+    path = "/Volumes/BERGRAID/data/veloce/reduced/" + date + "/"
+                
+    # list of all Fibre Thoriums (ThAr for 20180917 or ThXe for all later nights)
+    arc_list = glob.glob(path + 'ARC*optimal*')
+    if len(arc_list) == 0:
+        print('No Fibre Thoriums (ARC) exposures found for '+date+' !!!')
+        return []
+    
+    for i,fn in enumerate(arc_list):
+        red_arc_spec = pyfits.getdata(fn)
+        if i == 0:
+            master_arc = red_arc_spec.copy()
+        else:
+            master_arc = master_arc + red_arc_spec
+    del red_arc_spec
+    
+    return master_arc
+
+
+
+
+def make_arc_dispsols_for_all_nights(outpath='/Users/christoph/OneDrive - UNSW/dispsol/arc_dispsols/', 
+                                     deg_spectral=7, deg_spatial=7, polytype='chebyshev', overwrite=False, save_individual=False):
+    
+    # get list of all nights
+    datedir_list = glob.glob('/Volumes/BERGRAID/data/veloce/reduced/20*')
+    datedir_list.sort()
+
+#     fibslot = [0,1,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,23,24,25]
+    fibname = ['S5', 'S2', '07', '18', '17', '06', '16', '15', '05', '14', '13', '01', '12', '11', '04', '10', '09', '03', '08', '19', '02', 'S4', 'S3', 'S1']
+
+    # loop over all nights
+    for datedir in datedir_list:
+        datedir += '/'
+        date = datedir[-9:-1]
+        print('Creating ARC wavelength solution for ' + date + ' ...')
+        
+        # make master arc for that night
+        master_arc = make_master_fibth(date=date)
+        if master_arc == []:
+            continue
+        
+        # prepare output array
+        all_air_wl = np.zeros(master_arc.shape)
+        
+        # loop over all fibres
+        for fib in range(master_arc.shape[1]):
+            
+            print('Processing fibre ' + fibname[fib])
+            
+            # spectrum for that particular fibre
+            thflux = master_arc[:,fib,:]
+            
+            # what kind of arc lamp is it?
+            if date == '20180917':
+                lamptype = 'thar'
+            else:
+                lamptype = 'thxe'
+            
+            # calculate wl-solution    
+            air_wl, vac_wl = get_dispsol_from_known_lines(thflux, lamptype=lamptype, deg_spectral=deg_spectral, deg_spatial=deg_spatial,
+                                                          polytype=polytype, return_full=True, savetable=False, debug_level=0, timit=False)
+            
+            # save to all-fibres-combined array
+            all_air_wl[:,fib,:] = air_wl[:-1,:].copy()     # do NOT include the blue-most order
+            
+            # save to individual-fibre fits file(s)
+            if save_individual:
+                pyfits.writeto(outpath + lamptype + '_dispsol_' + date + '_fibre_' + fibname[fib] + '.fits', air_wl, clobber=overwrite)
+                
+        # save to all-fibres-combined fits file
+        pyfits.writeto(outpath + lamptype + '_dispsol_' + date + '.fits', all_air_wl, clobber=overwrite)
+        
+    return
+
 
 
 

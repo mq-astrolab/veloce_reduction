@@ -561,13 +561,13 @@ for i in range(24):
 #######
 
 # finding ThAr / ThXe regions to mask out
-spec_fn = '/Volumes/BERGRAID/data/veloce/reduced/20181115/ARC - ThAr_15nov30003_optimal3a_extracted.fits'
+thxespec_fn = '/Volumes/BERGRAID/data/veloce/reduced/20181115/ARC - ThAr_15nov30003_optimal3a_extracted.fits'
 thxespec = pyfits.getdata(thxespec_fn)
 thxeflux = np.sum(thxespec, axis=1)
 
 tharspec_fn = '/Users/christoph/OneDrive - UNSW/dispsol_tests/20180917/ARC_ThAr_17sep30080_optimal3a_extracted_with_slope_and_offset.fits'
 tharspec = pyfits.getdata(tharspec_fn)
-tharflux = np.sum(spec, axis=1)
+tharflux = np.sum(tharspec, axis=1)
 
 linenum, order, m, pix, wlref, vac_wlref, _, _, _, _ = readcol('/Users/christoph/OneDrive - UNSW/linelists/thar_lines_used_in_7x7_fit_as_of_2018-10-19.dat', twod=False, skipline=2)
 
