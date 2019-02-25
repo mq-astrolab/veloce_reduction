@@ -13,14 +13,18 @@ from veloce_reduction.veloce_reduction.barycentric_correction import get_barycen
 
 ########################################################################################################################
 # HOUSEKEEPING
-# path = '/Users/christoph/data/reduced/tauceti/tauceti_with_LFC/'
-path = '/Volumes/BERGRAID/data/veloce/reduced/tauceti/tauceti_with_LFC/'
+path = '/Users/christoph/data/reduced/tauceti/tauceti_with_LFC/'
+# path = '/Volumes/BERGRAID/data/veloce/reduced/tauceti/tauceti_with_LFC/'
 
-files = glob.glob(path + '*10700*')
+files_sep = glob.glob(path + 'sep2018/' + '*10700*')
+files_nov = glob.glob(path + 'nov2018/' + '*10700*')
+files_jan = glob.glob(path + 'jan2019/' + '*10700*')
 
+files = []
 # sort list of files
+# for tempfiles in [files_sep, files_nov, files_jan]:
 all_shortnames = []
-for i,filename in enumerate(files):
+for i,filename in enumerate(tempfiles):
     dum = filename.split('/')
     dum2 = dum[-1].split('.')
     dum3 = dum2[0]
@@ -28,10 +32,13 @@ for i,filename in enumerate(files):
     shortname = dum4[1]
     all_shortnames.append(shortname)
 sortix = np.argsort(all_shortnames)
-files = np.array(files)
-files = files[sortix]
+tempfiles = np.array(tempfiles)
+tempfiles = tempfiles[sortix]
 all_obsnames = np.array(all_shortnames)
 all_obsnames = all_obsnames[sortix]
+# files = files + list(tempfiles)
+
+
 ########################################################################################################################
 ########################################################################################################################
 ########################################################################################################################
@@ -65,10 +72,10 @@ for i,filename in enumerate(files):
     all_bc.append(bc[0])
     jd = pyfits.getval(filename, 'UTMJD') + 2.4e6 + 0.5
     all_jd.append(jd)
-    # outfile_names.write(shortname + ' \n')
-    # outfile_jd.write('%14.6f \n' % (jd))
-    # outfile_bc.write('%14.6f \n' % (bc))
-    # outfile.write(shortname + '     %14.6f     %14.6f \n' % (jd, bc))
+    outfile_names.write(shortname + ' \n')
+    outfile_jd.write('%14.6f \n' % (jd))
+    outfile_bc.write('%14.6f \n' % (bc))
+    outfile.write(shortname + '     %14.6f     %14.6f \n' % (jd, bc))
 
 # outfile.close()
 # outfile_jd.close()
@@ -129,17 +136,17 @@ all_sumrv = np.zeros(len(files))
 xcsums = np.zeros((len(files), 81))
 
 # TEMPLATE:
-f0 = pyfits.getdata(files[69], 0)   # that's the highest SNR observation for Sep 18
+# f0 = pyfits.getdata(files[69], 0)   # that's the highest SNR observation for Sep 18
 # f0 = pyfits.getdata(files[2], 0)   # that's the highest SNR observation for Nov 18
-# f0 = pyfits.getdata(files[35], 0)   # that's the 2nd highest SNR observation for Nov 18
+f0 = pyfits.getdata(files[35], 0)   # that's the 2nd highest SNR observation for Nov 18
 # err0 = pyfits.getdata(files[69], 1)
 # wl0 = pyfits.getdata(files[69], 2)
 # wl0 = pyfits.getdata('/Users/christoph/OneDrive - UNSW/dispsol/individual_fibres_dispsol_poly7_21sep30019.fits')
-obsname_0 = '24sep30078'     # that's the highest SNR observation for Sep 18
+# obsname_0 = '24sep30078'     # that's the highest SNR observation for Sep 18
 # obsname_0 = '16nov30128'     # that's the highest SNR observation for Nov 18
-# obsname_0 = '25nov30084'     # that's the 2nd highest SNR observation for Nov 18
-# wldict0,wl0 = get_dispsol_for_all_fibs(obsname_0, fudge=fudge, signflip_shift=signflip_shift, signflip_slope=signflip_slope)
-wldict0,wl0 = get_dispsol_for_all_fibs_2(obsname_0)
+obsname_0 = '25nov30084'     # that's the 2nd highest SNR observation for Nov 18
+wldict0,wl0 = get_dispsol_for_all_fibs(obsname_0, fudge=fudge, signflip_shift=signflip_shift, signflip_slope=signflip_slope)
+# wldict0,wl0 = get_dispsol_for_all_fibs_2(obsname_0)
 
 for i,filename in enumerate(files):
     print('Processing RV for tau Ceti observation ' + str(i+1) + '/' + str(len(files)))

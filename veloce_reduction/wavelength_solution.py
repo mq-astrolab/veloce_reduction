@@ -1667,7 +1667,8 @@ def get_dispsol_from_known_lines(thflux, fibre=None, fitwidth=4, search_width=No
                     if debug_level >= 1:
                         print('WARNING: not enough signal to fit a good peak at location', xguess)
                     
-            except RuntimeError:
+#             except RuntimeError:
+            except:
                 if debug_level >= 1:
                     print('WARNING: failed to fit a peak at location', xguess)
                 
@@ -2221,7 +2222,7 @@ def make_arc_dispsols_for_all_nights(outpath='/Users/christoph/OneDrive - UNSW/d
                                      deg_spectral=7, deg_spatial=7, polytype='chebyshev', overwrite=False, save_individual=False):
     
     # get list of all nights
-    datedir_list = glob.glob('/Volumes/BERGRAID/data/veloce/reduced/20*')
+    datedir_list = glob.glob('/Volumes/BERGRAID/data/veloce/reduced/2019*')
     datedir_list.sort()
 
 #     fibslot = [0,1,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,23,24,25]

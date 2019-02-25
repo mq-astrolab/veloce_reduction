@@ -347,10 +347,11 @@ def optimal_extraction(stripes, err_stripes=None, ron_stripes=None, RON=0., slit
         # fibparms = np.load('/Users/christoph/OneDrive - UNSW/fibre_profiles/fibre_profile_fits_20181107.npy').item()
         if date not in ['20181116', '20190127', '20190201']:
             fibparms = np.load('/Users/christoph/OneDrive - UNSW/fibre_profiles/archive/fibre_profile_fits_' + date + '.npy').item()
+            print('OK, loading fibre profiles for ' + date + '...')
         else:
             # have to laod this crutch, as the first order fits were crap for 20181116 / 20190127 / 20190201, so just for order 01 I replaced them with the parms from the following night
             fibparms = np.load('/Users/christoph/OneDrive - UNSW/fibre_profiles/archive/fibre_profile_fits_' + date + '_crutch.npy').item()
-        print('OK, loading fibre profiles for ' + date + '...')
+            print('OK, loading fibre profiles (CRUTCH!!!) for ' + date + '...')
 
     flux = {}
     err = {}
@@ -613,10 +614,11 @@ def optimal_extraction_from_indices(img, stripe_indices, err_img=None, RON=0., s
         # fibparms = np.load('/Users/christoph/OneDrive - UNSW/fibre_profiles/fibre_profile_fits_20181107.npy').item()
         if date not in ['20181116', '20190127', '20190201']:
             fibparms = np.load('/Users/christoph/OneDrive - UNSW/fibre_profiles/archive/fibre_profile_fits_' + date + '.npy').item()
+            print('OK, loading fibre profiles for ' + date + '...')
         else:
             # have to laod this crutch, as the first order fits were crap for 20181116 / 20190127 / 20190201, so just for order 01 I replaced them with the parms from the following night
             fibparms = np.load('/Users/christoph/OneDrive - UNSW/fibre_profiles/archive/fibre_profile_fits_' + date + '_crutch.npy').item()
-        print('OK, loading fibre profiles for ' + date + '...')
+            print('OK, loading fibre profiles (CRUTCH!!!) for ' + date + '...')
 
     flux = {}
     err = {}

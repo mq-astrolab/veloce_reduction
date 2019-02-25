@@ -423,7 +423,8 @@ def get_RV_from_xcorr_2(f, wl, f0, wl0, mask=None, smoothed_flat=None, delta_log
         rverr = np.zeros(xcarr.shape[0])
         for o in range(xcarr.shape[0]):
             xc = xcarr[o,:]
-            xrange = np.arange(len(xc)//2 - fitrangesize, len(xc)//2 + fitrangesize + 1, 1)
+            # xrange = np.arange(len(xc)//2 - fitrangesize, len(xc)//2 + fitrangesize + 1, 1)
+            xrange = np.arange(np.argmax(xc) - fitrangesize, np.argmax(xc) + fitrangesize + 1, 1)   # want to fit a symmetric region around the peak, not around the "centre" of the xc
             # parameters: mu, sigma, amp, beta, offset, slope
             guess = np.array([len(xc)//2, 10, (xc[np.argmax(xc)] - xc[np.argmax(xc) - fitrangesize]), 2.,
                               xc[np.argmax(xc) - fitrangesize], 0.])
