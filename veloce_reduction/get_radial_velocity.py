@@ -289,8 +289,8 @@ def get_RV_from_xcorr(f, err, wl, f0, wl0, mask=None, smoothed_flat=None, osf=2,
 
 
 
-def get_RV_from_xcorr_2(f, wl, f0, wl0, mask=None, smoothed_flat=None, delta_log_wl=1e-6, relgrid=False, osf=5, addrange=40, 
-                        fitrange=10, flipped=False, individual_fibres=True, individual_orders=True, debug_level=0, timit=False):
+def get_RV_from_xcorr_2(f, wl, f0, wl0, mask=None, smoothed_flat=None, delta_log_wl=1e-6, relgrid=False, osf=5, addrange=100,
+                        fitrange=25, flipped=False, individual_fibres=True, individual_orders=True, fit_slope=False, debug_level=0, timit=False):
     """
     This routine calculates the radial velocity of an observed spectrum relative to a template using cross-correlation.
     Note that input spectra should be de-blazed already!!!
@@ -423,26 +423,39 @@ def get_RV_from_xcorr_2(f, wl, f0, wl0, mask=None, smoothed_flat=None, delta_log
         rverr = np.zeros(xcarr.shape[0])
         for o in range(xcarr.shape[0]):
             xc = xcarr[o,:]
-            # xrange = np.arange(len(xc)//2 - fitrangesize, len(xc)//2 + fitrangesize + 1, 1)
-            xrange = np.arange(np.argmax(xc) - fitrangesize, np.argmax(xc) + fitrangesize + 1, 1)   # want to fit a symmetric region around the peak, not around the "centre" of the xc
-            # parameters: mu, sigma, amp, beta, offset, slope
-            # guess = np.array([len(xc)//2, 10, (xc[np.argmax(xc)] - xc[np.argmax(xc) - fitrangesize]), 2.,
-            #                   xc[np.argmax(xc) - fitrangesize], 0.])
-            guess = np.array([np.argmax(xc), 10, (xc[np.argmax(xc)] - xc[np.argmax(xc) - fitrangesize]), 2.,
-                              xc[np.argmax(xc) - fitrangesize]])
-            try:
-                # subtract the minimum of the fitrange so as to have a "dynamic range"
-                # popt, pcov = op.curve_fit(gausslike_with_amp_and_offset_and_slope, xrange, xc[xrange] - np.min(xc[xrange]), p0=guess, maxfev=1000000)
-                popt, pcov = op.curve_fit(gausslike_with_amp_and_offset, xrange,
-                                          xc[xrange] - np.min(xc[xrange]), p0=guess, maxfev=1000000)
-                mu = popt[0]
-                mu_err = pcov[0, 0]
-                if debug_level >= 1:
-                    print('Fit successful...')
-            except:
-                popt, pcov = (np.nan, np.nan)
-                mu = np.nan
-                mu_err = np.nan
+            # want to fit a symmetric region around the peak, not around the "centre" of the xc
+            xrange = np.arange(np.argmax(xc) - fitrangesize, np.argmax(xc) + fitrangesize + 1, 1)
+            if fit_slope:
+                # parameters: mu, sigma, amp, beta, offset, slope
+                guess = np.array([len(xc)//2, 10, (xc[np.argmax(xc)] - xc[np.argmax(xc) - fitrangesize]), 2.,
+                                  xc[np.argmax(xc) - fitrangesize], 0.])
+                try:
+                    # subtract the minimum of the fitrange so as to have a "dynamic range"
+                    popt, pcov = op.curve_fit(gausslike_with_amp_and_offset_and_slope, xrange, xc[xrange] - np.min(xc[xrange]), p0=guess, maxfev=1000000)
+                    mu = popt[0]
+                    mu_err = pcov[0, 0]
+                    if debug_level >= 1:
+                        print('Fit successful...')
+                except:
+                    popt, pcov = (np.nan, np.nan)
+                    mu = np.nan
+                    mu_err = np.nan
+            else:
+                print('haehaehae22222')
+                # parameters: mu, sigma, amp, beta, offset
+                guess = np.array([np.argmax(xc), 10, (xc[np.argmax(xc)] - xc[np.argmax(xc) - fitrangesize]), 2.,
+                                  xc[np.argmax(xc) - fitrangesize]])
+                try:
+                    # subtract the minimum of the fitrange so as to have a "dynamic range"
+                    popt, pcov = op.curve_fit(gausslike_with_amp_and_offset, xrange, xc[xrange] - np.min(xc[xrange]), p0=guess, maxfev=1000000)
+                    mu = popt[0]
+                    mu_err = pcov[0, 0]
+                    if debug_level >= 1:
+                        print('Fit successful...')
+                except:
+                    popt, pcov = (np.nan, np.nan)
+                    mu = np.nan
+                    mu_err = np.nan
             
 
             # convert to RV in m/s
@@ -475,7 +488,6 @@ def get_RV_from_xcorr_2(f, wl, f0, wl0, mask=None, smoothed_flat=None, delta_log
         else:
             return rv, rverr, np.array(xcsum)
     
-
 
 
 

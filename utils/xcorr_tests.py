@@ -133,7 +133,7 @@ for i,filename in enumerate(files):
 all_xc = []
 all_rv = np.zeros((len(files), 11, 19))
 all_sumrv = np.zeros(len(files))
-xcsums = np.zeros((len(files), 81))
+xcsums = np.zeros((len(files), 201))
 
 # TEMPLATE:
 f0 = pyfits.getdata(files[69], 0)   # that's the highest SNR observation for Sep 18
