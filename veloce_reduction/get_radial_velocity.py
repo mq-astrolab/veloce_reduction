@@ -429,7 +429,7 @@ def get_RV_from_xcorr_2(f, wl, f0, wl0, mask=None, smoothed_flat=None, delta_log
             # guess = np.array([len(xc)//2, 10, (xc[np.argmax(xc)] - xc[np.argmax(xc) - fitrangesize]), 2.,
             #                   xc[np.argmax(xc) - fitrangesize], 0.])
             guess = np.array([np.argmax(xc), 10, (xc[np.argmax(xc)] - xc[np.argmax(xc) - fitrangesize]), 2.,
-                              xc[np.argmax(xc) - fitrangesize], 0.])
+                              xc[np.argmax(xc) - fitrangesize]])
             try:
                 # subtract the minimum of the fitrange so as to have a "dynamic range"
                 # popt, pcov = op.curve_fit(gausslike_with_amp_and_offset_and_slope, xrange, xc[xrange] - np.min(xc[xrange]), p0=guess, maxfev=1000000)
@@ -437,6 +437,8 @@ def get_RV_from_xcorr_2(f, wl, f0, wl0, mask=None, smoothed_flat=None, delta_log
                                           xc[xrange] - np.min(xc[xrange]), p0=guess, maxfev=1000000)
                 mu = popt[0]
                 mu_err = pcov[0, 0]
+                if debug_level >= 1:
+                    print('Fit successful...')
             except:
                 popt, pcov = (np.nan, np.nan)
                 mu = np.nan
