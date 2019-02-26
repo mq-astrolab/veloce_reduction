@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 import scipy.interpolate as interp
 import scipy.optimize as op
 import time
-from veloce_reduction.veloce_reduction.helper_functions import gausslike_with_amp_and_offset_and_slope, central_parts_of_mask
+from veloce_reduction.veloce_reduction.helper_functions import gausslike_with_amp_and_offset, gausslike_with_amp_and_offset_and_slope, central_parts_of_mask
 from veloce_reduction.veloce_reduction.flat_fielding import deblaze_orders
 
 
@@ -426,10 +426,15 @@ def get_RV_from_xcorr_2(f, wl, f0, wl0, mask=None, smoothed_flat=None, delta_log
             # xrange = np.arange(len(xc)//2 - fitrangesize, len(xc)//2 + fitrangesize + 1, 1)
             xrange = np.arange(np.argmax(xc) - fitrangesize, np.argmax(xc) + fitrangesize + 1, 1)   # want to fit a symmetric region around the peak, not around the "centre" of the xc
             # parameters: mu, sigma, amp, beta, offset, slope
-            guess = np.array([len(xc)//2, 10, (xc[np.argmax(xc)] - xc[np.argmax(xc) - fitrangesize]), 2.,
+            # guess = np.array([len(xc)//2, 10, (xc[np.argmax(xc)] - xc[np.argmax(xc) - fitrangesize]), 2.,
+            #                   xc[np.argmax(xc) - fitrangesize], 0.])
+            guess = np.array([np.argmax(xc), 10, (xc[np.argmax(xc)] - xc[np.argmax(xc) - fitrangesize]), 2.,
                               xc[np.argmax(xc) - fitrangesize], 0.])
             try:
-                popt, pcov = op.curve_fit(gausslike_with_amp_and_offset_and_slope, xrange, xc[xrange], p0=guess, maxfev=1000000)
+                # subtract the minimum of the fitrange so as to have a "dynamic range"
+                # popt, pcov = op.curve_fit(gausslike_with_amp_and_offset_and_slope, xrange, xc[xrange] - np.min(xc[xrange]), p0=guess, maxfev=1000000)
+                popt, pcov = op.curve_fit(gausslike_with_amp_and_offset, xrange,
+                                          xc[xrange] - np.min(xc[xrange]), p0=guess, maxfev=1000000)
                 mu = popt[0]
                 mu_err = pcov[0, 0]
             except:

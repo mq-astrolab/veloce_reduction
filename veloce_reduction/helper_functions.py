@@ -155,6 +155,9 @@ def norm_fibmodel_with_amp_and_offset(x, mu, sigma, amp, beta, offset):
 def fibmodel_with_amp_and_offset_and_slope(x, mu, sigma, amp, beta, offset, slope):
     return amp * fibmodel(x, mu, sigma, beta=beta, alpha=0, norm=0) + offset + slope*x
 
+def gausslike_with_amp_and_offset(x, mu, sigma, amp, beta, offset):
+    return amp * fibmodel(x, mu, sigma, beta=beta, alpha=0, norm=0) + offset
+
 def gausslike_with_amp_and_offset_and_slope(x, mu, sigma, amp, beta, offset, slope):
     return amp * fibmodel(x, mu, sigma, beta=beta, alpha=0, norm=0) + offset + slope*x
 
