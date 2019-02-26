@@ -287,7 +287,7 @@ def get_RV_from_xcorr(f, err, wl, f0, wl0, mask=None, smoothed_flat=None, osf=2,
 
 
 
-def get_RV_from_xcorr_2(f, wl, f0, wl0, mask=None, smoothed_flat=None, delta_log_wl=1e-6, relgrid=False, osf=5,
+def get_RV_from_xcorr_2(f, wl, f0, wl0, bc=0, bc0=0, mask=None, smoothed_flat=None, delta_log_wl=1e-6, relgrid=False, osf=5,
                         addrange=150, fitrange=25, flipped=False, individual_fibres=True, individual_orders=True,
                         fit_slope=False, debug_level=0, timit=False):
     """
@@ -300,6 +300,8 @@ def get_RV_from_xcorr_2(f, wl, f0, wl0, mask=None, smoothed_flat=None, delta_log
     'wl'            : numpy array containing the wavelengths of the observed spectrum (n_ord, n_fib, n_pix)
     'f0'            : numpy array containing the flux of the template spectrum (n_ord, n_fib, n_pix)
     'wl0'           : numpy array containing the wavelengths of the template spectrum (n_ord, n_fib, n_pix)
+    'bc'            : the barycentric velocity correction for the observed spectrum
+    'bc0'           : the barycentric velocity correction for the template spectrum
     'mask'          : mask-dictionary from "find_stripes" (keys = orders)
     'smoothed_flat' : if no mask is provided, need to provide the smoothed_flat, so that a mask can be created on the fly
     'delta_log_wl'  : stepsize of the log-wl grid (only used if 'relgrid' is FALSE)
@@ -340,7 +342,7 @@ def get_RV_from_xcorr_2(f, wl, f0, wl0, mask=None, smoothed_flat=None, delta_log
         wl0[0, :, :] = 1.
 
     # make cross-correlation functions (list of length n_orders used)
-    xcs = make_ccfs(f, wl, f0, wl0, mask=None, smoothed_flat=None, delta_log_wl=delta_log_wl, relgrid=False,
+    xcs = make_ccfs(f, wl, f0, wl0, bc=bc, bc0=bc0, mask=None, smoothed_flat=None, delta_log_wl=delta_log_wl, relgrid=False,
                     flipped=flipped, individual_fibres=individual_fibres, debug_level=debug_level, timit=timit)
 
     # now fit Gaussian to central section of CCF for that order
@@ -489,8 +491,8 @@ def get_RV_from_xcorr_2(f, wl, f0, wl0, mask=None, smoothed_flat=None, delta_log
 
 
 
-def make_ccfs(f, wl, f0, wl0, mask=None, smoothed_flat=None, delta_log_wl=1e-6, relgrid=False, osf=5,
-             filter_width=25, bad_threshold=0.05, flipped=False, individual_fibres=True, debug_level=0, timit=False):
+def make_ccfs(f, wl, f0, wl0, bc=0., bc0=0., mask=None, smoothed_flat=None, delta_log_wl=1e-6, relgrid=False, osf=5,
+              filter_width=25, bad_threshold=0.05, flipped=False, individual_fibres=True, debug_level=0, timit=False):
     """
     This routine calculates the CCFs of an observed spectrum and a template spectrum for each order.
     Note that input spectra should be de-blazed already!!!
@@ -501,6 +503,8 @@ def make_ccfs(f, wl, f0, wl0, mask=None, smoothed_flat=None, delta_log_wl=1e-6, 
     'wl'                 : numpy array containing the wavelengths of the observed spectrum (n_ord, n_fib, n_pix)
     'f0'                 : numpy array containing the flux of the template spectrum (n_ord, n_fib, n_pix)
     'wl0'                : numpy array containing the wavelengths of the template spectrum (n_ord, n_fib, n_pix)
+    'bc'                 : the barycentric velocity correction for the observed spectrum
+    'bc0'                : the barycentric velocity correction for the template spectrum
     'mask'               : mask-dictionary from "find_stripes" (keys = orders)
     'smoothed_flat'      : if no mask is provided, need to provide the smoothed_flat, so that a mask can be created on the fly
     'delta_log_wl'       : stepsize of the log-wl grid (only used if 'relgrid' is FALSE)
@@ -523,6 +527,9 @@ def make_ccfs(f, wl, f0, wl0, mask=None, smoothed_flat=None, delta_log_wl=1e-6, 
     if timit:
         start_time = time.time()
 
+    # speed of light in m/s
+    c = 2.99792458e8
+
     # the dummy wavelengths for orders 'order_01' and 'order_40' cannot be zero as we're taking a log!!!
     if wl.shape[0] == 40:
         wl[0, :, :] = 1.
@@ -543,11 +550,11 @@ def make_ccfs(f, wl, f0, wl0, mask=None, smoothed_flat=None, delta_log_wl=1e-6, 
     # Duncan's suggestion
     # for o in [4,5,6,25,26,33,34,35]:
     for o in [5, 6, 17, 25, 26, 27, 31, 34, 35, 36, 37]:
-        
+
         if debug_level >= 2:
-            print('Order ' + str(o+1).zfill(2))
-            
-        ord = 'order_' + str(o+1).zfill(2)    
+            print('Order ' + str(o + 1).zfill(2))
+
+        ord = 'order_' + str(o + 1).zfill(2)
 
         # # only use pixels that have enough signal
         # if mask is None:
@@ -579,45 +586,56 @@ def make_ccfs(f, wl, f0, wl0, mask=None, smoothed_flat=None, delta_log_wl=1e-6, 
         # else:
         #     # ordmask  = mask[ord][::-1]
         #     ordmask = mask[ord]
-
-        ordmask = np.ones(4112, dtype=bool)
-        ordmask[:200] = False
-        ordmask[4000:] = False
-
-
-        # either way, disregard #(edge_cut) pixels at either end; this is slightly dodgy, but the gaussian filtering above introduces edge effects due to mode='reflect'
-        ordmask[:2 * int(filter_width)] = False
-        ordmask[-2 * int(filter_width):] = False
-
+        #
+        # ordmask = np.ones(4112, dtype=bool)
+        # ordmask[:200] = False
+        # ordmask[4000:] = False
+        #
+        #
+        # # either way, disregard #(edge_cut) pixels at either end; this is slightly dodgy, but the gaussian filtering above introduces edge effects due to mode='reflect'
+        # ordmask[:2 * int(filter_width)] = False
+        # ordmask[-2 * int(filter_width):] = False
+        #
         # f0_unblazed = f0[ord] / np.max(f0[ord]) / normflat   #see COMMENT above
         # f_unblazed = f[ord] / np.max(f[ord]) / normflat
 
+        # define parts of the spectrum to use (based on the (unshifted) wl-solution of the central fibre in the template observation)
+        # TODO: try and optimize that for each order and even for each target
+        min_wl = np.min(wl0[o, 9, :]) + 20.
+        max_wl = np.max(wl0[o, 9, :]) - 12.
+
+        # now apply barycentric correction to wl and wl0 so that we can always use the SAME PARTS OF THE SPECTRUM for X-CORR
+        wl_bcc = (1 + bc / c) * wl
+        wl0_bcc = (1 + bc0 / c) * wl0
+
         # create logarithmic wavelength grid
-        logwl = np.log(wl[o,:,:])
-        logwl0 = np.log(wl0[o,:,:])
+        logwl = np.log(wl_bcc[o, :, :])
+        logwl0 = np.log(wl0_bcc[o, :, :])
         if relgrid:
             logwlgrid = np.linspace(np.min(logwl[ordmask]), np.max(logwl[ordmask]), osf * np.sum(ordmask))
             delta_log_wl = logwlgrid[1] - logwlgrid[0]
             if debug_level >= 2:
                 print(ord, ' :  delta_log_wl = ', delta_log_wl)
         else:
-            #logwlgrid = np.arange(np.min(logwl[-1,ordmask]), np.max(logwl[-1,ordmask]), delta_log_wl)
-            # use range from the maximum of the indfib-minima to the minimum of the indfib-maxima (also across wl and wl0) - use list comprehensions...
-            logwlgrid = np.arange(np.max([np.min(logwl[fib,ordmask]) for fib in range(logwl.shape[0])] + [np.min(logwl0[fib,ordmask]) for fib in range(logwl0.shape[0])]), 
-                                  np.min([np.max(logwl[fib,ordmask]) for fib in range(logwl.shape[0])] + [np.max(logwl0[fib,ordmask]) for fib in range(logwl0.shape[0])]), 
-                                  delta_log_wl)
+            # logwlgrid = np.arange(np.min(logwl[-1,ordmask]), np.max(logwl[-1,ordmask]), delta_log_wl)
+            # # use range from the maximum of the indfib-minima to the minimum of the indfib-maxima (also across wl and wl0) - use list comprehensions...
+            # logwlgrid = np.arange(np.max([np.min(logwl[fib,ordmask]) for fib in range(logwl.shape[0])] + [np.min(logwl0[fib,ordmask]) for fib in range(logwl0.shape[0])]),
+            #                       np.min([np.max(logwl[fib,ordmask]) for fib in range(logwl.shape[0])] + [np.max(logwl0[fib,ordmask]) for fib in range(logwl0.shape[0])]),
+            #                       delta_log_wl)
+            # NO!!! use range as defined above, but same for all observations!!!
+            logwlgrid = np.arange(np.log(min_wl), np.log(max_wl), delta_log_wl)
 
         # wavelength array must be increasing for "InterpolatedUnivariateSpline" to work --> turn arrays around if necessary!!!
         if (np.diff(logwl) < 0).any():
             logwl_sorted = logwl[:, ::-1].copy()
-            logwl0_sorted = logwl0[:,::-1].copy()
-            ordmask_sorted = ordmask[::-1].copy()
-            ord_f0_sorted = f0[o,:,::-1].copy()
-            ord_f_sorted = f[o,:,::-1].copy()
+            logwl0_sorted = logwl0[:, ::-1].copy()
+            # ordmask_sorted = ordmask[::-1].copy()
+            ord_f0_sorted = f0[o, :, ::-1].copy()
+            ord_f_sorted = f[o, :, ::-1].copy()
         else:
             logwl_sorted = logwl.copy()
             logwl0_sorted = logwl0.copy()
-            ordmask_sorted = ordmask.copy()
+            # ordmask_sorted = ordmask.copy()
             ord_f0_sorted = f0[ord].copy()
             ord_f_sorted = f[ord].copy()
 
@@ -628,18 +646,24 @@ def make_ccfs(f, wl, f0, wl0, mask=None, smoothed_flat=None, delta_log_wl=1e-6, 
         rebinned_f0 = np.zeros((nfib, len(logwlgrid)))
         rebinned_f = np.zeros((nfib, len(logwlgrid)))
         for i in range(nfib):
-            spl_ref_f0 = interp.InterpolatedUnivariateSpline(logwl0_sorted[i,ordmask_sorted], ord_f0_sorted[i,ordmask_sorted], k=3)  # slightly slower than linear, but best performance for cubic spline
-            rebinned_f0[i,:] = spl_ref_f0(logwlgrid)
-            spl_ref_f = interp.InterpolatedUnivariateSpline(logwl_sorted[i,ordmask_sorted], ord_f_sorted[i,ordmask_sorted], k=3)  # slightly slower than linear, but best performance for cubic spline
-            rebinned_f[i,:] = spl_ref_f(logwlgrid)
+            # spl_ref_f0 = interp.InterpolatedUnivariateSpline(logwl0_sorted[i,ordmask_sorted], ord_f0_sorted[i,ordmask_sorted], k=3)  # slightly slower than linear, but best performance for cubic spline
+            # rebinned_f0[i,:] = spl_ref_f0(logwlgrid)
+            # spl_ref_f = interp.InterpolatedUnivariateSpline(logwl_sorted[i,ordmask_sorted], ord_f_sorted[i,ordmask_sorted], k=3)  # slightly slower than linear, but best performance for cubic spline
+            # rebinned_f[i,:] = spl_ref_f(logwlgrid)
+            spl_ref_f0 = interp.InterpolatedUnivariateSpline(logwl0_sorted[i, :], ord_f0_sorted[i, :],
+                                                             k=3)  # slightly slower than linear, but best performance for cubic spline
+            rebinned_f0[i, :] = spl_ref_f0(logwlgrid)
+            spl_ref_f = interp.InterpolatedUnivariateSpline(logwl_sorted[i, :], ord_f_sorted[i, :],
+                                                            k=3)  # slightly slower than linear, but best performance for cubic spline
+            rebinned_f[i, :] = spl_ref_f(logwlgrid)
 
         if individual_fibres:
             ord_xcs = []
             for fib in range(nfib):
                 if not flipped:
-                    xc = np.correlate(rebinned_f0[fib,:], rebinned_f[fib,:], mode='full')
+                    xc = np.correlate(rebinned_f0[fib, :], rebinned_f[fib, :], mode='full')
                 else:
-                    xc = np.correlate(rebinned_f[fib,:], rebinned_f0[fib,:], mode='full')
+                    xc = np.correlate(rebinned_f[fib, :], rebinned_f0[fib, :], mode='full')
                 ord_xcs.append(xc)
             xcs.append(ord_xcs)
         else:
@@ -657,7 +681,6 @@ def make_ccfs(f, wl, f0, wl0, mask=None, smoothed_flat=None, delta_log_wl=1e-6, 
         print('Time taken for creating CCFs: ' + str(np.round(delta_t, 2)) + ' seconds')
 
     return xcs
-
 
 
 def make_self_indfib_ccfs(f, wl, relto=9, mask=None, smoothed_flat=None, delta_log_wl=1e-6, filter_width=25, bad_threshold=0.05, debug_level=0, timit=False):

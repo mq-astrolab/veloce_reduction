@@ -1902,7 +1902,7 @@ def get_dispsol_for_all_fibs(obsname, relto='LFC', twod=False, degpol=7, deg_spe
     lfc_pix -= 1.   # b/c DW is using Matlab, which starts indexing at 1 not at 0!!!!!!!
 
     # read file containing slope and offset as measured from LFC peak positions
-    lfc_slope, lfc_shift = readcol('/Users/christoph/OneDrive - UNSW/dispsol/laser_offsets/relto_21sep30019/' + obsname + '_LFC_Slope_and_Offset.txt', twod=False)
+    lfc_slope, lfc_shift = readcol('/Users/christoph/OneDrive - UNSW/dispsol/laser_offsets/relto_21sep30019/' + obsname + '_Slope_and_Offset.txt', twod=False)
 
     if signflip_slope:
         lfc_slope *= -1.
