@@ -287,10 +287,9 @@ def get_RV_from_xcorr(f, err, wl, f0, wl0, mask=None, smoothed_flat=None, osf=2,
 
 
 
-
-
-def get_RV_from_xcorr_2(f, wl, f0, wl0, mask=None, smoothed_flat=None, delta_log_wl=1e-6, relgrid=False, osf=5, addrange=100,
-                        fitrange=25, flipped=False, individual_fibres=True, individual_orders=True, fit_slope=False, debug_level=0, timit=False):
+def get_RV_from_xcorr_2(f, wl, f0, wl0, mask=None, smoothed_flat=None, delta_log_wl=1e-6, relgrid=False, osf=5,
+                        addrange=150, fitrange=25, flipped=False, individual_fibres=True, individual_orders=True,
+                        fit_slope=False, debug_level=0, timit=False):
     """
     This routine calculates the radial velocity of an observed spectrum relative to a template using cross-correlation.
     Note that input spectra should be de-blazed already!!!
@@ -340,11 +339,9 @@ def get_RV_from_xcorr_2(f, wl, f0, wl0, mask=None, smoothed_flat=None, delta_log
         wl[0, :, :] = 1.
         wl0[0, :, :] = 1.
 
-
     # make cross-correlation functions (list of length n_orders used)
     xcs = make_ccfs(f, wl, f0, wl0, mask=None, smoothed_flat=None, delta_log_wl=delta_log_wl, relgrid=False,
                     flipped=flipped, individual_fibres=individual_fibres, debug_level=debug_level, timit=timit)
-
 
     # now fit Gaussian to central section of CCF for that order
     if relgrid:
@@ -354,16 +351,15 @@ def get_RV_from_xcorr_2(f, wl, f0, wl0, mask=None, smoothed_flat=None, delta_log
         # fitrangesize = int(np.round(0.0036 * len(xc) / 2. - 1, 0))  # this factor was simply eye-balled
         fitrangesize = fitrange
 
-
     if individual_fibres:
-        
+
         # make array only containing the central parts of the CCFs (which can have different total lengths) for fitting
         xcarr = np.zeros((len(xcs), len(xcs[0]), 2 * addrange + 1))
         for i in range(xcarr.shape[0]):
             for j in range(xcarr.shape[1]):
                 dum = np.array(xcs[i][j])
-                xcarr[i,j,:] = dum[len(dum) // 2 - addrange : len(dum) // 2 + addrange + 1]
-        
+                xcarr[i, j, :] = dum[len(dum) // 2 - addrange: len(dum) // 2 + addrange + 1]
+
         if individual_orders:
             if debug_level >= 1:
                 print('Calculating independent RVs for each order and for each fibre...')
@@ -373,41 +369,42 @@ def get_RV_from_xcorr_2(f, wl, f0, wl0, mask=None, smoothed_flat=None, delta_log
                 print('Calculating one RV for each fibre (summing up CCFs over individual orders)...')
             # sum up the CCFs for all orders
             xcarr = np.sum(xcarr, axis=0)
-            xcarr = xcarr[np.newaxis,:]   # need that extra dimension for the for-loop below
+            xcarr = xcarr[np.newaxis, :]  # need that extra dimension for the for-loop below
             xcsum = np.sum(xcarr, axis=0)
-                
+
         # format is (n_ord, n_fib)
         rv = np.zeros((xcarr.shape[0], xcarr.shape[1]))
         rverr = np.zeros((xcarr.shape[0], xcarr.shape[1]))
         for o in range(xcarr.shape[0]):
             for f in range(xcarr.shape[1]):
                 if debug_level >= 3:
-                    print('order = ',o,' ; fibre = ',f)
-                xc = xcarr[o,f,:]
+                    print('order = ', o, ' ; fibre = ', f)
+                xc = xcarr[o, f, :]
                 xrange = np.arange(np.argmax(xc) - fitrangesize, np.argmax(xc) + fitrangesize + 1, 1)
                 # parameters: mu, sigma, amp, beta, offset, slope
                 guess = np.array((np.argmax(xc), 15, np.max(xc) - np.min(xc), 2., np.min(xc), 0.))
                 try:
-                    popt, pcov = op.curve_fit(gausslike_with_amp_and_offset_and_slope, xrange, xc[xrange], p0=guess, maxfev=1000000)
+                    popt, pcov = op.curve_fit(gausslike_with_amp_and_offset_and_slope, xrange, xc[xrange], p0=guess,
+                                              maxfev=1000000)
                     mu = popt[0]
                     mu_err = pcov[0, 0]
                 except:
                     popt, pcov = (np.nan, np.nan)
                     mu = np.nan
                     mu_err = np.nan
-    
+
                 # convert to RV in m/s
-                rv[o,f] = c * (mu - (len(xc) // 2)) * delta_log_wl
-                rverr[o,f] = c * mu_err * delta_log_wl
-                
+                rv[o, f] = c * (mu - (len(xc) // 2)) * delta_log_wl
+                rverr[o, f] = c * mu_err * delta_log_wl
+
     else:
-        
+
         # make array only containing the central parts of the CCFs (which can have different total lengths) for fitting
         xcarr = np.zeros((len(xcs), 2 * addrange + 1))
         for i in range(xcarr.shape[0]):
             dum = np.array(xcs[i])
-            xcarr[i,:] = dum[len(dum) // 2 - addrange : len(dum) // 2 + addrange + 1]
-        
+            xcarr[i, :] = dum[len(dum) // 2 - addrange: len(dum) // 2 + addrange + 1]
+
         if individual_orders:
             if debug_level >= 1:
                 print('Calculating one RV for each order (summing up CCFs over individual fibres)...')
@@ -416,22 +413,23 @@ def get_RV_from_xcorr_2(f, wl, f0, wl0, mask=None, smoothed_flat=None, delta_log
                 print('Calculating one RV (summing up CCFs over individual fibres and over individual orders)')
             # sum up the CCFs for all orders
             xcarr = np.sum(xcarr, axis=0)
-            xcarr = xcarr[np.newaxis,:]   # need that extra dimension for the for-loop below
-            
+            xcarr = xcarr[np.newaxis, :]  # need that extra dimension for the for-loop below
+
         xcsum = np.sum(xcarr, axis=0)
         rv = np.zeros(xcarr.shape[0])
         rverr = np.zeros(xcarr.shape[0])
         for o in range(xcarr.shape[0]):
-            xc = xcarr[o,:]
+            xc = xcarr[o, :]
             # want to fit a symmetric region around the peak, not around the "centre" of the xc
             xrange = np.arange(np.argmax(xc) - fitrangesize, np.argmax(xc) + fitrangesize + 1, 1)
             if fit_slope:
                 # parameters: mu, sigma, amp, beta, offset, slope
-                guess = np.array([len(xc)//2, 10, (xc[np.argmax(xc)] - xc[np.argmax(xc) - fitrangesize]), 2.,
-                                  xc[np.argmax(xc) - fitrangesize], 0.])
+                guess = np.array([len(xc) // 2, 10, (xc[np.argmax(xc)] - xc[np.argmax(xc) - fitrangesize]), 2.,
+                                  -(1. / 6.) * (xc[np.argmax(xc)] - xc[np.argmax(xc) - fitrangesize]), 0.])
                 try:
                     # subtract the minimum of the fitrange so as to have a "dynamic range"
-                    popt, pcov = op.curve_fit(gausslike_with_amp_and_offset_and_slope, xrange, xc[xrange] - np.min(xc[xrange]), p0=guess, maxfev=1000000)
+                    popt, pcov = op.curve_fit(gausslike_with_amp_and_offset_and_slope, xrange,
+                                              xc[xrange] - np.min(xc[xrange]), p0=guess, maxfev=1000000)
                     mu = popt[0]
                     mu_err = pcov[0, 0]
                     if debug_level >= 1:
@@ -441,13 +439,14 @@ def get_RV_from_xcorr_2(f, wl, f0, wl0, mask=None, smoothed_flat=None, delta_log
                     mu = np.nan
                     mu_err = np.nan
             else:
-                print('haehaehae222222')
+                print('latest version OK')
                 # parameters: mu, sigma, amp, beta, offset
-                guess = np.array([np.argmax(xc), 10, (xc[np.argmax(xc)] - xc[np.argmax(xc) - fitrangesize]), 2.,
-                                  xc[np.argmax(xc) - fitrangesize]])
+                guess = np.array([np.argmax(xc), 10, (xc[np.argmax(xc)] - xc[np.argmax(xc) - fitrangesize]), 2., -(1./6.)*(xc[np.argmax(xc)] - xc[np.argmax(xc) - fitrangesize])])
+
                 try:
                     # subtract the minimum of the fitrange so as to have a "dynamic range"
-                    popt, pcov = op.curve_fit(gausslike_with_amp_and_offset, xrange, xc[xrange] - np.min(xc[xrange]), p0=guess, maxfev=1000000)
+                    popt, pcov = op.curve_fit(gausslike_with_amp_and_offset, xrange, xc[xrange] - np.min(xc[xrange]),
+                                              p0=guess, maxfev=1000000)
                     mu = popt[0]
                     mu_err = pcov[0, 0]
                     if debug_level >= 1:
@@ -456,7 +455,6 @@ def get_RV_from_xcorr_2(f, wl, f0, wl0, mask=None, smoothed_flat=None, delta_log
                     popt, pcov = (np.nan, np.nan)
                     mu = np.nan
                     mu_err = np.nan
-            
 
             # convert to RV in m/s
             rv[o] = c * (mu - (len(xc) // 2)) * delta_log_wl
@@ -464,10 +462,10 @@ def get_RV_from_xcorr_2(f, wl, f0, wl0, mask=None, smoothed_flat=None, delta_log
             # # plot a single fit for debugging
             # plot_osf = 10
             # plot_os_grid = np.linspace(xrange[0], xrange[-1], plot_osf * (len(xrange)-1) + 1)
-            # plt.plot(c * (xrange - (len(xcsums) // 2)) * delta_log_wl, xcsum[xrange], 'b.', label='data')
-            # plt.plot(c * (plot_os_grid - (len(xcsums) // 2)) * delta_log_wl, gausslike_with_amp_and_offset_and_slope(plot_os_grid, *guess),'r--', label='initial guess')
-            # plt.plot(c * (plot_os_grid - (len(xcsums) // 2)) * delta_log_wl, gausslike_with_amp_and_offset_and_slope(plot_os_grid, *popt),'g-', label='best fit')
-            # plt.axvline(c * (mu - (len(xcsum) // 2)) * delta_log_wl, color='g', linestyle=':')
+            # plt.plot(c * (xrange - (len(xcsum) // 2)) * delta_log_wl, xc[xrange] - np.min(xc[xrange]), 'b.', label='data')
+            # plt.plot(c * (plot_os_grid - (len(xc) // 2)) * delta_log_wl, gausslike_with_amp_and_offset(plot_os_grid, *guess),'r--', label='initial guess')
+            # plt.plot(c * (plot_os_grid - (len(xc) // 2)) * delta_log_wl, gausslike_with_amp_and_offset(plot_os_grid, *popt),'g-', label='best fit')
+            # plt.axvline(c * (mu - (len(xc) // 2)) * delta_log_wl, color='g', linestyle=':')
             # plt.legend()
             # plt.xlabel('delta RV [m/s]')
             # plt.ylabel('power')
@@ -487,7 +485,6 @@ def get_RV_from_xcorr_2(f, wl, f0, wl0, mask=None, smoothed_flat=None, delta_log
             return rv, rverr, np.array(xcsum)
         else:
             return rv, rverr, np.array(xcsum)
-    
 
 
 

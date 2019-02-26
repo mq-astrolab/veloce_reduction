@@ -920,9 +920,9 @@ def get_mean_snr(flux, err=None, per_order=False):
         if per_order:
             snr_ord = []
             for o in range(flux.shape[0]):
-                snr_ord.append(np.mean(np.maximum(0., flux[o,:] / np.maximum(np.sqrt(10.), err[o,:]))))
+                snr_ord.append(np.nanmedian(np.maximum(0., flux[o,:] / np.maximum(np.sqrt(10.), err[o,:]))))
         else:
-            snr = np.mean(np.maximum(0., flux)/np.maximum(np.sqrt(10.), err))    
+            snr = np.nanmedian(np.maximum(0., flux) / np.maximum(np.sqrt(10.), err))
     
     # data in the form of a dictionary
     elif flux.__class__ == dict:
@@ -940,9 +940,9 @@ def get_mean_snr(flux, err=None, per_order=False):
         snr_ord = []
         
         for o in sorted(flux.keys()):
-            snr_ord.append(np.mean(np.maximum(0., flux[o] / np.maximum(np.sqrt(10.), err[o]))))
+            snr_ord.append(np.nanmedian(np.maximum(0., flux[o] / np.maximum(np.sqrt(10.), err[o]))))
         
-        snr =  np.mean(snr_ord)
+        snr =  np.nanmedian(snr_ord)
     else:
         print('ERROR: data type / variable class not recognized')
         return
