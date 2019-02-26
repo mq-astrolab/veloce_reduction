@@ -441,7 +441,7 @@ def get_RV_from_xcorr_2(f, wl, f0, wl0, mask=None, smoothed_flat=None, delta_log
                     mu = np.nan
                     mu_err = np.nan
             else:
-                print('haehaehae22222')
+                print('haehaehae222222')
                 # parameters: mu, sigma, amp, beta, offset
                 guess = np.array([np.argmax(xc), 10, (xc[np.argmax(xc)] - xc[np.argmax(xc) - fitrangesize]), 2.,
                                   xc[np.argmax(xc) - fitrangesize]])
