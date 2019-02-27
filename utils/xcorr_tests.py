@@ -133,7 +133,7 @@ for i,filename in enumerate(files):
 all_xc = []
 all_rv = np.zeros((len(files), 11, 19))
 all_sumrv = np.zeros(len(files))
-xcsums = np.zeros((len(files), 201))
+xcsums = np.zeros((len(files), 301))
 
 # TEMPLATE:
 f0 = pyfits.getdata(files[6], 0)   # one of the higher SNR obs but closest to FibThars used to define fibtofib wl shifts
@@ -156,10 +156,10 @@ for i,filename in enumerate(files):
     # err = pyfits.getdata(file, 1)
     wl = pyfits.getdata(filename, 2)
     # wl = pyfits.getdata('/Users/christoph/OneDrive - UNSW/dispsol/individual_fibres_dispsol_poly7_21sep30019.fits')
-    all_xc.append(make_ccfs(f, wl, f0, wl0, mask=None, smoothed_flat=None, delta_log_wl=1e-6, relgrid=False,
+    all_xc.append(make_ccfs(f, wl, f0, wl0, bc=all_bc[i], bc0=all_bc[6], mask=None, smoothed_flat=None, delta_log_wl=1e-6, relgrid=False,
                             flipped=False, individual_fibres=False, debug_level=1, timit=False))
-    rv,rverr,xcsum = get_RV_from_xcorr_2(f, wl, f0, wl0, individual_fibres=True, individual_orders=True, debug_level=1)
-    sumrv,sumrverr,xcsum = get_RV_from_xcorr_2(f, wl, f0, wl0, individual_fibres=False, individual_orders=False, debug_level=1)
+    rv,rverr,xcsum = get_RV_from_xcorr_2(f, wl, f0, wl0, bc=all_bc[i], bc0=all_bc[6], individual_fibres=True, individual_orders=True, debug_level=1)
+    sumrv,sumrverr,xcsum = get_RV_from_xcorr_2(f, wl, f0, wl0, bc=all_bc[i], bc0=all_bc[6], individual_fibres=False, individual_orders=False, debug_level=1)
     all_rv[i,:,:] = rv
     all_sumrv[i] = sumrv
     xcsums[i,:] = xcsum
@@ -168,6 +168,55 @@ xcsums = np.array(xcsums)
 ########################################################################################################################
 ########################################################################################################################
 ########################################################################################################################
+
+# overplot all tau ceti spectra with the barycorr removed so that in theory they should all perfectly overlap
+# colour-coding by runs
+
+for i,filename in enumerate(files):
+    print('Processing RV for tau Ceti observation ' + str(i + 1) + '/' + str(len(files)))
+    f = pyfits.getdata(filename, 0)
+    dum = filename.split('/')
+    dum2 = dum[-1].split('.')
+    dum3 = dum2[0].split('_')
+    obsname = dum3[1]
+    wldict, wl = get_dispsol_for_all_fibs(obsname, fudge=fudge, signflip_shift=signflip_shift, signflip_slope=signflip_slope, refit=True)
+    wl_bcc = (1 + all_bc[i] / c) * wl
+    wl0_bcc = (1 + all_bc[6] / c) * wl0
+    logwl = np.log(wl_bcc[o, :, :])
+    logwl0 = np.log(wl0_bcc[o, :, :])
+    logwlgrid = np.arange(np.log(min_wl), np.log(max_wl), delta_log_wl)
+    logwl_sorted = logwl[:, ::-1].copy()
+    logwl0_sorted = logwl0[:, ::-1].copy()
+    ord_f0_sorted = f0[o, :, ::-1].copy()
+    ord_f_sorted = f[o, :, ::-1].copy()
+    nfib = ord_f0_sorted.shape[0]
+    rebinned_f0 = np.zeros((nfib, len(logwlgrid)))
+    rebinned_f = np.zeros((nfib, len(logwlgrid)))
+    for ii in range(nfib):
+        # spl_ref_f0 = interp.InterpolatedUnivariateSpline(logwl0_sorted[i,ordmask_sorted], ord_f0_sorted[i,ordmask_sorted], k=3)  # slightly slower than linear, but best performance for cubic spline
+        # rebinned_f0[i,:] = spl_ref_f0(logwlgrid)
+        # spl_ref_f = interp.InterpolatedUnivariateSpline(logwl_sorted[i,ordmask_sorted], ord_f_sorted[i,ordmask_sorted], k=3)  # slightly slower than linear, but best performance for cubic spline
+        # rebinned_f[i,:] = spl_ref_f(logwlgrid)
+        spl_ref_f0 = interp.InterpolatedUnivariateSpline(logwl0_sorted[ii, :], ord_f0_sorted[ii, :],
+                                                         k=3)  # slightly slower than linear, but best performance for cubic spline
+        rebinned_f0[ii, :] = spl_ref_f0(logwlgrid)
+        spl_ref_f = interp.InterpolatedUnivariateSpline(logwl_sorted[ii, :], ord_f_sorted[ii, :],
+                                                        k=3)  # slightly slower than linear, but best performance for cubic spline
+        rebinned_f[ii, :] = spl_ref_f(logwlgrid)
+    if i < 86:
+        color='r'
+    elif i < 138:
+        color='b'
+    else:
+        color='k'
+    plt.plot(logwlgrid, np.sum(rebinned_f, axis=0)/np.nanmedian(np.sum(rebinned_f, axis=0)), color=color)
+
+
+########################################################################################################################
+########################################################################################################################
+########################################################################################################################
+
+
 
 # WITH PRE-NORMALIZING FLATS
 

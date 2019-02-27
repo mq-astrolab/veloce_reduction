@@ -550,6 +550,7 @@ def make_ccfs(f, wl, f0, wl0, bc=0., bc0=0., mask=None, smoothed_flat=None, delt
     # Duncan's suggestion
     # for o in [4,5,6,25,26,33,34,35]:
     for o in [5, 6, 17, 25, 26, 27, 31, 34, 35, 36, 37]:
+    # for o in [5]:
 
         if debug_level >= 2:
             print('Order ' + str(o + 1).zfill(2))

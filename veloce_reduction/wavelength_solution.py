@@ -1723,13 +1723,21 @@ def get_dispsol_from_known_lines(thflux, fibre=None, fitwidth=4, search_width=No
 #         model_wl_vac = p_vac(x_norm, order_norm)
 #         resid_air = lam - model_wl_air
 #         resid_vac = vac_lam - model_wl_vac
-        now = datetime.datetime.now()
-        if outpath is None:
-            outpath = '/Users/christoph/OneDrive - UNSW/linelists/'
-        if fibre is None:
-            outfn = outpath + lamptype + '_lines_as_of_'+str(now)[:10]+'.dat'
+        if date is None:
+            now = datetime.datetime.now()
+            if outpath is None:
+                outpath = '/Users/christoph/OneDrive - UNSW/linelists/'
+            if fibre is None:
+                outfn = outpath + lamptype + '_lines_as_of_'+str(now)[:10]+'.dat'
+            else:
+                outfn = outpath + lamptype + '_lines_fibre_' + fibre + '_as_of_'+str(now)[:10]+'.dat'
         else:
-            outfn = outpath + lamptype + '_lines_fibre_' + fibre + '_as_of_'+str(now)[:10]+'.dat'
+            if outpath is None:
+                outpath = '/Users/christoph/OneDrive - UNSW/dispsol/fibth_line_tables/'
+            if fibre is None:
+                outfn = outpath + lamptype + '_lines_quick_for_' + date + '.dat'
+            else:
+                outfn = outpath + lamptype + '_lines_fibre_' + fibre + '_for_' + date + '.dat'
         outfile = open(outfn, 'w')
         outfile.write('line number   order_number   physical_order_number     pixel       air_ref_wl[A]   vac_ref_wl[A] \n') #  air_model_wl[A]   vac_model_wl[A]   air_resid[A]   vac_resid[A] \n')
         outfile.write('=================================================================================================\n')
@@ -1739,7 +1747,7 @@ def get_dispsol_from_known_lines(thflux, fibre=None, fitwidth=4, search_width=No
         outfile.close()                                                                                                                                                                     
 
     if timit:
-        print('Time elapsed: ',time.time() - start_time,' seconds')
+        print('Time elapsed for getting dispsol from known lines: ',time.time() - start_time,' seconds')
 
     # evaluate for every pixel along each order
     if return_full:
@@ -1755,128 +1763,143 @@ def get_dispsol_from_known_lines(thflux, fibre=None, fitwidth=4, search_width=No
     
     
 
+def define_pixel_offsets_between_fibres(date, relto='S1', savedict=False, saveplots=False, extra_lfc_offset=True,
+                                        return_all=False, debug_level=0, timit=False):
+    if timit:
+        start_time = time.time()
 
-
-def define_pixel_offsets_between_fibres(relto='S1', savedict=False, saveplots=False, extra_lfc_offset=True, return_all=False, debug_level=0):
-    # difference in pixel space (ie peak locations)    
-    path = '/Users/christoph/OneDrive - UNSW/dispsol_tests/20180917/'
+    # difference in pixel space (ie peak locations)
+    refpath = '/Users/christoph/OneDrive - UNSW/dispsol/fibth_line_tables/'
+    path = '/Users/christoph/OneDrive - UNSW/dispsol/pixfit_coeffs/'
     xx = np.arange(4112)
-    fibslot = [0,1,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,23,24,25]
-    fibname = ['S5', 'S2', '07', '18', '17', '06', '16', '15', '05', '14', '13', '01', '12', '11', '04', '10', '09', '03', '08', '19', '02', 'S4', 'S3', 'S1']
-    
+    fibslot = [0, 1, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 23, 24, 25]
+    fibname = ['S5', 'S2', '07', '18', '17', '06', '16', '15', '05', '14', '13', '01', '12', '11', '04', '10', '09',
+               '03', '08', '19', '02', 'S4', 'S3', 'S1']
+
     pixfit_coeffs = {}
-    zeroth_coeffs = np.zeros((39,24))
-    first_coeffs = np.zeros((39,24))
-    
+    zeroth_coeffs = np.zeros((39, 24))
+    first_coeffs = np.zeros((39, 24))
+
+    if date == '20180917':
+        lamptype = 'thar'
+    else:
+        lamptype = 'thxe'
+
     for o in range(39):
-        
-        ord = 'order_'+str(o+1).zfill(2)
-        
-        ref_filename = path + 'thar_lines_fibre_' + relto + '_as_of_2018-11-09.dat'
+
+        ord = 'order_' + str(o + 1).zfill(2)
+
+        ref_filename = refpath + lamptype + '_lines_fibre_' + relto + '_for_' + date + '.dat'
         linenum, order, m, pix, wlref, vac_wlref = readcol(ref_filename, twod=False, skipline=2)
         # linenum, order, m, pix, wlref, vac_wlref, _, _, _, _ = readcol('/Users/christoph/OneDrive - UNSW/linelists/thar_lines_used_in_7x7_fit_as_of_2018-10-19.dat', twod=False, skipline=2)
-        ix = np.argwhere(order == o+1).flatten()
+        ix = np.argwhere(order == o + 1).flatten()
         ref_x = pix[ix]
         ref_wlref = wlref[ix]
-    #     order_fit = np.poly1d(np.polyfit(ref_x, ref_wlref, 5))
-    #     ref_fit = order_fit(xx)
-        
+        #     order_fit = np.poly1d(np.polyfit(ref_x, ref_wlref, 5))
+        #     ref_fit = order_fit(xx)
+
         pixfit_coeffs[ord] = {}
         ord_zeroth_coeffs = []
         ord_first_coeffs = []
-        
+
         for fib in fibname:
-            filename = path + 'thar_lines_fibre_' + fib + '_as_of_2018-11-09.dat'
+            filename = refpath + lamptype + '_lines_fibre_' + fib + '_for_' + date + '.dat'
             linenum, order, m, pix, wlref, vac_wlref = readcol(filename, twod=False, skipline=2)
-            ix = np.argwhere(order == o+1).flatten()
+            ix = np.argwhere(order == o + 1).flatten()
             x = pix[ix]
             lam = wlref[ix]
             matched_ref_x = ref_x[np.in1d(ref_wlref, lam)]
             matched_x = x[np.in1d(lam, ref_wlref)]
             delta_x = matched_x - matched_ref_x
-        #     plt.plot(matched_ref_x, x - matched_ref_x, 'x-', label='fibre '+fib)
+            #     plt.plot(matched_ref_x, x - matched_ref_x, 'x-', label='fibre '+fib)
             # perform sanity-check 1D fit (remove only very obvious outliers, as there is quite a bit of scatter)
             test_fit = np.poly1d(np.polyfit(matched_ref_x, delta_x, 1))
             if debug_level >= 2:
                 plt.figure()
                 plt.plot(matched_ref_x, delta_x, 'x-')
-                plt.title('fibre '+fib)
+                plt.title('fibre ' + fib)
                 plt.plot(xx, test_fit(xx), 'r--')
                 plt.xlim(0, 4111)
             # remove obvious outliers
             fitres = delta_x - test_fit(matched_ref_x)
             # do single sigma clipping
-            goodres,goodix,badix = single_sigma_clip(fitres, 2, return_indices=True)
-            #fit again
+            goodres, goodix, badix = single_sigma_clip(fitres, 2, return_indices=True)
+            # fit again
             pix_fit = np.poly1d(np.polyfit(matched_ref_x[goodix], delta_x[goodix], 1))
             if debug_level >= 2:
                 plt.scatter(matched_ref_x[badix], delta_x[badix], color='r', marker='o')
                 plt.plot(xx, pix_fit(xx), 'g-')
-            
-            pixfit_coeffs[ord]['fibre_'+fib] = pix_fit
+
+            pixfit_coeffs[ord]['fibre_' + fib] = pix_fit
             ord_zeroth_coeffs.append(pix_fit[0])
             ord_first_coeffs.append(pix_fit[1])
-    #         #now fit new dispsol to the model-shifted lines
-    #         order_fit = np.poly1d(np.polyfit(ref_x + pix_fit(ref_x), ref_wlref, 5))
-    #         plt.plot(xx, order_fit(xx) - ref_fit, label='fibre '+fib)
-        
+        #         #now fit new dispsol to the model-shifted lines
+        #         order_fit = np.poly1d(np.polyfit(ref_x + pix_fit(ref_x), ref_wlref, 5))
+        #         plt.plot(xx, order_fit(xx) - ref_fit, label='fibre '+fib)
+
         # now fill array of fit coefficients
-        zeroth_coeffs[o,:] = ord_zeroth_coeffs
-        first_coeffs[o,:] = ord_first_coeffs     
-        
+        zeroth_coeffs[o, :] = ord_zeroth_coeffs
+        first_coeffs[o, :] = ord_first_coeffs
+
         # now estimate the extra offset between fibre 'S1' and the LFC fibre by extrapolating to the next fibre slot (ie slot 26)
         if extra_lfc_offset:
-            ex_fit_0 = np.poly1d(np.polyfit(fibslot, zeroth_coeffs[o,:], 2))
-            ex_fit_1 = np.poly1d(np.polyfit(fibslot, first_coeffs[o,:], 2))
-            zeroth_coeffs[o,:] -= ex_fit_0(26)
-            first_coeffs[o,:] -= ex_fit_1(26)
+            ex_fit_0 = np.poly1d(np.polyfit(fibslot, zeroth_coeffs[o, :], 2))
+            ex_fit_1 = np.poly1d(np.polyfit(fibslot, first_coeffs[o, :], 2))
+            zeroth_coeffs[o, :] -= ex_fit_0(26)
+            first_coeffs[o, :] -= ex_fit_1(26)
             for fib in pixfit_coeffs[ord].keys():
                 pixfit_coeffs[ord][fib][0] -= ex_fit_0(26)
                 pixfit_coeffs[ord][fib][1] -= ex_fit_1(26)
-                
+
         # now save the dictionary containing the fit coefficients that describe shift and slope in pixel space to file
         if savedict:
-            now = datetime.datetime.now()
+            # now = datetime.datetime.now()
+            # if extra_lfc_offset:
+            #     np.save(path + 'pixfit_coeffs_relto_LFC_as_of_' + str(now)[:10] + '.npy', pixfit_coeffs)
+            # else:
+            #     np.save(path + 'pixfit_coeffs_relto_' + relto + '_as_of_' + str(now)[:10] + '.npy', pixfit_coeffs)
             if extra_lfc_offset:
-                np.save(path + 'pixfit_coeffs_relto_LFC_as_of_' + str(now)[:10] + '.npy', pixfit_coeffs)
+                np.save(path + 'pixfit_coeffs_relto_LFC_for_' + date + '.npy', pixfit_coeffs)
             else:
-                np.save(path + 'pixfit_coeffs_relto_' + relto + '_as_of_' + str(now)[:10] + '.npy', pixfit_coeffs)
-        
+                np.save(path + 'pixfit_coeffs_relto_' + relto + '_for_' + date + '.npy', pixfit_coeffs)
+
         # now save a plot of both 0th and 1st order terms
         if saveplots:
-            
-            ordstring = 'Order_'+str(o+1).zfill(2)    
-        
-        #     plt.figure()
+            ordstring = 'Order_' + str(o + 1).zfill(2)
+
+            #     plt.figure()
             plt.plot(fibslot, zeroth_coeffs, 'bo-')
             plt.title('0th order coefficients  -  ' + ordstring)
-            plt.xlim(-2,27)
+            plt.xlim(-2, 27)
             plt.xlabel('fibre')
             plt.ylabel('offset [pix]')
             plt.axvline(2, color='gray', linestyle=':')
-            plt.axvline(22, color='gray', linestyle=':')    
+            plt.axvline(22, color='gray', linestyle=':')
             plt.savefig(path + '0th_order_coeffs_pixel_shits_' + ordstring + '.eps')
             plt.clf()
-            
-        #     plt.figure()
+
+            #     plt.figure()
             plt.plot(fibslot, first_coeffs, 'bo')
             plt.title('1st order coefficients  -  ' + ordstring)
-            plt.xlim(-2,27)
+            plt.xlim(-2, 27)
             plt.xlabel('fibre')
             plt.ylabel('slope')
             plt.axvline(2, color='gray', linestyle=':')
-            plt.axvline(22, color='gray', linestyle=':')    
+            plt.axvline(22, color='gray', linestyle=':')
             slope_fit = np.poly1d(np.polyfit(fibslot, first_coeffs, 2))
-            plot_x = np.arange(-1,26,0.1)
+            plot_x = np.arange(-1, 26, 0.1)
             plt.plot(plot_x, slope_fit(plot_x), 'r')
             plt.savefig(path + '1st_order_coeffs_pixel_shits_' + ordstring + '.eps')
             plt.clf()
-    
+
+    if timit:
+        delta_t = time.time() - start_time
+        print('Time taken for defining pixel offsets: ' + str(delta_t) + ' seconds')
+
     if return_all:
         return pixfit_coeffs, zeroth_coeffs, first_coeffs
     else:
         return pixfit_coeffs
-
 
 
 
@@ -2186,7 +2209,7 @@ def get_dispsol_for_all_fibs_2(obsname, relto='LFC', degpol=7, fibs='stellar', n
 
 
 
-def make_master_fibth(date=None):
+def make_master_fibth(date=None, laptop=False):
     
     # make sure we have an existing date
     if date is None:
@@ -2197,7 +2220,10 @@ def make_master_fibth(date=None):
             if os.path.isdir("/Volumes/BERGRAID/data/veloce/reduced/" + date + "/"):
                 ok = 1
     
-    path = "/Volumes/BERGRAID/data/veloce/reduced/" + date + "/"
+    if laptop:
+        path = "/Users/christoph/data/reduced/" + date + "/"
+    else:
+        path = "/Volumes/BERGRAID/data/veloce/reduced/" + date + "/"
                 
     # list of all Fibre Thoriums (ThAr for 20180917 or ThXe for all later nights)
     arc_list = glob.glob(path + 'ARC*optimal*')
@@ -2218,8 +2244,72 @@ def make_master_fibth(date=None):
 
 
 
-def make_arc_dispsols_for_all_nights(outpath='/Users/christoph/OneDrive - UNSW/dispsol/arc_dispsols/', 
-                                     deg_spectral=7, deg_spatial=7, polytype='chebyshev', overwrite=False, save_individual=False):
+
+def make_arc_dispsols(date, outpath='/Users/christoph/OneDrive - UNSW/dispsol/arc_dispsols/', deg_spectral=7, deg_spatial=7,
+                      polytype='chebyshev', savetable=False, savefits=True, overwrite=False, save_individual=False,
+                      laptop=False, debug_level=0, timit=False):
+
+    if timit:
+        start_time = time.time()
+
+    # fibslot = [0,1,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,23,24,25]
+    fibname = ['S5', 'S2', '07', '18', '17', '06', '16', '15', '05', '14', '13', '01', '12', '11', '04', '10', '09',
+               '03', '08', '19', '02', 'S4', 'S3', 'S1']
+
+    print('Creating ARC wavelength solution for ' + date + ' ...')
+
+    # make master arc for that night
+    master_arc = make_master_fibth(date=date, laptop=laptop)
+    # assert master_arc != [], 'ERROR: No FibThs found for '+date
+    if master_arc == []:
+        print('ERROR: No FibThs found for ' + date)
+        return -1
+
+    # prepare output array
+    all_air_wl = np.zeros(master_arc.shape)
+
+    # loop over all fibres
+    for fib in range(master_arc.shape[1]):
+
+        print('Processing fibre ' + fibname[fib])
+
+        # spectrum for that particular fibre
+        thflux = master_arc[:, fib, :]
+
+        # what kind of arc lamp is it?
+        if date == '20180917':
+            lamptype = 'thar'
+        else:
+            lamptype = 'thxe'
+
+        # calculate wl-solution
+        air_wl, vac_wl = get_dispsol_from_known_lines(thflux, fibre=fibname[fib], lamptype=lamptype, deg_spectral=deg_spectral,
+                                                      deg_spatial=deg_spatial, polytype=polytype, return_full=True,
+                                                      savetable=savetable, debug_level=debug_level, timit=timit)
+
+        # save to individual-fibre fits file(s)
+        if savefits:
+            # save to all-fibres-combined array
+            all_air_wl[:, fib, :] = air_wl[:-1, :].copy()  # do NOT include the blue-most order
+            if save_individual:
+                pyfits.writeto(outpath + lamptype + '_dispsol_' + date + '_fibre_' + fibname[fib] + '.fits', air_wl,
+                               clobber=overwrite)
+
+    # save to all-fibres-combined fits file
+    if savefits:
+        pyfits.writeto(outpath + lamptype + '_dispsol_' + date + '.fits', all_air_wl, clobber=overwrite)
+
+    if timit:
+        delta_t = time.time() - start_time
+        print('Time taken for creating ARC dispsol: ' + str(delta_t) + ' seconds')
+
+    return 1
+
+
+
+
+def make_arc_dispsols_for_all_nights(outpath='/Users/christoph/OneDrive - UNSW/dispsol/arc_dispsols/', deg_spectral=7, deg_spatial=7,
+                                     polytype='chebyshev', savetable=False, savefits=True, overwrite=False, save_individual=False):
     
     # get list of all nights
     datedir_list = glob.glob('/Volumes/BERGRAID/data/veloce/reduced/2019*')
@@ -2258,17 +2348,19 @@ def make_arc_dispsols_for_all_nights(outpath='/Users/christoph/OneDrive - UNSW/d
             
             # calculate wl-solution    
             air_wl, vac_wl = get_dispsol_from_known_lines(thflux, lamptype=lamptype, deg_spectral=deg_spectral, deg_spatial=deg_spatial,
-                                                          polytype=polytype, return_full=True, savetable=False, debug_level=0, timit=False)
+                                                          polytype=polytype, return_full=True, savetable=savetable, debug_level=0, timit=False)
             
             # save to all-fibres-combined array
             all_air_wl[:,fib,:] = air_wl[:-1,:].copy()     # do NOT include the blue-most order
             
             # save to individual-fibre fits file(s)
-            if save_individual:
-                pyfits.writeto(outpath + lamptype + '_dispsol_' + date + '_fibre_' + fibname[fib] + '.fits', air_wl, clobber=overwrite)
+            if savefits:
+                if save_individual:
+                    pyfits.writeto(outpath + lamptype + '_dispsol_' + date + '_fibre_' + fibname[fib] + '.fits', air_wl, clobber=overwrite)
                 
         # save to all-fibres-combined fits file
-        pyfits.writeto(outpath + lamptype + '_dispsol_' + date + '.fits', all_air_wl, clobber=overwrite)
+        if savefits:
+            pyfits.writeto(outpath + lamptype + '_dispsol_' + date + '.fits', all_air_wl, clobber=overwrite)
         
     return
 
