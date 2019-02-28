@@ -28,6 +28,14 @@ def define_target_dict(starnames):
     px = 16.15604552
     rv = 21.04070239e3
 
+    # for TOI394
+    ra = 48.49947914772984
+    dec = -8.573851369791486
+    pmra = -9.3210485208989
+    pmdec = -76.26200762315906
+    px = 6.994665452843984
+    rv = 18.040873585123297e3
+
     return target_dict
 
 

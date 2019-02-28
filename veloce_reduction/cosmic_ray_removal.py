@@ -24,7 +24,7 @@ def onedim_medfilt_cosmic_ray_removal(f, err, w=15, thresh=8., debug_level=0):
     err_sm = medfilt(err, w)
     badix = (f - f_sm) / err_sm > thresh
     if debug_level >= 1:
-        print('Number of bad pixels found: ',np.sum(badix))
+        print('Number of bad pixels found: ', np.sum(badix))
         plt.plot(badix * 1e5, color='orange')
         plt.plot(f - f_sm, 'b-')
     f_clean[badix] = f_sm[badix]

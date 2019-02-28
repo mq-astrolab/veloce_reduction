@@ -1151,9 +1151,26 @@ def wsv(data, err):
     return 1
 
 
+def xcorr(x, y, scale='none'):
+    # Pad shorter array if signals are different lengths
+    if x.size > y.size:
+        pad_amount = x.size - y.size
+        y = np.append(y, np.repeat(0, pad_amount))
+    elif y.size > x.size:
+        pad_amount = y.size - x.size
+        x = np.append(x, np.repeat(0, pad_amount))
 
+    corr = np.correlate(x, y, mode='full')  # scale = 'none'
+    lags = np.arange(-(x.size - 1), x.size)
 
+    if scale == 'biased':
+        corr = corr / x.size
+    elif scale == 'unbiased':
+        corr /= (x.size - abs(lags))
+    elif scale == 'coeff':
+        corr /= np.sqrt(np.dot(x, x) * np.dot(y, y))
 
+    return corr
 
 
 
