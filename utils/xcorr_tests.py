@@ -103,6 +103,7 @@ for i,file in enumerate(files):
 # calculate wl-solution for all fibres, including the LFC shifts and slopes; also append to reduced spectrum FITS file
 signflip_shift = True
 signflip_slope = True
+signflip_secord = True
 fudge = 1.
 maxdiff= []
 for i,filename in enumerate(files):
@@ -147,8 +148,14 @@ obsname_0 = '20sep30087'     # one of the higher SNR obs but closest to FibThars
 # obsname_0 = '24sep30078'     # that's the highest SNR observation for Sep 18
 # obsname_0 = '16nov30128'     # that's the highest SNR observation for Nov 18
 # obsname_0 = '25nov30084'     # that's the 2nd highest SNR observation for Nov 18
-wldict0,wl0 = get_dispsol_for_all_fibs(obsname_0, fudge=fudge, signflip_shift=signflip_shift, signflip_slope=signflip_slope)
+wldict0,wl0 = get_dispsol_for_all_fibs(obsname_0, fudge=fudge, signflip_shift=signflip_shift,
+                                       signflip_slope=signflip_slope, signflip_secord=signflip_secord)
 # wldict0,wl0 = get_dispsol_for_all_fibs_2(obsname_0)
+
+# use a synthetic template?
+# wl0, f0 = readcol('/Users/christoph/OneDrive - UNSW/synthetic_templates/' + 'synth_teff5250_logg45.txt', twod=False)
+wl0 = pyfits.getdata('/Users/christoph/OneDrive - UNSW/synthetic_templates/phoenix/WAVE_PHOENIX-ACES-AGSS-COND-2011.fits')
+f0 = pyfits.getdata('/Users/christoph/OneDrive - UNSW/synthetic_templates/phoenix/lte05400-4.50-0.0.PHOENIX-ACES-AGSS-COND-2011-HiRes.fits')
 
 for i,filename in enumerate(files):
     print('Processing RV for tau Ceti observation ' + str(i+1) + '/' + str(len(files)))

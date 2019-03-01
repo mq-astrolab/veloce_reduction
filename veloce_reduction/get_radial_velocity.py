@@ -289,7 +289,7 @@ def get_RV_from_xcorr(f, err, wl, f0, wl0, mask=None, smoothed_flat=None, osf=2,
 
 def get_RV_from_xcorr_2(f, wl, f0, wl0, bc=0, bc0=0, mask=None, smoothed_flat=None, delta_log_wl=1e-6, relgrid=False, osf=5,
                         addrange=150, fitrange=25, flipped=False, individual_fibres=True, individual_orders=True,
-                        fit_slope=False, debug_level=0, timit=False):
+                        fit_slope=False, synthetic_template=False, debug_level=0, timit=False):
     """
     This routine calculates the radial velocity of an observed spectrum relative to a template using cross-correlation.
     Note that input spectra should be de-blazed already!!!
@@ -312,6 +312,7 @@ def get_RV_from_xcorr_2(f, wl, f0, wl0, bc=0, bc0=0, mask=None, smoothed_flat=No
     'flipped'       : boolean - reverse order of inputs to xcorr routine?
     'individual_fibres'  : boolean - do you want to return the RVs for individual fibres? (if FALSE, then the RV is calculated from the sum of the ind. fib. CCFs)
     'individual_orders'  : boolean - do you want to return the RVs for individual orders? (if FALSE, then the RV is calculated from the sum of the ind. ord. CCFs)
+    'synthetic_template' : boolean - are you using a synthetic template?
     'debug_level'   : boolean - for debugging...
     'timit'         : boolean - for timing the execution run time...
 
@@ -335,15 +336,17 @@ def get_RV_from_xcorr_2(f, wl, f0, wl0, bc=0, bc0=0, mask=None, smoothed_flat=No
     if wl.shape[0] == 40:
         wl[0, :, :] = 1.
         wl[-1, :, :] = 1.
-        wl0[0, :, :] = 1.
-        wl0[-1, :, :] = 1.
+        if not synthetic_template:
+            wl0[0, :, :] = 1.
+            wl0[-1, :, :] = 1.
     elif wl.shape[0] == 39:
         wl[0, :, :] = 1.
-        wl0[0, :, :] = 1.
+        if not synthetic_template:
+            wl0[0, :, :] = 1.
 
     # make cross-correlation functions (list of length n_orders used)
     xcs = make_ccfs(f, wl, f0, wl0, bc=bc, bc0=bc0, mask=None, smoothed_flat=None, delta_log_wl=delta_log_wl, relgrid=False,
-                    flipped=flipped, individual_fibres=individual_fibres, debug_level=debug_level, timit=timit)
+                    flipped=flipped, individual_fibres=individual_fibres, synthetic_template=synthetic_template, debug_level=debug_level, timit=timit)
 
     # now fit Gaussian to central section of CCF for that order
     if relgrid:
@@ -492,7 +495,8 @@ def get_RV_from_xcorr_2(f, wl, f0, wl0, bc=0, bc0=0, mask=None, smoothed_flat=No
 
 
 def make_ccfs(f, wl, f0, wl0, bc=0., bc0=0., mask=None, smoothed_flat=None, delta_log_wl=1e-6, relgrid=False, osf=5,
-              filter_width=25, bad_threshold=0.05, flipped=False, individual_fibres=True, debug_level=0, timit=False):
+              filter_width=25, bad_threshold=0.05, flipped=False, individual_fibres=True, synthetic_template=False,
+              debug_level=0, timit=False):
     """
     This routine calculates the CCFs of an observed spectrum and a template spectrum for each order.
     Note that input spectra should be de-blazed already!!!
@@ -530,16 +534,26 @@ def make_ccfs(f, wl, f0, wl0, bc=0., bc0=0., mask=None, smoothed_flat=None, delt
     # speed of light in m/s
     c = 2.99792458e8
 
+    nfib = f.shape[1]
+
     # the dummy wavelengths for orders 'order_01' and 'order_40' cannot be zero as we're taking a log!!!
     if wl.shape[0] == 40:
         wl[0, :, :] = 1.
         wl[-1, :, :] = 1.
-        wl0[0, :, :] = 1.
-        wl0[-1, :, :] = 1.
+        if not synthetic_template:
+            wl0[0, :, :] = 1.
+            wl0[-1, :, :] = 1.
     if wl.shape[0] == 39:
         wl[0, :, :] = 1.
-        wl0[0, :, :] = 1.
+        if not synthetic_template:
+            wl0[0, :, :] = 1.
 
+
+    # read min and max of the wl ranges for the logwlgrid for the xcorr
+    # HARD-CODED...UGLY!!!
+    dumord, min_wl_arr, max_wl_arr = readcol('/Users/christoph/OneDrive - UNSW/dispsol/veloce_xcorr_wlrange.txt', twod=False)
+
+    # prepare output variable
     xcs = []
 
     # loop over orders
@@ -601,17 +615,26 @@ def make_ccfs(f, wl, f0, wl0, bc=0., bc0=0., mask=None, smoothed_flat=None, delt
         # f_unblazed = f[ord] / np.max(f[ord]) / normflat
 
         # define parts of the spectrum to use (based on the (unshifted) wl-solution of the central fibre in the template observation)
-        # TODO: try and optimize that for each order and even for each target
-        min_wl = np.min(wl0[o, 9, :]) + 20.
-        max_wl = np.max(wl0[o, 9, :]) - 12.
+        # # TODO: try and optimize that for each order and even for each target
+        # min_wl = np.min(wl0[o, 9, :]) + 20.
+        # max_wl = np.max(wl0[o, 9, :]) - 12.
+        min_wl = min_wl_arr[o]
+        max_wl = max_wl_arr[o]
 
         # now apply barycentric correction to wl and wl0 so that we can always use the SAME PARTS OF THE SPECTRUM for X-CORR
         wl_bcc = (1 + bc / c) * wl
-        wl0_bcc = (1 + bc0 / c) * wl0
-
         # create logarithmic wavelength grid
         logwl = np.log(wl_bcc[o, :, :])
-        logwl0 = np.log(wl0_bcc[o, :, :])
+        if not synthetic_template:
+            wl0_bcc = (1 + bc0 / c) * wl0
+            logwl0 = np.log(wl0_bcc[o, :, :])
+        else:
+            # create logarithmic wavelength grid for the synthetic template (first trim, then go to log space)
+            ordix_0 = (wl0 >= np.min(wl[o, 9, :])) & (wl0 <= np.max(wl[o, 9, :]))
+            wl0_ord = wl0[ordix_0]
+            logwl0 = np.log(wl0_ord)
+            f0_ord = f0[ordix_0]
+
         if relgrid:
             logwlgrid = np.linspace(np.min(logwl[ordmask]), np.max(logwl[ordmask]), osf * np.sum(ordmask))
             delta_log_wl = logwlgrid[1] - logwlgrid[0]
@@ -628,22 +651,30 @@ def make_ccfs(f, wl, f0, wl0, bc=0., bc0=0., mask=None, smoothed_flat=None, delt
 
         # wavelength array must be increasing for "InterpolatedUnivariateSpline" to work --> turn arrays around if necessary!!!
         if (np.diff(logwl) < 0).any():
-            logwl_sorted = logwl[:, ::-1].copy()
-            logwl0_sorted = logwl0[:, ::-1].copy()
+            logwl_sorted = logwl[:,::-1].copy()
+            ord_f_sorted = f[o,:,::-1].copy()
             # ordmask_sorted = ordmask[::-1].copy()
-            ord_f0_sorted = f0[o, :, ::-1].copy()
-            ord_f_sorted = f[o, :, ::-1].copy()
+            if not synthetic_template:
+                logwl0_sorted = logwl0[:,::-1].copy()
+                ord_f0_sorted = f0[o,:,::-1].copy()
+            else:
+                logwl0_sorted = np.array([logwl0,]*nfib)
+                ord_f0_sorted = np.array([f0_ord,]*nfib)
         else:
             logwl_sorted = logwl.copy()
-            logwl0_sorted = logwl0.copy()
-            # ordmask_sorted = ordmask.copy()
-            ord_f0_sorted = f0[ord].copy()
             ord_f_sorted = f[ord].copy()
+            # ordmask_sorted = ordmask.copy()
+            if not synthetic_template:
+                logwl0_sorted = logwl0.copy()
+                ord_f0_sorted = f0[ord].copy()
+            else:
+                logwl0_sorted = np.array([logwl0,]*19)
+                ord_f0_sorted = np.array([f0_ord,]*nfib)
 
         # rebin spectra onto logarithmic wavelength grid
         # rebinned_f0 = np.interp(logwlgrid,logwl[mask],f0_unblazed[mask])
         # rebinned_f = np.interp(logwlgrid,logwl[mask],f_unblazed[mask])
-        nfib = ord_f0_sorted.shape[0]
+        # nfib = ord_f_sorted.shape[0] (already done above now)
         rebinned_f0 = np.zeros((nfib, len(logwlgrid)))
         rebinned_f = np.zeros((nfib, len(logwlgrid)))
         for i in range(nfib):

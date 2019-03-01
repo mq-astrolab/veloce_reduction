@@ -1905,7 +1905,8 @@ def define_pixel_offsets_between_fibres(date, relto='S1', savedict=False, savepl
 
 
 def get_dispsol_for_all_fibs(obsname, relto='LFC', twod=False, degpol=7, deg_spectral=7, deg_spatial=7, fibs='stellar', nx=4112,
-                             polytype='chebyshev', refit=False, debug_level=0, timit=False, fudge=1., signflip_shift=True, signflip_slope=True):
+                             polytype='chebyshev', refit=False, debug_level=0, timit=False, fudge=1., signflip_shift=True,
+                             signflip_slope=True, signflip_secord=True):
 
     '''using Duncan's xcorrs to measure LFC shifts'''
 
@@ -1925,12 +1926,23 @@ def get_dispsol_for_all_fibs(obsname, relto='LFC', twod=False, degpol=7, deg_spe
     lfc_pix -= 1.   # b/c DW is using Matlab, which starts indexing at 1 not at 0!!!!!!!
 
     # read file containing slope and offset as measured from LFC peak positions
-    lfc_slope, lfc_shift = readcol('/Users/christoph/OneDrive - UNSW/dispsol/laser_offsets/relto_21sep30019/' + obsname + '_Slope_and_Offset.txt', twod=False)
+    # read file and see how many coefficients are provided
+    fn = '/Users/christoph/OneDrive - UNSW/dispsol/laser_offsets/relto_21sep30019/' + obsname + '_Slope_and_Offset.txt'
+    dum = readcol(fn)
+    n_coeffs = dum.shape[1]
+    assert n_coeffs in [2,3], "ERROR: DW's LFC drift coefficient files do not have exactly two or three colums!!!"
+    if n_coeffs == 2:
+        lfc_slope, lfc_shift = readcol(fn, twod=False)
+        lfc_secord = np.zeros(lfc_slope.shape)
+    if n_coeffs == 3:
+        lfc_secord, lfc_slope, lfc_shift = readcol(fn, twod=False)
 
     if signflip_slope:
         lfc_slope *= -1.
     if signflip_shift:
         lfc_shift *= -1.
+    if signflip_secord:
+        lfc_secord *= -1.
 
     # some housekeeping...
     n_ord = len(np.unique(lfc_ord))
@@ -1959,7 +1971,7 @@ def get_dispsol_for_all_fibs(obsname, relto='LFC', twod=False, degpol=7, deg_spe
                 # # now apply the shift to the pixel positions
                 # diff = - lfc_shift[o-1] + lfc_slope[o-1] * x0     # signs are confusing here, but comparison to DW's results suggests this is correct
                 # x = x0 + diff - np.max(diff) + np.min(diff)       # signs are confusing here, but comparison to DW's results suggests this is correctly
-                diff = lfc_shift[o-1] + lfc_slope[o-1] * x0         # need the o-1 here because Duncan's indices start with 1
+                diff = lfc_shift[o-1] + lfc_slope[o-1] * x0 + lfc_secord[o-1] * x0**2        # need the o-1 here because Duncan's indices start with 1
                 x = x0 - fudge * diff
                 lfc_fit = np.poly1d(np.polyfit(x, lam, degpol))
                 newly_fit_dispsol = lfc_fit(xx)
@@ -1974,7 +1986,7 @@ def get_dispsol_for_all_fibs(obsname, relto='LFC', twod=False, degpol=7, deg_spe
                     wl[o,i,:] = fib_fit(xx)
             # or re-evaluate the master fit at new x-values (better b/c less margin for fitting variations and hence more constancy)
             else:
-                xx_prime = xx + fudge * (lfc_shift[o-1] + lfc_slope[o-1] * xx)
+                xx_prime = xx + fudge * (lfc_shift[o-1] + lfc_slope[o-1] * xx + lfc_secord[o-1] * xx**2)
                 eval_xprime_dispsol = master_lfc_fit(xx_prime)
                 wldict[ord]['laser'] = eval_xprime_dispsol[::-1]   # need to turn around, b/c DW's LFC spectra are flipped (left-right) wrt to CBs
                 # need to flip x now, because the pixfit_coeffs are using CMB layout
@@ -1984,7 +1996,7 @@ def get_dispsol_for_all_fibs(obsname, relto='LFC', twod=False, degpol=7, deg_spe
                     xfib_flipped = x0_flipped + pixfit_coeffs[ord]['fibre_'+fib](x0_flipped)
                     xfib = (nx - 1) - xfib_flipped   # and flip it back --> can't think right now, can I combine those two flips???
                     master_lfc_fit_fib = np.poly1d(np.polyfit(xfib, lam, degpol))
-                    xx_prime_fib = xx + fudge * (lfc_shift[o-1] + lfc_slope[o-1] * xx)
+                    xx_prime_fib = xx + fudge * (lfc_shift[o-1] + lfc_slope[o-1] * xx + lfc_secord[o-1] * xx**2)
                     eval_xprime_dispsol_fib = master_lfc_fit_fib(xx_prime_fib)
                     wldict[ord][fib] = eval_xprime_dispsol_fib[::-1]
                     wl[o,i,:] = eval_xprime_dispsol_fib[::-1]
