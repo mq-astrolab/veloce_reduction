@@ -274,7 +274,7 @@ def get_RV_from_xcorr(f, err, wl, f0, wl0, mask=None, smoothed_flat=None, osf=2,
         mu = popt[0]
 #         print(ord, f[ord][3000:3003])
 #         print(ord, f[ord][::-1][3000:3003])
-        mu_err = pcov[0,0]
+        mu_err = np.sqrt(pcov[0,0])
         #convert to RV in m/s
         rv[ord] = c * (mu - (len(xc)//2)) * delta_log_wl
         rverr[ord] = c * mu_err * delta_log_wl
@@ -450,7 +450,7 @@ def get_RV_from_xcorr_2(f, wl, f0, wl0, bc=0, bc0=0, mask=None, smoothed_flat=No
                     popt, pcov = op.curve_fit(gausslike_with_amp_and_offset, xrange, xc[xrange] - np.min(xc[xrange]),
                                               p0=guess, maxfev=1000000)
                     mu = popt[0]
-                    mu_err = pcov[0, 0]
+                    mu_err = np.sqrt(pcov[0, 0])
                     if debug_level >= 1:
                         print('Fit successful...')
                 except:
