@@ -1904,23 +1904,43 @@ def define_pixel_offsets_between_fibres(date, relto='S1', savedict=False, savepl
 
 
 
-def get_dispsol_for_all_fibs(obsname, relto='LFC', twod=False, degpol=7, deg_spectral=7, deg_spatial=7, fibs='stellar', nx=4112,
+def old_get_dispsol_for_all_fibs(obsname, date=None, relto='LFC', twod=False, degpol=7, deg_spectral=7, deg_spatial=7, fibs='stellar', nx=4112,
                              polytype='chebyshev', refit=False, debug_level=0, timit=False, fudge=1., signflip_shift=True,
-                             signflip_slope=True, signflip_secord=True):
+                             signflip_slope=True, signflip_secord=True, nightly_coeffs=True):
 
     '''using Duncan's xcorrs to measure LFC shifts'''
 
     if timit:
         start_time = time.time()
 
-    # laod default coefficients
-    pixfit_coeffs = np.load('/Users/christoph/OneDrive - UNSW/dispsol_tests/20180917/pixfit_coeffs_relto_' + relto + '_as_of_2018-11-14.npy').item()
-    
+    # if no date is provided, get it from the obsname
+    if date is None:
+        day = obsname[:2]
+        monstr = obsname[2:5]
+        months = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec']
+        mon = str(1 + np.argwhere(np.array(months) == monstr)[0][0]).zfill(2)
+        if mon in ['01', '02']:
+            yr = '2019'
+        else:
+            yr = '2018'
+        date = yr + mon + day
+
+    # need to do this b/c not all files have a pixfit coeffs file
+    if nightly_coeffs:
+        pc_fn = '/Users/christoph/OneDrive - UNSW/dispsol/pixfit_coeffs/pixfit_coeffs_relto_' + relto + '_for_' + date + '.npy'
+        while not os.path.isfile(pc_fn):
+            date = str(int(date) - 1)
+            pc_fn = '/Users/christoph/OneDrive - UNSW/dispsol/pixfit_coeffs/pixfit_coeffs_relto_' + relto + '_for_' + date + '.npy'
+    else:
+        # load default coefficients
+        pc_fn = '/Users/christoph/OneDrive - UNSW/dispsol_tests/20180917/pixfit_coeffs_relto_' + relto + '_as_of_2018-11-14.npy'
+    pixfit_coeffs = np.load(pc_fn).item()
+
     # fibslot = [0,1,   3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,   23,24,25]
     fibname = ['S5', 'S2', '07', '18', '17', '06', '16', '15', '05', '14', '13', '01', '12', '11', '04', '10', '09', '03', '08', '19', '02', 'S4', 'S3', 'S1']
-    
+
     nfib = len(fibname)
-    
+
     # read master LFC linelist
     lfc_ord, lfc_pix, lfc_wl = readcol('/Users/christoph/OneDrive - UNSW/dispsol/laser_dispsol_20181015/PeakPos.txt', twod=False)
     lfc_pix -= 1.   # b/c DW is using Matlab, which starts indexing at 1 not at 0!!!!!!!
@@ -1936,23 +1956,27 @@ def get_dispsol_for_all_fibs(obsname, relto='LFC', twod=False, degpol=7, deg_spe
         lfc_secord = np.zeros(lfc_slope.shape)
     if n_coeffs == 3:
         lfc_secord, lfc_slope, lfc_shift = readcol(fn, twod=False)
+        # TESTING ONLY!!!
+        # lfc_shift = np.zeros(lfc_slope.shape)
+        # lfc_secord = np.zeros(lfc_slope.shape)
+        # lfc_slope = np.zeros(lfc_slope.shape)
 
-    if signflip_slope:
-        lfc_slope *= -1.
     if signflip_shift:
         lfc_shift *= -1.
+    if signflip_slope:
+        lfc_slope *= -1.
     if signflip_secord:
         lfc_secord *= -1.
 
     # some housekeeping...
     n_ord = len(np.unique(lfc_ord))
     xx = np.arange(nx)
-    
+
     # prepare outputs
     wldict = {}
     # wl = np.zeros((n_ord, nfib, nx))
     wl = np.zeros((40, nfib, nx))
-    
+
     if not twod:
         if debug_level >= 1:
             print('OK, getting a 1-D wavelength solution...')
@@ -1964,7 +1988,7 @@ def get_dispsol_for_all_fibs(obsname, relto='LFC', twod=False, degpol=7, deg_spe
             x0 = lfc_pix[ix]
             lam = lfc_wl[ix]
             master_lfc_fit = np.poly1d(np.polyfit(x0, lam, degpol))
-            
+
             # either perform a new fit using the new x-values
             if refit:
                 # FFFFUUUUU, broke my brain turning that around, but don't need to, b/c DW's LFC spectra are flipped (left-right) wrt to CBs
@@ -1986,7 +2010,8 @@ def get_dispsol_for_all_fibs(obsname, relto='LFC', twod=False, degpol=7, deg_spe
                     wl[o,i,:] = fib_fit(xx)
             # or re-evaluate the master fit at new x-values (better b/c less margin for fitting variations and hence more constancy)
             else:
-                xx_prime = xx + fudge * (lfc_shift[o-1] + lfc_slope[o-1] * xx + lfc_secord[o-1] * xx**2)
+                diff = lfc_shift[o-1] + lfc_slope[o-1] * x0 + lfc_secord[o-1] * x0**2
+                xx_prime = xx + fudge * diff
                 eval_xprime_dispsol = master_lfc_fit(xx_prime)
                 wldict[ord]['laser'] = eval_xprime_dispsol[::-1]   # need to turn around, b/c DW's LFC spectra are flipped (left-right) wrt to CBs
                 # need to flip x now, because the pixfit_coeffs are using CMB layout
@@ -1996,41 +2021,42 @@ def get_dispsol_for_all_fibs(obsname, relto='LFC', twod=False, degpol=7, deg_spe
                     xfib_flipped = x0_flipped + pixfit_coeffs[ord]['fibre_'+fib](x0_flipped)
                     xfib = (nx - 1) - xfib_flipped   # and flip it back --> can't think right now, can I combine those two flips???
                     master_lfc_fit_fib = np.poly1d(np.polyfit(xfib, lam, degpol))
-                    xx_prime_fib = xx + fudge * (lfc_shift[o-1] + lfc_slope[o-1] * xx + lfc_secord[o-1] * xx**2)
+                    diff_xx = lfc_shift[o-1] + lfc_slope[o-1] * xx + lfc_secord[o-1] * xx**2
+                    xx_prime_fib = xx + fudge * diff_xx
                     eval_xprime_dispsol_fib = master_lfc_fit_fib(xx_prime_fib)
                     wldict[ord][fib] = eval_xprime_dispsol_fib[::-1]
                     wl[o,i,:] = eval_xprime_dispsol_fib[::-1]
-       
+
     else:
 
         print('THIS IS STILL WRONG (needs to be flipped) - USE THE 1-DIM VERSION FOR NOW!!!')
 
         if debug_level >= 1:
             print('OK, getting a 2-D wavelength solution...')
-            
+
         order = lfc_ord.copy() + 1     # DW's order numbers are offset by one to CB's
         pixel = np.tile(lfc_pix.copy(), (nfib,1))
         lam = lfc_wl.copy()
-        
+
         # temporarily remove the blue-most order until I have incorporated that into the rest of the reduction
         dumix = np.argwhere(lfc_ord == 39).flatten()
         order = np.delete(order, dumix)
         pixel = np.delete(pixel,dumix,1)
         lam = np.delete(lam,dumix)
-        
+
         # fit the pure LFC dispsol
         x_norm = np.squeeze( (pixel[0,:] / ((nx-1)/2.)) - 1. )
         order_norm = np.squeeze( ((order-1) / ((40-1)/2.)) - 1. )
-        p_wl_lfc = fit_poly_surface_2D(x_norm, order_norm, lam, weights=None, polytype=polytype, poly_deg_x=deg_spectral, poly_deg_y=deg_spatial, debug_level=0)    
+        p_wl_lfc = fit_poly_surface_2D(x_norm, order_norm, lam, weights=None, polytype=polytype, poly_deg_x=deg_spectral, poly_deg_y=deg_spatial, debug_level=0)
         # calculate wavelengths from model for full (n_ord x n_pix)-array
         xxn = (xx / ((len(xx)-1)/2.)) - 1.
         oo = np.arange(1,41)
-        oon = ((oo-1) / ((40-1)/2.)) - 1.   
+        oon = ((oo-1) / ((40-1)/2.)) - 1.
         X,O = np.meshgrid(xxn,oon)
         wl_lfc = p_wl_lfc(X,O)
-            
+
         # loop over all orders
-        for o in np.unique(lfc_ord)[:-1]:    
+        for o in np.unique(lfc_ord)[:-1]:
             ord = 'order_'+str(o+1).zfill(2)     # DW's order numbers are offset by one to CB's
             wldict[ord] = {}
             ix = np.argwhere(lfc_ord == o).flatten()
@@ -2041,7 +2067,7 @@ def get_dispsol_for_all_fibs(obsname, relto='LFC', twod=False, degpol=7, deg_spe
             # loop over all fibres
             for i,fib in enumerate(fibname):
                 pixel[i,ix] = x + pixfit_coeffs[ord]['fibre_'+fib](x)
-        
+
         # now fit a 2-D wavelength solution for each fibre individually
         # loop over all fibres
         for i,fib in enumerate(fibname):
@@ -2051,18 +2077,18 @@ def get_dispsol_for_all_fibs(obsname, relto='LFC', twod=False, degpol=7, deg_spe
             # go to normalized co-ordinates
             x_norm = np.squeeze( (pixel[i,:] / ((nx-1)/2.)) - 1. )
             order_norm = np.squeeze( ((order-1) / ((40-1)/2.)) - 1. )
-        
+
             # call the 2D fitting routine
-            p_wl = fit_poly_surface_2D(x_norm, order_norm, lam, weights=None, polytype=polytype, poly_deg_x=deg_spectral, poly_deg_y=deg_spatial, debug_level=0)    
-            
+            p_wl = fit_poly_surface_2D(x_norm, order_norm, lam, weights=None, polytype=polytype, poly_deg_x=deg_spectral, poly_deg_y=deg_spatial, debug_level=0)
+
             # calculate wavelengths from model for full (n_ord x n_pix)-array
             xxn = (xx / ((len(xx)-1)/2.)) - 1.
             oo = np.arange(1,41)
-            oon = ((oo-1) / ((40-1)/2.)) - 1.   
+            oon = ((oo-1) / ((40-1)/2.)) - 1.
             X,O = np.meshgrid(xxn,oon)
             wl[:,i,:] = p_wl(X,O)
-            
-        for i,o in enumerate(np.unique(lfc_ord)[:-1]):    
+
+        for i,o in enumerate(np.unique(lfc_ord)[:-1]):
             ord = 'order_'+str(o+1).zfill(2)
             for j,fib in enumerate(fibname):
                 wldict[ord]['fibre_'+fib] = wl[o,j,:].copy()
@@ -2080,6 +2106,200 @@ def get_dispsol_for_all_fibs(obsname, relto='LFC', twod=False, degpol=7, deg_spe
     return wldict,wl
 
 
+
+def get_dispsol_for_all_fibs(obsname, date=None, relto='LFC', twod=False, degpol=7, deg_spectral=7, deg_spatial=7, fibs='stellar', nx=4112,
+                             polytype='chebyshev', refit=False, debug_level=0, timit=False, fudge=1., signflip_shift=True,
+                             signflip_slope=True, signflip_secord=True, nightly_coeffs=True):
+
+    '''using Duncan's xcorrs to measure LFC shifts'''
+
+    if timit:
+        start_time = time.time()
+
+    # if no date is provided, get it from the obsname
+    if date is None:
+        day = obsname[:2]
+        monstr = obsname[2:5]
+        months = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec']
+        mon = str(1 + np.argwhere(np.array(months) == monstr)[0][0]).zfill(2)
+        if mon in ['01', '02']:
+            yr = '2019'
+        else:
+            yr = '2018'
+        date = yr + mon + day
+
+    # need to do this b/c not all files have a pixfit coeffs file
+    if nightly_coeffs:
+        pc_fn = '/Users/christoph/OneDrive - UNSW/dispsol/pixfit_coeffs/pixfit_coeffs_relto_' + relto + '_for_' + date + '.npy'
+        while not os.path.isfile(pc_fn):
+            date = str(int(date) - 1)
+            pc_fn = '/Users/christoph/OneDrive - UNSW/dispsol/pixfit_coeffs/pixfit_coeffs_relto_' + relto + '_for_' + date + '.npy'
+    else:
+        # load default coefficients
+        pc_fn = '/Users/christoph/OneDrive - UNSW/dispsol_tests/20180917/pixfit_coeffs_relto_' + relto + '_as_of_2018-11-14.npy'
+    pixfit_coeffs = np.load(pc_fn).item()
+
+    # fibslot = [0,1,   3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,   23,24,25]
+    fibname = ['S5', 'S2', '07', '18', '17', '06', '16', '15', '05', '14', '13', '01', '12', '11', '04', '10', '09', '03', '08', '19', '02', 'S4', 'S3', 'S1']
+
+    nfib = len(fibname)
+
+    # read master LFC linelist
+    lfc_ord, lfc_pix, lfc_wl = readcol('/Users/christoph/OneDrive - UNSW/dispsol/laser_dispsol_20181015/PeakPos.txt', twod=False)
+    lfc_pix = 4112 - lfc_pix   # b/c DW is using Matlab, which starts indexing at 1 not at 0, and also his pixels increase with wl, mine decrease
+
+    # read file containing slope and offset as measured from LFC peak positions
+    # read file and see how many coefficients are provided
+    fn = '/Users/christoph/OneDrive - UNSW/dispsol/laser_offsets/relto_21sep30019/' + obsname + '_Slope_and_Offset.txt'
+    dum = readcol(fn)
+    n_coeffs = dum.shape[1]
+    assert n_coeffs in [2,3], "ERROR: DW's LFC drift coefficient files do not have exactly two or three colums!!!"
+    if n_coeffs == 2:
+        lfc_slope, lfc_shift = readcol(fn, twod=False)
+        lfc_secord = np.zeros(lfc_slope.shape)
+    if n_coeffs == 3:
+        lfc_secord, lfc_slope, lfc_shift = readcol(fn, twod=False)
+        # TESTING ONLY!!!
+        # lfc_shift = np.zeros(lfc_slope.shape)
+        # lfc_secord = np.zeros(lfc_slope.shape)
+        # lfc_slope = np.zeros(lfc_slope.shape)
+
+    # if signflip_shift:
+    #     lfc_shift *= -1.
+    # if signflip_slope:
+    #     lfc_slope *= -1.
+    # if signflip_secord:
+    #     lfc_secord *= -1.
+
+    # some housekeeping...
+    n_ord = len(np.unique(lfc_ord))
+    xx = np.arange(nx)
+
+    # prepare outputs
+    wldict = {}
+    # wl = np.zeros((n_ord, nfib, nx))
+    wl = np.zeros((40, nfib, nx))
+
+    if not twod:
+        if debug_level >= 1:
+            print('OK, getting a 1-D wavelength solution...')
+        # loop over all orders
+        for o in np.unique(lfc_ord)[:-1]:
+            ord = 'order_'+str(o+1).zfill(2)     # DW's order numbers are offset by one to CB's
+            wldict[ord] = {}
+            ix = np.argwhere(lfc_ord == o).flatten()
+            x0 = lfc_pix[ix]
+            lam = lfc_wl[ix]
+            master_lfc_fit = np.poly1d(np.polyfit(x0, lam, degpol))
+
+            # either perform a new fit using the new x-values
+            if refit:
+                # no more x-flipping needed b/c already done above, but need to add one b/x Python vs Matlab indexing
+                diff = lfc_shift[o-1] + lfc_slope[o-1] * (x0+1) + lfc_secord[o-1] * (x0+1)**2     # also, the o-1 is needed b/c Duncan starts at order_02
+                x = x0 - fudge * diff
+                lfc_fit = np.poly1d(np.polyfit(x, lam, degpol))
+                newly_fit_dispsol = lfc_fit(xx)
+                wldict[ord]['laser'] = newly_fit_dispsol
+                # loop over all fibres
+                for i,fib in enumerate(fibname):
+                    xfib = x + pixfit_coeffs[ord]['fibre_'+fib](x)
+                    fib_fit = np.poly1d(np.polyfit(xfib, lam, degpol))
+                    wldict[ord][fib] = fib_fit(xx)
+                    wl[o,i,:] = fib_fit(xx)
+            # or re-evaluate the master fit at new x-values (better b/c less margin for fitting variations and hence more constancy)
+            else:
+                diff_xx = lfc_shift[o-1] + lfc_slope[o-1] * (xx+1) + lfc_secord[o-1] * (xx+1)**2  # also, the o-1 is needed b/c Duncan starts at order_02
+                xx_prime = xx + fudge * diff_xx
+                eval_xprime_dispsol = master_lfc_fit(xx_prime)
+                wldict[ord]['laser'] = eval_xprime_dispsol
+                # loop over all fibres
+                for i,fib in enumerate(fibname):
+                    xfib = x0 + pixfit_coeffs[ord]['fibre_'+fib](x0)
+                    # xfib = (nx - 1) - xfib_flipped   # and flip it back --> can't think right now, can I combine those two flips???
+                    master_lfc_fit_fib = np.poly1d(np.polyfit(xfib, lam, degpol))
+                    # diff_xx = lfc_shift[o-1] + lfc_slope[o-1] * xx + lfc_secord[o-1] * xx**2
+                    xx_prime_fib = xx + fudge * diff_xx   # same as xx_prime, but OK
+                    eval_xprime_dispsol_fib = master_lfc_fit_fib(xx_prime_fib)
+                    wldict[ord][fib] = eval_xprime_dispsol_fib
+                    wl[o,i,:] = eval_xprime_dispsol_fib
+
+    else:
+
+        print('THIS IS STILL WRONG (needs to be flipped) - USE THE 1-DIM VERSION FOR NOW!!!')
+
+        if debug_level >= 1:
+            print('OK, getting a 2-D wavelength solution...')
+
+        order = lfc_ord.copy() + 1     # DW's order numbers are offset by one to CB's
+        pixel = np.tile(lfc_pix.copy(), (nfib,1))
+        lam = lfc_wl.copy()
+
+        # temporarily remove the blue-most order until I have incorporated that into the rest of the reduction
+        dumix = np.argwhere(lfc_ord == 39).flatten()
+        order = np.delete(order, dumix)
+        pixel = np.delete(pixel,dumix,1)
+        lam = np.delete(lam,dumix)
+
+        # fit the pure LFC dispsol
+        x_norm = np.squeeze( (pixel[0,:] / ((nx-1)/2.)) - 1. )
+        order_norm = np.squeeze( ((order-1) / ((40-1)/2.)) - 1. )
+        p_wl_lfc = fit_poly_surface_2D(x_norm, order_norm, lam, weights=None, polytype=polytype, poly_deg_x=deg_spectral, poly_deg_y=deg_spatial, debug_level=0)
+        # calculate wavelengths from model for full (n_ord x n_pix)-array
+        xxn = (xx / ((len(xx)-1)/2.)) - 1.
+        oo = np.arange(1,41)
+        oon = ((oo-1) / ((40-1)/2.)) - 1.
+        X,O = np.meshgrid(xxn,oon)
+        wl_lfc = p_wl_lfc(X,O)
+
+        # loop over all orders
+        for o in np.unique(lfc_ord)[:-1]:
+            ord = 'order_'+str(o+1).zfill(2)     # DW's order numbers are offset by one to CB's
+            wldict[ord] = {}
+            ix = np.argwhere(lfc_ord == o).flatten()
+            x0 = lfc_pix[ix]
+            # now apply the shift to the pixel positions
+            diff = - lfc_shift[o-1] + lfc_slope[o-1] * x0   # signs are confusing here, but comparison to DW's results suggests this is correct
+            x = x0 + diff - np.max(diff) + np.min(diff)     # signs are confusing here, but comparison to DW's results suggests this is correct
+            # loop over all fibres
+            for i,fib in enumerate(fibname):
+                pixel[i,ix] = x + pixfit_coeffs[ord]['fibre_'+fib](x)
+
+        # now fit a 2-D wavelength solution for each fibre individually
+        # loop over all fibres
+        for i,fib in enumerate(fibname):
+            if debug_level >= 1:
+                print(fib)
+            # print(fib)
+            # go to normalized co-ordinates
+            x_norm = np.squeeze( (pixel[i,:] / ((nx-1)/2.)) - 1. )
+            order_norm = np.squeeze( ((order-1) / ((40-1)/2.)) - 1. )
+
+            # call the 2D fitting routine
+            p_wl = fit_poly_surface_2D(x_norm, order_norm, lam, weights=None, polytype=polytype, poly_deg_x=deg_spectral, poly_deg_y=deg_spatial, debug_level=0)
+
+            # calculate wavelengths from model for full (n_ord x n_pix)-array
+            xxn = (xx / ((len(xx)-1)/2.)) - 1.
+            oo = np.arange(1,41)
+            oon = ((oo-1) / ((40-1)/2.)) - 1.
+            X,O = np.meshgrid(xxn,oon)
+            wl[:,i,:] = p_wl(X,O)
+
+        for i,o in enumerate(np.unique(lfc_ord)[:-1]):
+            ord = 'order_'+str(o+1).zfill(2)
+            for j,fib in enumerate(fibname):
+                wldict[ord]['fibre_'+fib] = wl[o,j,:].copy()
+            wldict[ord]['laser'] = wl_lfc[o,:].copy()
+
+    if timit:
+        print('Time elapsed: '+str(np.round(time.time() - start_time,1))+' seconds')
+
+    if fibs not in ['all', 'stellar']:
+        print('ERROR: "fibs" not valid!!!')
+        return
+    elif fibs == 'stellar':
+        wl = wl[:,2:21,:]
+
+    return wldict,wl
 
 
 

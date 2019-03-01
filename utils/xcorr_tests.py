@@ -145,10 +145,11 @@ f0 = pyfits.getdata(files[6], 0)   # one of the higher SNR obs but closest to Fi
 # wl0 = pyfits.getdata(files[69], 2)
 # wl0 = pyfits.getdata('/Users/christoph/OneDrive - UNSW/dispsol/individual_fibres_dispsol_poly7_21sep30019.fits')
 obsname_0 = '20sep30087'     # one of the higher SNR obs but closest to FibThars used to define fibtofib wl shifts
+date_0 = '20180920'
 # obsname_0 = '24sep30078'     # that's the highest SNR observation for Sep 18
 # obsname_0 = '16nov30128'     # that's the highest SNR observation for Nov 18
 # obsname_0 = '25nov30084'     # that's the 2nd highest SNR observation for Nov 18
-wldict0,wl0 = get_dispsol_for_all_fibs(obsname_0, fudge=fudge, signflip_shift=signflip_shift,
+wldict0,wl0 = get_dispsol_for_all_fibs(obsname_0, date=date_0, fudge=fudge, signflip_shift=signflip_shift,
                                        signflip_slope=signflip_slope, signflip_secord=signflip_secord)
 # wldict0,wl0 = get_dispsol_for_all_fibs_2(obsname_0)
 
@@ -178,7 +179,7 @@ xcsums = np.array(xcsums)
 
 # overplot all tau ceti spectra with the barycorr removed so that in theory they should all perfectly overlap
 # colour-coding by runs
-
+o=26
 for i,filename in enumerate(files):
     print('Processing RV for tau Ceti observation ' + str(i + 1) + '/' + str(len(files)))
     f = pyfits.getdata(filename, 0)
@@ -186,11 +187,14 @@ for i,filename in enumerate(files):
     dum2 = dum[-1].split('.')
     dum3 = dum2[0].split('_')
     obsname = dum3[1]
-    wldict, wl = get_dispsol_for_all_fibs(obsname, fudge=fudge, signflip_shift=signflip_shift, signflip_slope=signflip_slope, refit=True)
+    wldict, wl = get_dispsol_for_all_fibs(obsname, fudge=fudge, signflip_shift=signflip_shift, signflip_slope=signflip_slope,
+                                          signflip_secord=signflip_secord, nightly_coeffs=False)
     wl_bcc = (1 + all_bc[i] / c) * wl
     wl0_bcc = (1 + all_bc[6] / c) * wl0
     logwl = np.log(wl_bcc[o, :, :])
     logwl0 = np.log(wl0_bcc[o, :, :])
+    min_wl = min_wl_arr[o]
+    max_wl = max_wl_arr[o]
     logwlgrid = np.arange(np.log(min_wl), np.log(max_wl), delta_log_wl)
     logwl_sorted = logwl[:, ::-1].copy()
     logwl0_sorted = logwl0[:, ::-1].copy()
