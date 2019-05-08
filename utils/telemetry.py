@@ -183,7 +183,8 @@ def check_tauceti_shifts_with_telemetry():
 def check_all_shifts_with_telemetry(nx=4112, save_M=False, save_shifts=False, verbose=False):
     
     peak_path = '/Volumes/BERGRAID/data/veloce/lfc_peaks/all/'
-    # data_path = '/Volumes/BERGRAID/data/veloce/raw_goodonly/'
+#     peak_path = '/Volumes/BERGRAID/data/veloce/lfc_peaks/tauceti/'
+#     data_path = '/Volumes/BERGRAID/data/veloce/raw_goodonly/'
     data_path = '/Volumes/BERGRAID/data/veloce/raw/'
     
     peak_files_sep = glob.glob(peak_path + '*sep*olc.nst')

@@ -455,13 +455,13 @@ def optimal_extraction(stripes, err_stripes=None, ron_stripes=None, RON=0., slit
                 # get normalized profiles for all fibres for this cutout
                 if combined_profiles:
                     print('WARNING: we currently do not have a profile estimate for the calibration fibres!!!')
-                    phi_laser = np.sum(make_norm_profiles_4(sr[:, i], i, fppo, integrate=integrate_profiles, fibs='laser'), axis=1)
-                    phi_thxe = np.sum(make_norm_profiles_4(sr[:, i], i, fppo, integrate=integrate_profiles, fibs='thxe'), axis=1)
-                    phis_sky3 = make_norm_profiles_4(sr[:, i], i, fppo, integrate=integrate_profiles, fibs='sky3')
+                    phi_laser = np.sum(make_norm_profiles_5(sr[:, i], i, fppo, integrate=integrate_profiles, fibs='laser'), axis=1)
+                    phi_thxe = np.sum(make_norm_profiles_5(sr[:, i], i, fppo, integrate=integrate_profiles, fibs='thxe'), axis=1)
+                    phis_sky3 = make_norm_profiles_5(sr[:, i], i, fppo, integrate=integrate_profiles, fibs='sky3')
                     phi_sky3 = np.sum(phis_sky3, axis=1) / 3.
-                    phis_stellar = make_norm_profiles_4(sr[:, i], i, fppo, integrate=integrate_profiles, fibs='stellar')
+                    phis_stellar = make_norm_profiles_5(sr[:, i], i, fppo, integrate=integrate_profiles, fibs='stellar')
                     phi_stellar = np.sum(phis_stellar * relints, axis=1)
-                    phis_sky2 = make_norm_profiles_4(sr[:, i], i, fppo, integrate=integrate_profiles, fibs='sky2')
+                    phis_sky2 = make_norm_profiles_5(sr[:, i], i, fppo, integrate=integrate_profiles, fibs='sky2')
                     phi_sky2 = np.sum(phis_sky2, axis=1) / 2.
                     phi_sky = (phi_sky3 + phi_sky2) / 2.
                     phi = np.vstack((phi_laser, phi_sky, phi_stellar, phi_thxe)).T

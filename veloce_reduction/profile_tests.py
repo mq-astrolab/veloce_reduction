@@ -399,18 +399,18 @@ def fit_multiple_profiles_from_indices(P_id, img, err_img, stripe_indices, mask=
         if mask is None:
             cenmask[ord] = np.ones(sc.shape[1], dtype='bool')
 
-            # fit profile for single order and save result in "global" parameter dictionary for entire chip
-            fpo = get_multiple_fibre_profiles_single_order(sc, sr, err_sc, ordpol, ordmask=cenmask[ord], nfib=24,
-                                                           sampling_size=25, varbeta=varbeta, offset=offset,
-                                                           return_snr=True, debug_level=debug_level, timit=timit)
+        # fit profile for single order and save result in "global" parameter dictionary for entire chip
+        fpo = get_multiple_fibre_profiles_single_order(sc, sr, err_sc, ordpol, ordmask=cenmask[ord], nfib=24,
+                                                       sampling_size=25, varbeta=varbeta, offset=offset,
+                                                       return_snr=True, debug_level=debug_level, timit=timit)
 
-            # if stacking:
-            #     colfits = determine_spatial_profiles_single_order(sc, sr, err_sc, ordpol, ordmask=mask[ord], model=model,
-            #                                                       return_stats=return_stats, timit=timit)
-            # else:
-            #     colfits = fit_profiles_single_order(sr, sc, ordpol, osf=1, silent=True, timit=timit)
+        # if stacking:
+        #     colfits = determine_spatial_profiles_single_order(sc, sr, err_sc, ordpol, ordmask=mask[ord], model=model,
+        #                                                       return_stats=return_stats, timit=timit)
+        # else:
+        #     colfits = fit_profiles_single_order(sr, sc, ordpol, osf=1, silent=True, timit=timit)
 
-            fibre_profiles[ord] = fpo
+        fibre_profiles[ord] = fpo
 
     if timit:
         print('Time elapsed: ' + str(int(time.time() - start_time)) + ' seconds...')

@@ -1568,9 +1568,13 @@ def xcorr_thflux(thflux, thflux2, scale=300., masking=True, satmask=None, lampty
 
 
 
-def get_dispsol_from_known_lines(thflux, fibre=None, fitwidth=4, search_width=None, satmask=None, lamptype='thar', minsigma=0.4, maxsigma=2.,
+def get_dispsol_from_known_lines(thflux, fibre=None, date=None, fitwidth=4, search_width=None, satmask=None, lamptype='thar', minsigma=0.4, maxsigma=2.,
                                  sigma_0=0.85, minamp=0., maxamp=np.inf, return_all_pars=False, deg_spectral=7, deg_spatial=7,
                                  polytype='chebyshev', return_full=True, savetable=True, outpath=None, debug_level=0, timit=False):
+
+    '''
+    thflux   -   shape (n_ord, n_pix), ie for each fibre individually, or quick-extracted format
+    '''
 
     if timit:
         start_time = time.time()
@@ -1762,6 +1766,8 @@ def get_dispsol_from_known_lines(thflux, fibre=None, fitwidth=4, search_width=No
         return p_air, p_vac
     
     
+    
+    
 
 def define_pixel_offsets_between_fibres(date, relto='S1', savedict=False, saveplots=False, extra_lfc_offset=True,
                                         return_all=False, debug_level=0, timit=False):
@@ -1900,6 +1906,7 @@ def define_pixel_offsets_between_fibres(date, relto='S1', savedict=False, savepl
         return pixfit_coeffs, zeroth_coeffs, first_coeffs
     else:
         return pixfit_coeffs
+
 
 
 
@@ -2107,11 +2114,14 @@ def old_get_dispsol_for_all_fibs(obsname, date=None, relto='LFC', twod=False, de
 
 
 
+
+
 def get_dispsol_for_all_fibs(obsname, date=None, relto='LFC', twod=False, degpol=7, deg_spectral=7, deg_spatial=7, fibs='stellar', nx=4112,
-                             polytype='chebyshev', refit=False, debug_level=0, timit=False, fudge=1., signflip_shift=True,
-                             signflip_slope=True, signflip_secord=True, nightly_coeffs=True):
+                             polytype='chebyshev', refit=False, debug_level=0, timit=False, fudge=1., fibtofib=True, nightly_coeffs=True):
 
     '''using Duncan's xcorrs to measure LFC shifts'''
+
+#     print('haehaehae!!!!!')
 
     if timit:
         start_time = time.time()
@@ -2129,15 +2139,16 @@ def get_dispsol_for_all_fibs(obsname, date=None, relto='LFC', twod=False, degpol
         date = yr + mon + day
 
     # need to do this b/c not all files have a pixfit coeffs file
-    if nightly_coeffs:
-        pc_fn = '/Users/christoph/OneDrive - UNSW/dispsol/pixfit_coeffs/pixfit_coeffs_relto_' + relto + '_for_' + date + '.npy'
-        while not os.path.isfile(pc_fn):
-            date = str(int(date) - 1)
+    if fibtofib:
+        if nightly_coeffs:
             pc_fn = '/Users/christoph/OneDrive - UNSW/dispsol/pixfit_coeffs/pixfit_coeffs_relto_' + relto + '_for_' + date + '.npy'
-    else:
-        # load default coefficients
-        pc_fn = '/Users/christoph/OneDrive - UNSW/dispsol_tests/20180917/pixfit_coeffs_relto_' + relto + '_as_of_2018-11-14.npy'
-    pixfit_coeffs = np.load(pc_fn).item()
+            while not os.path.isfile(pc_fn):
+                date = str(int(date) - 1)
+                pc_fn = '/Users/christoph/OneDrive - UNSW/dispsol/pixfit_coeffs/pixfit_coeffs_relto_' + relto + '_for_' + date + '.npy'
+        else:
+            # load default coefficients
+            pc_fn = '/Users/christoph/OneDrive - UNSW/dispsol_tests/20180917/pixfit_coeffs_relto_' + relto + '_as_of_2018-11-14.npy'
+        pixfit_coeffs = np.load(pc_fn).item()
 
     # fibslot = [0,1,   3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,   23,24,25]
     fibname = ['S5', 'S2', '07', '18', '17', '06', '16', '15', '05', '14', '13', '01', '12', '11', '04', '10', '09', '03', '08', '19', '02', 'S4', 'S3', 'S1']
@@ -2159,17 +2170,11 @@ def get_dispsol_for_all_fibs(obsname, date=None, relto='LFC', twod=False, degpol
         lfc_secord = np.zeros(lfc_slope.shape)
     if n_coeffs == 3:
         lfc_secord, lfc_slope, lfc_shift = readcol(fn, twod=False)
-        # TESTING ONLY!!!
+        # # TESTING ONLY!!!
         # lfc_shift = np.zeros(lfc_slope.shape)
         # lfc_secord = np.zeros(lfc_slope.shape)
         # lfc_slope = np.zeros(lfc_slope.shape)
 
-    # if signflip_shift:
-    #     lfc_shift *= -1.
-    # if signflip_slope:
-    #     lfc_slope *= -1.
-    # if signflip_secord:
-    #     lfc_secord *= -1.
 
     # some housekeeping...
     n_ord = len(np.unique(lfc_ord))
@@ -2202,7 +2207,10 @@ def get_dispsol_for_all_fibs(obsname, date=None, relto='LFC', twod=False, degpol
                 wldict[ord]['laser'] = newly_fit_dispsol
                 # loop over all fibres
                 for i,fib in enumerate(fibname):
-                    xfib = x + pixfit_coeffs[ord]['fibre_'+fib](x)
+                    if fibtofib:
+                        xfib = x + pixfit_coeffs[ord]['fibre_'+fib](x)
+                    else:
+                        xfib = x.copy()
                     fib_fit = np.poly1d(np.polyfit(xfib, lam, degpol))
                     wldict[ord][fib] = fib_fit(xx)
                     wl[o,i,:] = fib_fit(xx)
@@ -2214,7 +2222,10 @@ def get_dispsol_for_all_fibs(obsname, date=None, relto='LFC', twod=False, degpol
                 wldict[ord]['laser'] = eval_xprime_dispsol
                 # loop over all fibres
                 for i,fib in enumerate(fibname):
-                    xfib = x0 + pixfit_coeffs[ord]['fibre_'+fib](x0)
+                    if fibtofib:
+                        xfib = x0 + pixfit_coeffs[ord]['fibre_'+fib](x0)
+                    else:
+                        xfib = x0.copy()
                     # xfib = (nx - 1) - xfib_flipped   # and flip it back --> can't think right now, can I combine those two flips???
                     master_lfc_fit_fib = np.poly1d(np.polyfit(xfib, lam, degpol))
                     # diff_xx = lfc_shift[o-1] + lfc_slope[o-1] * xx + lfc_secord[o-1] * xx**2
@@ -2300,6 +2311,8 @@ def get_dispsol_for_all_fibs(obsname, date=None, relto='LFC', twod=False, degpol
         wl = wl[:,2:21,:]
 
     return wldict,wl
+
+
 
 
 
@@ -2441,6 +2454,7 @@ def get_dispsol_for_all_fibs_2(obsname, relto='LFC', degpol=7, fibs='stellar', n
 
 
 
+
 def make_master_fibth(date=None, laptop=False):
     
     # make sure we have an existing date
@@ -2480,6 +2494,10 @@ def make_master_fibth(date=None, laptop=False):
 def make_arc_dispsols(date, outpath='/Users/christoph/OneDrive - UNSW/dispsol/arc_dispsols/', deg_spectral=7, deg_spatial=7,
                       polytype='chebyshev', savetable=False, savefits=True, overwrite=False, save_individual=False,
                       laptop=False, debug_level=0, timit=False):
+
+    """
+    for making the one per night fibre ThAr/ThXe dispsols
+    """
 
     if timit:
         start_time = time.time()
@@ -2536,6 +2554,7 @@ def make_arc_dispsols(date, outpath='/Users/christoph/OneDrive - UNSW/dispsol/ar
         print('Time taken for creating ARC dispsol: ' + str(delta_t) + ' seconds')
 
     return 1
+
 
 
 

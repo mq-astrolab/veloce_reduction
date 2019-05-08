@@ -10,7 +10,7 @@ import scipy.ndimage as ndimage
 from scipy.ndimage.morphology import generate_binary_structure, binary_erosion
 from scipy.optimize import curve_fit
 
-from .helper_functions import gauss2D, affine_matrix
+from veloce_reduction.veloce_reduction.helper_functions import gauss2D, affine_matrix
 
 
 
@@ -32,7 +32,7 @@ from .helper_functions import gauss2D, affine_matrix
 
 
 
-def find_laser_peaks_2D(img, err_img, boxwidth=11, bg_thresh=1., count_thresh=2000., gauss_filter_size=1., RON=None, xsigma=1.2, ysigma=0.7, smooth=False, timit=False):
+def find_laser_peaks_2D(img, err_img, boxwidth=11, bg_thresh=1., count_thresh=2000., gauss_filter_size=1., RON=None, xsigma=1.2, ysigma=0.7, smooth=False, timit=False, debug_level=0):
 
     if timit:
         start_time = time.time()
@@ -89,7 +89,8 @@ def find_laser_peaks_2D(img, err_img, boxwidth=11, bg_thresh=1., count_thresh=20
     #LOOP OVER ALL LABELLED MAXIMA...
     for i in range(n_peaks):
         
-        print(i, xy[i,:])
+        if debug_level >= 1:
+            print(i, xy[i,:])
         
         #initially I had this the wrong way around
 #         xr = np.arange(int(round(xy[i,0])) - padsize, int(round(xy[i,0])) + padsize +1)
@@ -117,8 +118,8 @@ def find_laser_peaks_2D(img, err_img, boxwidth=11, bg_thresh=1., count_thresh=20
             zflat = z.flatten()
             errflat = err.flatten()
             lower_bounds = np.array([0., 0., 0., 0., 0., -np.pi/4.])
-            upper_bounds = np.array([np.inf, img.shape[1]-1., img.shape[0]-1., np.inf, np.inf, np.pi/4.])
-            popt,pcov = curve_fit(gauss2D, (xflat,yflat), zflat, sigma=errflat, p0=pguess, bounds=(lower_bounds,upper_bounds))
+            upper_bounds = np.array([1e6, img.shape[1]-1., img.shape[0]-1., 4, 3, np.pi/4.])
+            popt,pcov = curve_fit(gauss2D, (xflat,yflat), zflat, sigma=errflat, p0=pguess, bounds=(lower_bounds,upper_bounds), maxfev=1000000)
             bestmodel = gauss2D((xx,yy), *popt)
             res = z - bestmodel
             #err = np.sqrt( z + RON**2 )

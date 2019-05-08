@@ -20,7 +20,7 @@ import copy
 from veloce_reduction.veloce_reduction.get_info_from_headers import get_obstype_lists_temp
 from veloce_reduction.veloce_reduction.helper_functions import short_filenames
 from veloce_reduction.veloce_reduction.calibration import get_bias_and_readnoise_from_bias_frames, make_offmask_and_ronmask, make_master_bias_from_coeffs, make_master_dark, correct_orientation, crop_overscan_region
-from veloce_reduction.veloce_reduction.order_tracing import find_stripes, make_P_id, make_mask_dict, extract_stripes #, find_tramlines
+from veloce_reduction.veloce_reduction.order_tracing import find_stripes, make_P_id, make_mask_dict, extract_stripes
 from veloce_reduction.veloce_reduction.spatial_profiles import fit_profiles, fit_profiles_from_indices
 from veloce_reduction.veloce_reduction.extraction import *
 from veloce_reduction.veloce_reduction.process_scripts import process_whites, process_science_images
@@ -116,9 +116,11 @@ MW,err_MW = process_whites(flat_list, MB=medbias, ronmask=ronmask, MD=MDS, gain=
 # find orders roughly
 #P,tempmask = find_stripes(MW, deg_polynomial=2, min_peak=0.05, gauss_filter_sigma=3., simu=False)
 P,tempmask = find_stripes(MW, deg_polynomial=2, min_peak=0.05, gauss_filter_sigma=10., simu=False, maskthresh = 400)
+# if the bad pixel column is found as an order:
+# del P[5]
 # assign physical diffraction order numbers (this is only a dummy function for now) to order-fit polynomials and bad-region masks
-assert len(P_id_dum) == 39, 'ERROR: not exactly 39 orders found!!!'
 P_id_dum = make_P_id(P)
+assert len(P_id_dum) == 39, 'ERROR: not exactly 39 orders found!!!'
 mask = make_mask_dict(tempmask)
 P_id = copy.deepcopy(P_id_dum)
 for o in P_id.keys():

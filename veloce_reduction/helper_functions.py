@@ -23,9 +23,8 @@ from scipy import ndimage
 
 
 
-def linfunc(p, x):
+def linfunc(x, m, c):
     """linear function"""
-    c,m = p
     return m*x + c
 
 
@@ -115,6 +114,9 @@ def CMB_multi_gaussian_with_offset(x, *p):
 
 def CMB_pure_gaussian(x, mu, sig, amp):
     return (amp * np.exp(-np.power(x - mu, 2.) / (2 * np.power(sig, 2.))))
+
+def CMB_norm_gaussian(x, mu, sig):
+    return (1./np.sqrt(2.*np.pi*sig*sig) * np.exp(-np.power(x - mu, 2.) / (2 * np.power(sig, 2.))))
 
 def gaussian_with_offset(x, mu, sig, amp, off):
     return (amp * np.exp(-np.power(x - mu, 2.) / (2 * np.power(sig, 2.)))) + off
@@ -424,10 +426,12 @@ def make_norm_profiles_4(x, col, fppo, integrate=False, fibs='stellar', slope=Fa
 
     return phinorm
 
+
+
 def make_norm_profiles_5(x, col, fppo, integrate=False, fibs='stellar', slope=False, offset=False):
     """
     THAT's the latest version to be used with fibre profiles from real fibre flats!!!
-    In this version we have 24 fibres (19 stellasr + 5 sky)!
+    In this version we have 24 fibres (19 stellar + 5 sky)!
     clone of "make_norm_profiles", but takes as "fppo" (= fibparms per order) as input, rather
     than "ord" and the entire "fibparms" dictionary
     
@@ -483,8 +487,8 @@ def make_norm_profiles_5(x, col, fppo, integrate=False, fibs='stellar', slope=Fa
         # but rather we want to integrate the (highly non-linear) function from the left edge to the right edge of the pixels (co-ordinates are pixel centres!!!)
         if integrate:
             for i in np.arange(len(x)):
-                phi[i,k] = fixed_quad(fibmodel, x[i]-0.5, x[i]+0.5, args=(mu, sigma, beta))[0]
-                # phi[i, k] = quad(fibmodel, x[i] - 0.5, x[i] + 0.5, args=(mu, sigma, beta))[0]
+                # phi[i,k] = fixed_quad(fibmodel, x[i] - 0.5, x[i] + 0.5, args=(mu, sigma, beta))[0]   # factor of ~4 faster, but not as accurate (fails for simple Gaussian test)
+                phi[i, k] = quad(fibmodel, x[i] - 0.5, x[i] + 0.5, args=(mu, sigma, beta))[0]
         else:
             phi[:, k] = fibmodel(x, mu, sigma, beta=beta, alpha=0, norm=0)
 
@@ -506,6 +510,8 @@ def make_norm_profiles_5(x, col, fppo, integrate=False, fibs='stellar', slope=Fa
     phinorm = phi / np.sum(phi, axis=0)
 
     return phinorm
+
+
 
 def make_norm_profiles_temp(x, o, col, fibparms, slope=False, offset=False):  
     
