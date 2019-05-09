@@ -2199,7 +2199,7 @@ def get_dispsol_for_all_fibs(obsname, date=None, relto='LFC', twod=False, degpol
 
             # either perform a new fit using the new x-values
             if refit:
-                # no more x-flipping needed b/c already done above, but need to add one b/x Python vs Matlab indexing
+                # no more x-flipping needed b/c already done above, but need to add one b/c Python vs Matlab indexing
                 diff = lfc_shift[o-1] + lfc_slope[o-1] * (x0+1) + lfc_secord[o-1] * (x0+1)**2     # also, the o-1 is needed b/c Duncan starts at order_02
                 x = x0 - fudge * diff
                 lfc_fit = np.poly1d(np.polyfit(x, lam, degpol))
@@ -2498,6 +2498,8 @@ def make_arc_dispsols(date, outpath='/Users/christoph/OneDrive - UNSW/dispsol/ar
     """
     for making the one per night fibre ThAr/ThXe dispsols
     """
+
+    print('VACUUM OR AIR???')
 
     if timit:
         start_time = time.time()

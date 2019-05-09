@@ -16,9 +16,9 @@ import scipy.optimize as op
 # from lmfit.models import *
 # from lmfit.minimizer import *
 
-from .linalg import linalg_extract_column
-from .helper_functions import make_norm_profiles_2, central_parts_of_mask
-from .order_tracing import flatten_single_stripe, flatten_single_stripe_from_indices
+from veloce_reduction.veloce_reduction.linalg import linalg_extract_column
+from veloce_reduction.veloce_reduction.helper_functions import make_norm_profiles_2, central_parts_of_mask, CMB_pure_gaussian
+from veloce_reduction.veloce_reduction.order_tracing import flatten_single_stripe, flatten_single_stripe_from_indices
 
 
 
@@ -120,9 +120,11 @@ def get_relints_single_order(sc, sr, err_sc, ordpol, fppo, ordmask=None, nfib=19
                 grid.append(sr[:,j] - ordpol(j) + refpos)
                 #data.append(sc[:,j])
                 normdata.append(sc[:,j] / np.sum(sc[:,j]))
-                #assign weights for flux (and take care of NaNs and INFs)
-                #normerr = np.sqrt(sc[:,j] + RON**2) / np.sum(sc[:,j])
-                normerr = err_sc[:,j] / np.sum(sc[:,j])
+                # assign weights for flux (and take care of NaNs and INFs)
+                # normerr = np.sqrt(sc[:,j] + RON**2) / np.sum(sc[:,j])
+                # normerr = err_sc[:,j] / np.sum(sc[:,j])
+                # using relative errors for weights in the fit
+                normerr = (err_sc[:, j] / sc[:, j]) / np.sum(sc[:, j])
                 pix_w = 1./(normerr*normerr)  
                 pix_w[np.isinf(pix_w)] = 0.
                 weights.append(pix_w)    
@@ -663,9 +665,9 @@ def get_relints_single_order_gaussian(sc, sr, err_sc, ordpol, ordmask=None, nfib
         # fail-check variable
         fu = 0
 
-        # calculate SNR of collapsed super-pixel at this location (ignoring RON)
+        # calculate SNR of collapsed super-pixel at this location
         if return_snr:
-            #snr.append(np.sqrt(np.sum(sc[:,pix])))
+            #snr.append(np.sqrt(np.sum(sc[:,pix])))    # ignoring RON
             snr.append(np.sum(sc[:, pix]) / np.sqrt(np.sum(err_sc[:, pix] ** 2)))
 
         # check if that particular cutout falls fully onto CCD
@@ -702,7 +704,9 @@ def get_relints_single_order_gaussian(sc, sr, err_sc, ordpol, ordmask=None, nfib
                 normdata.append(sc[:, j] / np.sum(sc[:, j]))
                 # assign weights for flux (and take care of NaNs and INFs)
                 # normerr = np.sqrt(sc[:,j] + RON**2) / np.sum(sc[:,j])
-                normerr = err_sc[:, j] / np.sum(sc[:, j])
+                # normerr = err_sc[:, j] / np.sum(sc[:, j])
+                # using relative errors for weights in the fit
+                normerr = (err_sc[:, j] / sc[:, j]) / np.sum(sc[:, j])
                 pix_w = 1. / (normerr * normerr)
                 pix_w[np.isinf(pix_w)] = 0.
                 weights.append(pix_w)
@@ -717,9 +721,13 @@ def get_relints_single_order_gaussian(sc, sr, err_sc, ordpol, ordmask=None, nfib
                     plt.xlim(-sc.shape[0] / 2, sc.shape[0] / 2)
 
             # data = np.array(data)
-            normdata = np.array(normdata)
-            weights = np.array(weights)
-            grid = np.array(grid)
+            # normdata = np.array(normdata)
+            # weights = np.array(weights)
+            # grid = np.array(grid)
+            # need 1-dim arrays
+            normdata = np.array(normdata).flatten()
+            weights = np.array(weights).flatten()
+            grid = np.array(grid).flatten()
             # data = data[grid.argsort()]
             normdata = normdata[grid.argsort()]
             weights = weights[grid.argsort()]
@@ -834,7 +842,7 @@ def get_relints_single_order_gaussian(sc, sr, err_sc, ordpol, ordmask=None, nfib
 
 
 
-def get_relints_from_indices_gaussian(P_id, img, err_img, stripe_indices, mask=None, sampling_size=25, slit_height=25,
+def get_relints_from_indices_gaussian(P_id, img, err_img, stripe_indices, mask=None, nfib=24, sampling_size=25, slit_height=25,
                                       debug_level=0, timit=False):
     """
     This routine computes the relative intensities in the individual fibres of a Veloce spectrum.
@@ -847,6 +855,7 @@ def get_relints_from_indices_gaussian(P_id, img, err_img, stripe_indices, mask=N
     'err_img'        : estimated uncertainties in the 2-dim input array/image
     'stripe_indices' : dictionary (keys = orders) containing the indices of the pixels that are identified as the "stripes" (ie the to-be-extracted regions centred on the orders)
     'mask'           : dictionary of boolean masks (keys = orders) from "find_stripes" (masking out regions of very low signal)
+    'nfib'           : number of fibres (default is 24, ie 19 stellar + 5 sky)
     'sampling_size'  : 'sampling_size'  : how many pixels (in dispersion direction) either side of current i-th pixel do you want to consider?
                        (ie stack profiles for a total of 2*sampling_size+1 pixels in dispersion direction...)
     'slit_height'    : height of the extraction slit (ie the pixel columns are 2*slit_height pixels long)
@@ -859,7 +868,7 @@ def get_relints_from_indices_gaussian(P_id, img, err_img, stripe_indices, mask=N
     'relints_norm'  : normalized relative intensities in the individual fibres (only if 'return_full' is set to TRUE)
     """
 
-    print('Fitting relative intensities of fibres...')
+    print('Fitting relative intensities of fibres using simple Gaussians...')
 
     if timit:
         start_time = time.time()
@@ -905,7 +914,7 @@ def get_relints_from_indices_gaussian(P_id, img, err_img, stripe_indices, mask=N
 
         # fit profile for single order and save result in "global" parameter dictionary for entire chip
         relints_ord, relints_ord_norm, positions, snr_ord = get_relints_single_order_gaussian(sc, sr, err_sc, ordpol,
-                                                                                   ordmask=cenmask[ord], nfib=24,
+                                                                                   ordmask=cenmask[ord], nfib=nfib,
                                                                                    sampling_size=sampling_size)
 
 
@@ -934,7 +943,8 @@ def get_relints_from_indices_gaussian(P_id, img, err_img, stripe_indices, mask=N
             allrelints = np.vstack((allrelints, relints_norm[ord]))
         except:
             allrelints = relints_norm[ord]
-    wm_relints = np.average(allrelints, axis=0, weights=np.array(allsnr), returned=False)
+    flattened_allsnr = [snr for sublist in allsnr for snr in sublist]
+    wm_relints = np.average(allrelints, axis=0, weights=np.array(flattened_allsnr), returned=False)
 
     if timit:
         print('Time elapsed: ' + str(int(time.time() - start_time)) + ' seconds...')

@@ -118,14 +118,16 @@ MW,err_MW = process_whites(flat_list, MB=medbias, ronmask=ronmask, MD=MDS, gain=
 P,tempmask = find_stripes(MW, deg_polynomial=2, min_peak=0.05, gauss_filter_sigma=10., simu=False, maskthresh = 400)
 # if the bad pixel column is found as an order:
 # del P[5]
+# tempmask = tempmask[np.r_[0:5, 6:40],:]
 # assign physical diffraction order numbers (this is only a dummy function for now) to order-fit polynomials and bad-region masks
 P_id_dum = make_P_id(P)
 assert len(P_id_dum) == 39, 'ERROR: not exactly 39 orders found!!!'
 mask = make_mask_dict(tempmask)
 P_id = copy.deepcopy(P_id_dum)
-for o in P_id.keys():
-    P_id[o][0] -= 2.
+# for o in P_id.keys():
+#     P_id[o][0] -= 2.
 np.save(path + 'P_id.npy', P_id)
+np.save(path + 'mask.npy', mask)
 
 # extract stripes of user-defined width from the science image, centred on the polynomial fits defined in step (1)
 MW_stripes,MW_indices = extract_stripes(MW, P_id, return_indices=True, slit_height=30)

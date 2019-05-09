@@ -271,7 +271,7 @@ def get_multiple_fibre_profiles_single_order(sc, sr, err_sc, ordpol, ordmask=Non
 
 
 
-def fit_multiple_profiles(P_id, stripes, err_stripes, mask=None, slit_height=25, varbeta=True, offset=True,
+def fit_multiple_profiles(P_id, stripes, err_stripes, mask=None, slit_height=25, nfib=24, varbeta=True, offset=True,
                           debug_level=0, timit=False):
     """
     This routine determines the profiles of the fibres in spatial direction. This is an extremely crucial step, as the
@@ -284,6 +284,7 @@ def fit_multiple_profiles(P_id, stripes, err_stripes, mask=None, slit_height=25,
     'err_stripes'   : dictionary containing the errors in the extracted stripes (keys = orders)
     'mask'          : dictionary of boolean masks (keys = orders) from "find_stripes" (masking out regions of very low signal)
     'slit_height'   : height of the extraction slit (ie the pixel columns are 2*slit_height pixels long)
+    'nfib'          : number of fibres
     'varbeta'       : boolean - if set to TRUE, use Gauss-like function for fitting, if set to FALSE use plain Gaussian
     'offset'        : boolean - do you want to fit an offset as well?
     'debug_level'   : for debugging...
@@ -326,7 +327,7 @@ def fit_multiple_profiles(P_id, stripes, err_stripes, mask=None, slit_height=25,
             cenmask[ord] = np.ones(sc.shape[1], dtype='bool')
 
         # fit profile for single order and save result in "global" parameter dictionary for entire chip
-        fpo = get_multiple_fibre_profiles_single_order(sc, sr, err_sc, ordpol, ordmask=cenmask[ord], nfib=24,
+        fpo = get_multiple_fibre_profiles_single_order(sc, sr, err_sc, ordpol, ordmask=cenmask[ord], nfib=nfib,
                                                        sampling_size=25, varbeta=varbeta, offset=offset,
                                                        return_snr=True, debug_level=debug_level, timit=timit)
 
@@ -345,7 +346,7 @@ def fit_multiple_profiles(P_id, stripes, err_stripes, mask=None, slit_height=25,
 
 
 
-def fit_multiple_profiles_from_indices(P_id, img, err_img, stripe_indices, mask=None,  slit_height=25,
+def fit_multiple_profiles_from_indices(P_id, img, err_img, stripe_indices, mask=None, slit_height=25, nfib=24,
                                        varbeta=True, offset=True, debug_level=0, timit=False):
     """
     This routine determines the profiles of the fibres in spatial direction. This is an extremely crucial step, as the
@@ -360,6 +361,7 @@ def fit_multiple_profiles_from_indices(P_id, img, err_img, stripe_indices, mask=
     'err_img'       : estimated uncertainties in the 2-dim input array/image
     'mask'          : dictionary of boolean masks (keys = orders) from "find_stripes" (masking out regions of very low signal)
     'slit_height'   : height of the extraction slit (ie the pixel columns are 2*slit_height pixels long)
+    'nfib'          : number of fibres
     'varbeta'       : boolean - if set to TRUE, use Gauss-like function for fitting, if set to FALSE use plain Gaussian
     'offset'        : boolean - do you want to fit an offset as well?
     'debug_level'   : for debugging...
@@ -400,7 +402,7 @@ def fit_multiple_profiles_from_indices(P_id, img, err_img, stripe_indices, mask=
             cenmask[ord] = np.ones(sc.shape[1], dtype='bool')
 
         # fit profile for single order and save result in "global" parameter dictionary for entire chip
-        fpo = get_multiple_fibre_profiles_single_order(sc, sr, err_sc, ordpol, ordmask=cenmask[ord], nfib=24,
+        fpo = get_multiple_fibre_profiles_single_order(sc, sr, err_sc, ordpol, ordmask=cenmask[ord], nfib=nfib,
                                                        sampling_size=25, varbeta=varbeta, offset=offset,
                                                        return_snr=True, debug_level=debug_level, timit=timit)
 
