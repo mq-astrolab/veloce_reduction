@@ -235,14 +235,14 @@ def get_multiple_fibre_profiles_single_order(sc, sr, err_sc, ordpol, ordmask=Non
 
                 if offset:
                     if varbeta:
-                        popt_arr = np.reshape(popt[:-1], (24, 4))
+                        popt_arr = np.reshape(popt[:-1], (nfib, 4))
                     else:
-                        popt_arr = np.reshape(popt[:-1], (24, 3))
+                        popt_arr = np.reshape(popt[:-1], (nfib, 3))
                 else:
                     if varbeta:
-                        popt_arr = np.reshape(popt, (24, 4))
+                        popt_arr = np.reshape(popt, (nfib, 4))
                     else:
-                        popt_arr = np.reshape(popt, (24, 3))
+                        popt_arr = np.reshape(popt, (nfib, 3))
 
                 # fibre numbers here increase from red to blue, ie from ThXe side to LFC side, as in:
                 # pseudo-slit layout:   ThXe S5  S2   X   7  18  17   6  16  15   5  14  13   1  12  11   4  10   9   3   8  19   2   X  S4  S3  S1 LFC

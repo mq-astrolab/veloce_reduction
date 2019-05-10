@@ -123,7 +123,7 @@ def get_relints_single_order(sc, sr, err_sc, ordpol, fppo, ordmask=None, nfib=19
                 # assign weights for flux (and take care of NaNs and INFs)
                 # normerr = np.sqrt(sc[:,j] + RON**2) / np.sum(sc[:,j])
                 # normerr = err_sc[:,j] / np.sum(sc[:,j])
-                # using relative errors for weights in the fit
+                # using relative errors for weights in the fit !?!?!?
                 normerr = (err_sc[:, j] / sc[:, j]) / np.sum(sc[:, j])
                 pix_w = 1./(normerr*normerr)  
                 pix_w[np.isinf(pix_w)] = 0.
@@ -705,7 +705,7 @@ def get_relints_single_order_gaussian(sc, sr, err_sc, ordpol, ordmask=None, nfib
                 # assign weights for flux (and take care of NaNs and INFs)
                 # normerr = np.sqrt(sc[:,j] + RON**2) / np.sum(sc[:,j])
                 # normerr = err_sc[:, j] / np.sum(sc[:, j])
-                # using relative errors for weights in the fit
+                # using relative errors for weights in the fit !?!?!?
                 normerr = (err_sc[:, j] / sc[:, j]) / np.sum(sc[:, j])
                 pix_w = 1. / (normerr * normerr)
                 pix_w[np.isinf(pix_w)] = 0.
