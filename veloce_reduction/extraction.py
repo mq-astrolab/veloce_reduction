@@ -308,11 +308,43 @@ def collapse_extract_from_indices(img, err_img, stripe_indices, tramlines, slit_
 
 
 
-def optimal_extraction(stripes, err_stripes=None, ron_stripes=None, RON=0., slit_height=25, phi_onthefly=False,
-                       timit=False, simu=False, individual_fibres=True, combined_profiles=False, integrate_profiles=False, 
-                       slope=False, offset=False, fibs='all', date=None, relints=None, collapse=False, debug_level=0):
-    # if error array is not provided, then RON and gain must be provided (but this is bad because that way we don't
-    # know about large errors for cosmic-corrected pixels etc)
+def optimal_extraction(stripes, err_stripes=None, ron_stripes=None, slit_height=25, date=None, fibs='all', relints=None,
+                       simu=False, phi_onthefly=False, individual_fibres=True, combined_profiles=False, integrate_profiles=False,
+                       slope=False, offset=False, collapse=False, debug_level=0, timit=False):
+
+    """
+    This routine performs the optimal extraction of an echelle spectrum following the formalism described in Sharp & Birchall 2010, PASA, 27:91.
+    Output is saved in dictionaries ("pix", "flux", "err").
+    The exact behaviour can be controlled via a variety of keywords (see more description of (3a), (3b) & (3c) in "extract_spectrum").
+
+    INPUT:
+    'stripes'            : dictionary (keys = orders) containing the 2-dim stripes (ie the to-be-extracted regions centred on the orders) of the spectrum
+    'err_stripes'        : dictionary (keys = orders) containing the errors in the 2-dim stripes (ie the to-be-extracted regions centred on the orders) of the spectrum
+    'ron_stripes'        : dictionary (keys = orders) containing the read-out noise in the 2-dim stripes (ie the to-be-extracted regions centred on the orders) of the spectrum
+    'slit_height'        : height of the extraction slit (ie the pixel columns are 2*slit_height pixels long)
+    'date'               : the date ('YYYYMMDD') the obervations were taken (so that the sorresponding (pre-determined) fibre profiles can be loaded)
+    'fibs'               : which fibres are you using? ['all', 'stellar', 'sky2', 'sky3', 'allsky']
+    'relints'            : an array of the relative intensities in the stellar fibres (only needed if 'individual_fibres' == FALSE and 'combined_profiles' == TRUE)
+    'simu'               : boolean - are you using simulated spectra?
+    'phi_onthefly'       : boolean - CODING RELIC - TO BE REMOVED; creates fibre profiles on the fly
+    'individual_fibres'  : boolean - do you want to extract spectra for each fibre individually?
+    'combined_profiles'  : boolean - do you want to use a combined profile for each 'object' (stellar / sky / laser / thxe)? ignored if 'individual_fibres' is set to TRUE
+    'integrate_profiles' : boolean - do you want to integrate the fibre profiles (better but MUCH slower), or just evaluate them at the pixel centres?
+    'slope'              : boolean - do you want to include a slope as an "extra fibre"?
+    'offset'             : boolean - do you want to include an offset as an "extra fibre"?
+    'collapse'           : boolean - set this keyword to simply do a collapse extract (not recommended - this is a CODING RELIC - TO BE REMOVED; use routine "quick_extract" instead)
+    'debug_level'        : for debugging...
+    'timit'              : boolean - do you want to measure execution run time?
+
+    OUTPUT:
+    'pix'   : dictionary (keys = orders) containing the pixel numbers (in dispersion direction)
+    'flux'  : dictionary (keys = orders) containing the extracted flux (ie the eta's in Sharp & Birchall)
+    'err'   : dictionary (keys = orders) containing the uncertainty in the extracted flux
+
+    TODO:
+    incorporate the sim ThXe profiles
+
+    """
 
     if timit:
         start_time = time.time()
@@ -373,11 +405,11 @@ def optimal_extraction(stripes, err_stripes=None, ron_stripes=None, RON=0., slit
         # define stripe
         stripe = stripes[ord]
         ron_stripe = ron_stripes[ord]
-        # indices = stripe_indices[ord]
+
         # find the "order-box"
         sc, sr = flatten_single_stripe(stripe, slit_height=slit_height, timit=False)
         ron_sc, ron_sr = flatten_single_stripe(ron_stripe, slit_height=slit_height, timit=False)
-        # sc,sr = flatten_single_stripe_from_indices(img, indices, slit_height=slit_height, timit=False)
+
         if err_stripes is not None:
             err_stripe = err_stripes[ord]
             err_sc, err_sr = flatten_single_stripe(err_stripe, slit_height=slit_height, timit=False)
@@ -412,7 +444,6 @@ def optimal_extraction(stripes, err_stripes=None, ron_stripes=None, RON=0., slit
 
         goodrange = np.arange(npix)
         if simu and ord == 'order_01':
-            # goodrange = goodrange[fibparms[ord]['fibre_21']['onchip']]
             goodrange = np.arange(1300, 4096)
             for j in range(1300):
                 pix[ord].append(ordnum + str(j + 1).zfill(4))
@@ -506,6 +537,7 @@ def optimal_extraction(stripes, err_stripes=None, ron_stripes=None, RON=0., slit
                 v[v < np.mean(roncol) ** 2] = np.maximum(np.mean(roncol) ** 2, 1.)  # just a stupid fix so that variance is never below 1
 
                 if individual_fibres:
+                    ### THIS IS METHOD (3a) - PREFERRED OPTION! ###
                     # fill flux- and error- output arrays for individual fibres
                     for j in range(nfib):
                         fib = 'fibre_' + str(j + 1).zfill(2)
@@ -513,6 +545,7 @@ def optimal_extraction(stripes, err_stripes=None, ron_stripes=None, RON=0., slit
                         err[ord][fib].append(np.sqrt(v[j]))
 
                 elif combined_profiles:
+                    ### THIS IS METHOD (3c) ###
                     # fill flux- and error- output arrays for all objects (Laser, Sky, Stellar, ThXe)
                     # Laser
                     flux[ord]['laser'].append(f[0])
@@ -528,6 +561,7 @@ def optimal_extraction(stripes, err_stripes=None, ron_stripes=None, RON=0., slit
                     err[ord]['thxe'].append(np.sqrt(v[3]))
 
                 else:
+                    ### THIS IS METHOD (3b) ###
                     # Optimal extraction was done for all fibres individually, but now add up the respective "eta's"
                     # for the different "objects"
                     # fill flux- and error- output arrays for all objects (Laser, Sky, Stellar, ThXe)
@@ -574,12 +608,46 @@ def optimal_extraction(stripes, err_stripes=None, ron_stripes=None, RON=0., slit
 
 
 
-def optimal_extraction_from_indices(img, stripe_indices, err_img=None, RON=0., slit_height=25,
-                                    phi_onthefly=False, timit=False, simu=False, individual_fibres=True,
+def optimal_extraction_from_indices(img, stripe_indices, err_img=None, ronmask=None, slit_height=25, date=None, fibs='all',
+                                    relints=None, simu=False, phi_onthefly=False, individual_fibres=True,
                                     combined_profiles=False, integrate_profiles=False, slope=False, offset=False,
-                                    fibs='all', date=None, relints=None, collapse=False, debug_level=0):
-    # if error array is not provided, then RON and gain must be provided (but this is bad because that way we don't
-    # know about large errors for cosmic-correctdd pixels etc)
+                                    collapse=False, debug_level=0, timit=False):
+    """
+    This routine performs the optimal extraction of an echelle spectrum following the formalism described in Sharp & Birchall 2010, PASA, 27:91.
+    Output is saved in dictionaries ("pix", "flux", "err").
+    The exact behaviour can be controlled via a variety of keywords (see more description of (3a), (3b) & (3c) in "extract_spectrum").
+
+    INPUT:
+    'img'                : 2-dim flux array
+    'stripe_indices'     : dictionary (keys = orders) containing the indices of the pixels that are identified as the "stripes" (ie the to-be-extracted regions centred on the orders)
+    'err_img'            : 2-dim array of the corresponding errors 
+    'ronmask'            : read-noise mask (same dimension as img) in e-/pix
+    'slit_height'        : height of the extraction slit (ie the pixel columns are 2*slit_height pixels long)
+    'date'               : the date ('YYYYMMDD') the obervations were taken (so that the sorresponding (pre-determined) fibre profiles can be loaded)
+    'fibs'               : which fibres are you using? ['all', 'stellar', 'sky2', 'sky3', 'allsky']
+    'relints'            : an array of the relative intensities in the stellar fibres (only needed if 'individual_fibres' == FALSE and 'combined_profiles' == TRUE)
+    'simu'               : boolean - are you using simulated spectra?
+    'phi_onthefly'       : boolean - CODING RELIC - TO BE REMOVED; creates fibre profiles on the fly
+    'individual_fibres'  : boolean - do you want to extract spectra for each fibre individually?
+    'combined_profiles'  : boolean - do you want to use a combined profile for each 'object' (stellar / sky / laser / thxe)? ignored if 'individual_fibres' is set to TRUE
+    'integrate_profiles' : boolean - do you want to integrate the fibre profiles (better but MUCH slower), or just evaluate them at the pixel centres?
+    'slope'              : boolean - do you want to include a slope as an "extra fibre"?
+    'offset'             : boolean - do you want to include an offset as an "extra fibre"?
+    'collapse'           : boolean - set this keyword to simply do a collapse extract (not recommended - this is a CODING RELIC - TO BE REMOVED; use routine "quick_extract" instead)
+    'debug_level'        : for debugging...
+    'timit'              : boolean - do you want to measure execution run time?
+
+    OUTPUT:
+    'pix'   : dictionary (keys = orders) containing the pixel numbers (in dispersion direction)
+    'flux'  : dictionary (keys = orders) containing the extracted flux (ie the eta's in Sharp & Birchall)
+    'err'   : dictionary (keys = orders) containing the uncertainty in the extracted flux
+
+    TODO:
+    - incorporate the sim ThXe profiles
+
+    """
+
+
 
     if timit:
         start_time = time.time()
@@ -589,7 +657,7 @@ def optimal_extraction_from_indices(img, stripe_indices, err_img=None, RON=0., s
 
     if err_img is None:
         print('WARNING: errors not provided! Using sqrt(flux + RON**2) as an estimate...')
-        
+
     if fibs.lower() == 'all':
         nfib = 24
     elif fibs.lower() == 'stellar':
@@ -639,13 +707,14 @@ def optimal_extraction_from_indices(img, stripe_indices, err_img=None, RON=0., s
         # fibre profile parameters for that order
         fppo = fibparms[ord]
 
-        # define stripe
-        # stripe = stripes[ord]
+        # define stripe indices
         indices = stripe_indices[ord]
+
         # find the "order-box"
-        # sc,sr = flatten_single_stripe(stripe,slit_height=slit_height,timit=False)
         sc, sr = flatten_single_stripe_from_indices(img, indices, slit_height=slit_height, timit=False)
-        ron_sc, ron_sr = flatten_single_stripe_from_indices(RON, indices, slit_height=slit_height, timit=False)
+        if ronmask is None:
+            ronmask = np.ones(img.shape) * 3.
+        ron_sc, ron_sr = flatten_single_stripe_from_indices(ronmask, indices, slit_height=slit_height, timit=False)
         if err_img is not None:
             err_sc, err_sr = flatten_single_stripe_from_indices(err_img, indices, slit_height=slit_height, timit=False)
 
@@ -780,6 +849,7 @@ def optimal_extraction_from_indices(img, stripe_indices, err_img=None, RON=0., s
                 v[v < np.mean(roncol) ** 2] = np.maximum(np.mean(roncol) ** 2, 1.)  # just a stupid fix so that variance is never below 1
 
                 if individual_fibres:
+                    ### THIS IS METHOD (3a) - PREFERRED OPTION! ###
                     # fill flux- and error- output arrays for individual fibres
                     for j in range(nfib):
                         fib = 'fibre_' + str(j + 1).zfill(2)
@@ -787,6 +857,7 @@ def optimal_extraction_from_indices(img, stripe_indices, err_img=None, RON=0., s
                         err[ord][fib].append(np.sqrt(v[j]))
 
                 elif combined_profiles:
+                    ### THIS IS METHOD (3c) ###
                     # fill flux- and error- output arrays for all objects (Laser, Sky, Stellar, ThXe)
                     # Laser
                     flux[ord]['laser'].append(f[0])
@@ -802,6 +873,7 @@ def optimal_extraction_from_indices(img, stripe_indices, err_img=None, RON=0., s
                     err[ord]['thxe'].append(np.sqrt(v[3]))
 
                 else:
+                    ### THIS IS METHOD (3b) ###
                     # Optimal extraction was done for all fibres individually, but now add up the respective "eta's"
                     # for the different "objects"
                     # fill flux- and error- output arrays for all objects (Laser, Sky, Stellar, ThXe)
@@ -849,7 +921,7 @@ def optimal_extraction_from_indices(img, stripe_indices, err_img=None, RON=0., s
 
 
 def extract_spectrum(stripes, err_stripes, ron_stripes, method='optimal', individual_fibres=True, combined_profiles=False, integrate_profiles=False, slope=False,
-                     offset=False, fibs='all', slit_height=25, RON=0., savefile=False, filetype='fits', obsname=None, date=None, path=None, simu=False, verbose=False, timit=False, debug_level=0):
+                     offset=False, fibs='all', slit_height=25, savefile=False, filetype='fits', obsname=None, date=None, path=None, simu=False, verbose=False, timit=False, debug_level=0):
     """
     This routine is simply a wrapper code for the different extraction methods. There are a total FIVE (1,2,3a,3b,3c) different extraction methods implemented, 
     which can be selected by a combination of the 'method', individual_fibres', and 'combined_profile' keyword arguments.
@@ -883,13 +955,12 @@ def extract_spectrum(stripes, err_stripes, ron_stripes, method='optimal', indivi
     'method'             : method for extraction - valid options are ["quick" / "tramline" / "optimal"]
     'individual_fibres'  : boolean - set to TRUE for method (3a); set to FALSE for methods (3b) or (3c) ; ignored if method is not set to 'optimal'
     'combined_profiles'  : boolean - set to TRUE for method (3c); set to FALSE for method (3b) ; only takes effect if 'individual_fibres' is set to FALSE; ignored if method is not set to 'optimal'
-    'integrate_profiles' : boolean - set to TRUE if you want to (CORRECTLY but SLOWER) integrate over the (highly non-linear) functional form describing the profiles, rather than evaluating
+    'integrate_profiles' : boolean - set to TRUE if you want to (CORRECTLY but MUCH SLOWER) integrate over the (highly non-linear) functional form describing the profiles, rather than evaluating
                            the function at the discrete values corresponding to the pixel centres (which is only a good approximation if the function varies slowly)
     'slope'              : boolean - do you want to include a slope (along the slit) as an extra 'fibre' in the optimal extraction?
     'offset'             : boolean - do you want to include an offset as an extra 'fibre' in the optimal extraction?
     'fibs'               : which fibres do you want to include in the profile creation for the optimal extraction? ['all', 'stellar', 'sky2', 'sky3', 'allsky']
     'slit_height'        : height of the extraction slit is 2*slit_height pixels
-    'RON'                : read-out noise per pixel
     'gain'               : gain
     'savefile'           : boolean - do you want to save the extracted spectrum to a file? 
     'filetype'           : if 'savefile' is set to TRUE: do you want to save it as a 'fits' file, or as a 'dict' (python disctionary), or 'both'
@@ -925,7 +996,7 @@ def extract_spectrum(stripes, err_stripes, ron_stripes, method='optimal', indivi
         #tramlines = find_tramlines(fibre_profiles_02, fibre_profiles_03, fibre_profiles_21, fibre_profiles_22, mask_02, mask_03, mask_21, mask_22)
         #pix,flux,err = collapse_extract(stripes, err_stripes, tramlines, slit_height=slit_height, verbose=verbose, timit=timit, debug_level=debug_level)
     elif method.lower() == 'optimal':
-        pix,flux,err = optimal_extraction(stripes, err_stripes=err_stripes, ron_stripes=ron_stripes, RON=RON, slit_height=slit_height, individual_fibres=individual_fibres,
+        pix,flux,err = optimal_extraction(stripes, err_stripes=err_stripes, ron_stripes=ron_stripes, slit_height=slit_height, individual_fibres=individual_fibres,
                                           combined_profiles=combined_profiles, integrate_profiles=integrate_profiles, slope=slope, offset=offset, fibs=fibs, date=date, simu=simu, timit=timit, debug_level=debug_level)
     else:
         print('ERROR: Nightmare! That should never happen  --  must be an error in the Matrix...')
@@ -1014,8 +1085,8 @@ def extract_spectrum(stripes, err_stripes, ron_stripes, method='optimal', indivi
 
 
 
-def extract_spectrum_from_indices(img, err_img, stripe_indices, method='optimal', individual_fibres=True, combined_profiles=False, integrate_profiles=False, slope=False,
-                                  offset=False, fibs='all', slit_height=25, RON=0., savefile=False, filetype='fits', obsname=None, date=None, path=None, simu=False, verbose=False, timit=False, debug_level=0):
+def extract_spectrum_from_indices(img, err_img, stripe_indices, ronmask=None, method='optimal', individual_fibres=True, combined_profiles=False, integrate_profiles=False, slope=False,
+                                  offset=False, fibs='all', slit_height=25, savefile=False, filetype='fits', obsname=None, date=None, path=None, simu=False, verbose=False, timit=False, debug_level=0):
     """
     CLONE OF 'extract_spectrum'!
     This routine is simply a wrapper code for the different extraction methods. There are a total FIVE (1,2,3a,3b,3c) different extraction methods implemented, 
@@ -1045,18 +1116,18 @@ def extract_spectrum_from_indices(img, err_img, stripe_indices, method='optimal'
     'img'            : 2-dim input array
     'err_img'        : 2-dim array of the corresponding errors
     'stripe_indices' : dictionary (keys = orders) containing the indices of the pixels that are identified as the "stripes" (ie the to-be-extracted regions centred on the orders)
-    
+    'ronmask'        : read-noise mask in e-/pix (same dimensions as img)
+
     OPTIONAL INPUT / KEYWORDS:
     'method'             : method for extraction - valid options are ["quick" / "tramline" / "optimal"]
     'individual_fibres'  : boolean - set to TRUE for method (3a); set to FALSE for methods (3b) or (3c) ; ignored if method is not set to 'optimal'
     'combined_profiles'  : boolean - set to TRUE for method (3c); set to FALSE for method (3b) ; only takes effect if 'individual_fibres' is set to FALSE; ignored if method is not set to 'optimal'
-    'integrate_profiles' : boolean - set to TRUE if you want to (CORRECTLY but SLOWER) integrate over the (highly non-linear) functional form describing the profiles, rather than evaluating
+    'integrate_profiles' : boolean - set to TRUE if you want to (CORRECTLY but MUCH SLOWER) integrate over the (highly non-linear) functional form describing the profiles, rather than evaluating
                            the function at the discrete values corresponding to the pixel centres (which is only a good approximation if the function varies slowly)
     'slope'              : boolean - do you want to include a slope (along the slit) as an extra 'fibre' in the optimal extraction?
     'offset'             : boolean - do you want to include an offset as an extra 'fibre' in the optimal extraction?
     'fibs'               : which fibres do you want to include in the profile creation for the optimal extraction? ['all', 'stellar', 'sky2', 'sky3', 'allsky']
     'slit_height'        : height of the extraction slit is 2*slit_height pixels
-    'RON'                : read-out noise per pixel
     'gain'               : gain
     'savefile'           : boolean - do you want to save the extracted spectrum to a file? 
     'filetype'           : if 'savefile' is set to TRUE: do you want to save it as a 'fits' file, or as a 'dict' (python disctionary)
@@ -1091,7 +1162,7 @@ def extract_spectrum_from_indices(img, err_img, stripe_indices, method='optimal'
         #tramlines = find_tramlines(fibre_profiles_02, fibre_profiles_03, fibre_profiles_21, fibre_profiles_22, mask_02, mask_03, mask_21, mask_22)
         #pix,flux,err = collapse_extract_from_indices(img, err_img, stripe_indices, tramlines, slit_height=slit_height, verbose=verbose, timit=timit, debug_level=debug_level)
     elif method.lower() == 'optimal':
-        pix,flux,err = optimal_extraction_from_indices(img, stripe_indices, err_img=err_img, RON=RON, slit_height=slit_height, individual_fibres=individual_fibres,
+        pix,flux,err = optimal_extraction_from_indices(img, stripe_indices, err_img=err_img, ronmask=ronmask, slit_height=slit_height, individual_fibres=individual_fibres,
                                                        combined_profiles=combined_profiles, integrate_profiles=integrate_profiles, slope=slope, offset=offset, fibs=fibs, 
                                                        date=date, simu=simu, timit=timit, debug_level=debug_level)
     else:
