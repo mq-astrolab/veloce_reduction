@@ -111,7 +111,7 @@ def get_multiple_fibre_profiles_single_order(sc, sr, err_sc, ordpol, ordmask=Non
                 fibre_profiles_ord['beta'][i, :] = np.repeat(-1., nfib)
             if offset:
                 fibre_profiles_ord['offset'].append(-1.)
-        elif snr < 400:
+        elif snr < nfib * 15.:
             print('WARNING: SNR too low!!!')
             fibre_profiles_ord['mu'][i, :] = np.repeat(-1., nfib)
             fibre_profiles_ord['sigma'][i, :] = np.repeat(-1., nfib)

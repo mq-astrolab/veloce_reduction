@@ -19,7 +19,8 @@ from veloce_reduction.veloce_reduction.order_tracing import find_stripes, make_P
 
 # fp_in = np.load('/Users/christoph/OneDrive - UNSW/fibre_profiles/individual_fibre_profiles_20180924.npy').item()
 
-def make_real_fibparms_by_ord(fp_in, degpol=7, savefile=True, date=None):
+def make_real_fibparms_by_ord(fp_in, degpol=7, savefile=True, date=None, simthxe=False, nx=4112,
+                              path = '/Users/christoph/OneDrive - UNSW/fibre_profiles/archive/'):
     
     '''
     PURPOSE:
@@ -31,14 +32,14 @@ def make_real_fibparms_by_ord(fp_in, degpol=7, savefile=True, date=None):
     'degpol'   : degree of the polynomial for fitting the fibre traces
     'savefile  : boolean - do you want to save the resulting output dictionary to file? 
     'date'     : date for the output filename - should be in standard string format 'YYYYMMDD'
-    
+    'simthxe'  : boolean - set to TRUE if creatingt the fibre profiles for the sim ThXe fibre
+    'nx'       : number of pixels in dispersion direction
+
     OUTPUT:
     'fibparms' : dictionary containing the smoothed fibre profiles and traces in the right format for "make_norm_profiles_5"
     '''
     
-    xx = np.arange(4112)
-
-    path = '/Users/christoph/OneDrive - UNSW/fibre_profiles/archive/'
+    xx = np.arange(nx)
 
     fibparms = {}
 
@@ -50,9 +51,11 @@ def make_real_fibparms_by_ord(fp_in, degpol=7, savefile=True, date=None):
 
         #sanity check the dimensions are right
         nfib = fp_in['order_01']['mu'].shape[1]
-        if nfib != 24:
-            print('ERROR: input dictionary does NOT contain data for all 24 fibres!!!')
-            return
+        if simthxe:
+            assert nfib == 1, 'ERROR: input dictionary does NOT contain data for exactly 1 fibre!!!'
+        else:
+            assert nfib == 24, 'ERROR: input dictionary does NOT contain data for all 24 fibres!!!'
+
 
         # fibre numbers here increase from red to blue, ie from ThXe side to LFC side, as in:
         # pseudo-slit layout:   S5 S2 X 7 18 17 6 16 15 5 14 13  1 12 11  4 10  9  3  8 19  2 X S4 S3 S1
@@ -62,9 +65,12 @@ def make_real_fibparms_by_ord(fp_in, degpol=7, savefile=True, date=None):
         snr = np.array(fp_in[ord]['SNR'])
 
         #these are the "names" of the stellar and sky fibres (01=LFC, 05=blank, 25=blank, 28=ThXe)
-        allfibs = ['fibre_02', 'fibre_03', 'fibre_04', 'fibre_06', 'fibre_07', 'fibre_08', 'fibre_09', 'fibre_10',
-                   'fibre_11', 'fibre_12', 'fibre_13', 'fibre_14', 'fibre_15', 'fibre_16', 'fibre_17', 'fibre_18',
-                   'fibre_19', 'fibre_20', 'fibre_21', 'fibre_22', 'fibre_23', 'fibre_24', 'fibre_26', 'fibre_27']
+        if simthxe:
+            allfibs = ['fibre_28']
+        else:
+            allfibs = ['fibre_02', 'fibre_03', 'fibre_04', 'fibre_06', 'fibre_07', 'fibre_08', 'fibre_09', 'fibre_10',
+                       'fibre_11', 'fibre_12', 'fibre_13', 'fibre_14', 'fibre_15', 'fibre_16', 'fibre_17', 'fibre_18',
+                       'fibre_19', 'fibre_20', 'fibre_21', 'fibre_22', 'fibre_23', 'fibre_24', 'fibre_26', 'fibre_27']
 
         # loop over 24 fibres (19 stellar + 5 sky) - NOTE the flipping - has to be that way!!!
         for i,fib in enumerate(allfibs[::-1]):
@@ -120,10 +126,14 @@ def make_real_fibparms_by_ord(fp_in, degpol=7, savefile=True, date=None):
 
 
     if savefile:
+        if simthxe:
+            issim = 'sim_ThXe_'
+        else:
+            issim = ''
         if date is None:
             now = datetime.datetime.now()
             date = str(now)[:10].replace('-','')
-        np.save(path + 'fibre_profile_fits_' + date + '.npy', fibparms)
+        np.save(path + issim + 'fibre_profile_fits_' + date + '.npy', fibparms)
 
     return fibparms
 
