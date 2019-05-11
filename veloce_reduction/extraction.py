@@ -620,7 +620,7 @@ def optimal_extraction_from_indices(img, stripe_indices, err_img=None, ronmask=N
     INPUT:
     'img'                : 2-dim flux array
     'stripe_indices'     : dictionary (keys = orders) containing the indices of the pixels that are identified as the "stripes" (ie the to-be-extracted regions centred on the orders)
-    'err_img'            : 2-dim array of the corresponding errors 
+    'err_img'            : 2-dim array of the corresponding errors
     'ronmask'            : read-noise mask (same dimension as img) in e-/pix
     'slit_height'        : height of the extraction slit (ie the pixel columns are 2*slit_height pixels long)
     'date'               : the date ('YYYYMMDD') the obervations were taken (so that the sorresponding (pre-determined) fibre profiles can be loaded)

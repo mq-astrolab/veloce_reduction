@@ -1180,5 +1180,7 @@ def xcorr(x, y, scale='none'):
 
 
 
-
+def jdnow():
+    """get current JD"""
+    return time.time() / 86400. + 2440587.5
 

@@ -13,6 +13,8 @@ from veloce_reduction.veloce_reduction.helper_functions import sigma_clip
 
 
 
+
+
 def find_stripes(flat, deg_polynomial=2, gauss_filter_sigma=3., min_peak=0.05, maskthresh=100., weighted_fits=True, slowmask=False, simu=False, timit=False, debug_level=0):
     """
     BASED ON JULIAN STUERMER'S MAROON_X PIPELINE:
@@ -336,7 +338,6 @@ def find_gaps(flat, deg_polynomial=2, gauss_filter_sigma=3., min_peak=0.05, mask
         print('Elapsed time: '+str(time.time() - start_time)+' seconds')
 
     return P,mask
-
 
 
 
