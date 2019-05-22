@@ -47,8 +47,8 @@ path = '/Users/christoph/data/raw_goodonly/' + date + '/'
 ###END TEMP###
 acq_list, bias_list, dark_list, flat_list, skyflat_list, domeflat_list, arc_list, thxe_list, laser_list, laser_and_thxe_list, stellar_list, unknown_list = get_obstype_lists_temp(path)
 assert len(unknown_list) == 0, "WARNING: unknown files encountered!!!"
-obsnames = short_filenames(stellar_list)
-dumimg = crop_overscan_region(correct_orientation(pyfits.getdata(stellar_list[0])))
+obsnames = short_filenames(bias_list)
+dumimg = crop_overscan_region(correct_orientation(pyfits.getdata(bias_list[0])))
 ny,nx = dumimg.shape
 del dumimg
 #####################################################################################################################################################

@@ -111,13 +111,13 @@ def process_whites(white_list, MB=None, ronmask=None, MD=None, gain=None, scalab
     ### now we do essentially what "CREATE_MASTER_IMG" does for whites... ###
     #########################################################################
     #add individual-image errors in quadrature (need it either way, not only for fancy method)
-    err_summed = np.sqrt(np.sum((np.array(allerr)**2),axis=0))
+    err_summed = np.sqrt(np.sum((np.array(allerr)**2), axis=0))
     #get median image
     medimg = np.median(np.array(allimg), axis=0)
 
     if fancy:
         #need to create a co-added frame if we want to do outlier rejection the fancy way
-        summed = np.sum((np.array(allimg)),axis=0)
+        summed = np.sum((np.array(allimg)), axis=0)
         if diffimg:
             diff = np.zeros(summed.shape)
 
@@ -151,12 +151,15 @@ def process_whites(white_list, MB=None, ronmask=None, MD=None, gain=None, scalab
         master = summed / len(white_list)
         err_master = err_summed / len(white_list)
     else:
-        #ie not fancy, just take the median image to remove outliers
-        medimg = np.median(np.array(allimg), axis=0)
+        #ie not fancy, just take the median image to remove outliers       
         #now set master image equal to median image
         master = medimg.copy()
-        #estimate of the corresponding error array (estimate only!!!)
-        err_master = err_summed / len(white_list)
+        nw = len(white_list)     # number of whites 
+#         #estimate of the corresponding error array (estimate only!!!)
+#         err_master = err_summed / nw     # I don't know WTF I was thinking here...
+        # if roughly Gaussian distribution of values: error of median ~= 1.253*error of mean
+        err_master = 1.253 * np.std(allimg, axis=0) / np.sqrt(nw-1)     # normally it would be sigma/sqrt(n), but np.std is dividing by sqrt(n), not by sqrt(n-1)
+        # err_master = np.sqrt( np.sum( (np.array(allimg) - np.mean(np.array(allimg), axis=0))**2 / (nw*(nw-1)) , axis=0) )   # that is equivalent, but slower
 
 
     #now save master white to file

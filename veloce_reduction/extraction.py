@@ -365,6 +365,10 @@ def optimal_extraction(stripes, err_stripes=None, ron_stripes=None, slit_height=
         nfib = 3
     elif fibs.lower() == 'allsky':
         nfib = 5
+    elif fibs.lower() == 'thxe':
+        nfib = 1
+    elif fibs.lower() in ['lfc', 'laser']:
+        nfib = 1
     else:
         print('WARNING: input for "fibs" not recognized - using all 24 fibres as a default...')
         nfib = 24
@@ -668,6 +672,10 @@ def optimal_extraction_from_indices(img, stripe_indices, err_img=None, ronmask=N
         nfib = 3
     elif fibs.lower() == 'allsky':
         nfib = 5
+    elif fibs.lower() == 'thxe':
+        nfib = 1
+    elif fibs.lower() in ['lfc', 'laser']:
+        nfib = 1
     else:
         print('WARNING: input for "fibs" not recognized - using all 24 fibres as a default...')
         nfib = 24

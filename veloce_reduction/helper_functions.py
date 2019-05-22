@@ -447,12 +447,12 @@ def make_norm_profiles_5(x, col, fppo, integrate=False, fibs='stellar', slope=Fa
     elif fibs == 'stellar':
         # nfib = 19
         userange = np.arange(2, 21, 1)
-    # elif fibs == 'laser':
-    #     nfib = 1
-    #     userange = np.arange(0, 1, 2)
-    # elif fibs == 'thxe':
-    #     nfib = 1
-    #     userange = np.arange(27, 28, 2)
+    elif fibs == 'laser':
+        # nfib = 1
+        userange = np.arange(0, 1, 2)
+    elif fibs == 'thxe':
+        # nfib = 1
+        userange = np.arange(27, 28, 2)
     elif fibs == 'sky3':
         # nfib = 3
         userange = np.arange(21, 24, 1)
@@ -462,6 +462,91 @@ def make_norm_profiles_5(x, col, fppo, integrate=False, fibs='stellar', slope=Fa
     elif fibs == 'allsky':
         # nfib = 5
         userange = np.r_[np.arange(2),np.arange(21, 24, 1)]
+    else:
+        print('ERROR: fibre selection not recognised!!!')
+        return
+
+    # Do we want to include extra "fibres" to take care of slope and/or offset?
+    # Default is NO for both (as this should probably be already taken care of globally)
+    addfibs = 0
+    if offset:
+        # nfib += 1
+        addfibs += 1
+    if slope:
+        # nfib += 1
+        addfibs += 1
+
+    phi = np.zeros((len(x), nfib + addfibs))
+
+    # NOTE: need to turn fibre numbers around here to be correct
+    for k, fib in enumerate(sorted(fppo.keys())[::-1]):
+        mu = fppo[fib]['mu_fit'][col]
+        sigma = fppo[fib]['sigma_fit'][col]
+        beta = fppo[fib]['beta_fit'][col]
+        # now, I think we actually don't want to evaluate the functional form of the profiles as declared by "fibmodel" at the respective locations,
+        # but rather we want to integrate the (highly non-linear) function from the left edge to the right edge of the pixels (co-ordinates are pixel centres!!!)
+        if integrate:
+            for i in np.arange(len(x)):
+                # phi[i,k] = fixed_quad(fibmodel, x[i] - 0.5, x[i] + 0.5, args=(mu, sigma, beta))[0]   # factor of ~4 faster, but not as accurate (fails for simple Gaussian test)
+                phi[i, k] = quad(fibmodel, x[i] - 0.5, x[i] + 0.5, args=(mu, sigma, beta))[0]
+        else:
+            phi[:, k] = fibmodel(x, mu, sigma, beta=beta, alpha=0, norm=0)
+
+    if offset and not slope:
+        phi[:, -1] = 1.
+        userange = np.append(userange, nfib)
+    if slope and not offset:
+        phi[:, -1] = x - x[0]
+        userange = np.append(userange, nfib)
+    if offset and slope:
+        phi[:, -2] = 1.
+        phi[:, -1] = x - x[0]
+        userange = np.append(userange, np.array([nfib,nfib+1]))
+
+    # deprecate phi-array to only use wanted fibres
+    phi = phi[:, userange]
+
+    # return normalized profiles
+    phinorm = phi / np.sum(phi, axis=0)
+
+    return phinorm
+
+
+
+def make_norm_profiles_6(x, col, fppo, integrate=False, fibs='stellar', slope=False, offset=False):
+    """
+    THAT's the latest version to be used with fibre profiles from real fibre flats!!!
+    In this version we have 26 fibres (1 ThXe + 2 sky + 19 stellar + 3 sky + 1 LFC)!
+    clone of "make_norm_profiles", but takes as "fppo" (= fibparms per order) as input, rather
+    than "ord" and the entire "fibparms" dictionary
+    
+    UPDATE:
+    This version now takes the fibparms in explicit form, rather than as a function to apply to 'pix'.
+    """
+    
+    nfib = 26
+    
+    # same number of fibres for every order, of course
+    if fibs == 'all':
+        userange = np.arange(nfib)
+    elif fibs == 'stellar':
+        # nfib = 19
+        userange = np.arange(3, 22, 1)
+    elif fibs == 'laser':
+        # nfib = 1
+        userange = np.arange(25, 26, 2)
+    elif fibs == 'thxe':
+        # nfib = 1
+        userange = np.arange(0, 1, 2)
+    elif fibs == 'sky3':
+        # nfib = 3
+        userange = np.arange(22, 25, 1)
+    elif fibs == 'sky2':
+        # nfib = 2
+        userange = np.arange(1,3,1)
+    elif fibs == 'allsky':
+        # nfib = 5
+        userange = np.r_[np.arange(1,3,1), np.arange(22, 25, 1)]
     else:
         print('ERROR: fibre selection not recognised!!!')
         return
