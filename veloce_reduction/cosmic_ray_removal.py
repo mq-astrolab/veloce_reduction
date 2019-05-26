@@ -19,7 +19,7 @@ from scipy.signal import medfilt
 
 
 
-def median_remove_cosmics(img_list, ronmask=None, main_index=0, thresh=5., low_thresh=3., debug_level=0):
+def median_remove_cosmics(img_list, ronmask=None, main_index=0, thresh=5., low_thresh=3., debug_level=0, timit=False):
     """
     If there are multiple exposures of a star per epoch, then simply remove the cosmics by comparing to median of the scaled images.
     If there are exactly two exposures per epoch, then look at the deviation from the lower one (after scaling).
@@ -31,6 +31,8 @@ def median_remove_cosmics(img_list, ronmask=None, main_index=0, thresh=5., low_t
     use the overall scaling for the master white as well!?!?!?
     """
 
+    if timit:
+        start_time = time.time()
 
     if len(img_list) == 1:
         if debug_level > 1:
@@ -86,6 +88,9 @@ def median_remove_cosmics(img_list, ronmask=None, main_index=0, thresh=5., low_t
 
     # replace cosmic-ray affected pixels by the pixel values in the median image
     cleaned[bad_edges] = medimg[bad_edges]
+
+    if timit:
+        print('Total time elapsed: '+str(np.round(time.time() - start_time,1))+' seconds')
 
     return cleaned
 
