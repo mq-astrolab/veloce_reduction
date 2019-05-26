@@ -123,7 +123,7 @@ def process_whites(white_list, MB=None, ronmask=None, MD=None, gain=None, scalab
 
         master_outie_mask = np.zeros(summed.shape, dtype='int')
 
-        #make sure we do not have any negative pixels for the sqrt
+        # make sure we do not have any negative pixels for the sqrt
         medimgpos = medimg.copy()
         medimgpos[medimgpos < 0] = 0.
         med_sig_arr = np.sqrt(medimgpos + ronmask*ronmask)       #expected STDEV for the median image (from LB Eq 2.1); still in ADUs
@@ -212,7 +212,23 @@ def process_science_images(imglist, P_id, mask=None, sampling_size=25, slit_heig
     
     if timit:
         start_time = time.time()
-    
+
+    # sort image list, just in case
+    imglist.sort()
+
+    # get a list with the object names
+    object_list = [pyfits.getval(file, 'OBJECT').split('+')[0] for file in imglist]
+    # and the indices where the object changes (to figure out which observations belong to one epoch)
+    changes = np.where(np.array(object_list)[:-1] != np.array(object_list)[1:])[0] + 1   # need the plus one to get the indices of the first occasion of a new object
+    # list of indices for individual epochs - surely there's an easier way to do this...
+    all_epoch_list = []
+    all_epoch_list.append(np.arange(0,changes[0]))
+    for i in range(len(changes) - 1):
+        all_epoch_list.append(np.arange(changes[i],changes[i+1]))
+    all_epoch_list.append(np.arange(changes[-1], len(object_list)))
+
+
+
     #####################################
     ### (1) bias and dark subtraction ###
     #####################################
@@ -241,26 +257,43 @@ def process_science_images(imglist, P_id, mask=None, sampling_size=25, slit_heig
     
     if not from_indices:
         ron_stripes = extract_stripes(ronmask, P_id, return_indices=False, slit_height=slit_height, savefiles=False, timit=True)
-    
-    for i,filename in enumerate(sorted(imglist)):
+
+    # loop over all files
+    for i,filename in enumerate(imglist):
 
         print('Extracting stellar spectrum '+str(i+1)+'/'+str(len(imglist)))
 
-        #do some housekeeping with filenames
+        # (0) do some housekeeping with filenames, and check if there are multiple exposures for a given epoch of a star
         dum = filename.split('/')
         dum2 = dum[-1].split('.')
         obsname = dum2[0]
-              
+        obsnum = int(obsname[-5:])
+        object = pyfits.getval(filename, 'OBJECT').split('+')[0]
+        object_indices = np.where(object == np.array(object_list))[0]
+        # list of all the observations belonging to this epoch
+        epoch_ix = [sublist for sublist in all_epoch_list if i in sublist]
+        epoch_list = list(np.array(imglist)[epoch_ix])
+
         # (1) call routine that does all the bias and dark correction stuff and proper error treatment
         img = correct_for_bias_and_dark_from_filename(filename, MB, MD, gain=gain, scalable=scalable, savefile=saveall, path=path, timit=True)   #[e-]
         #err = np.sqrt(img + ronmask*ronmask)   # [e-]
         #TEMPFIX:
         err_img = np.sqrt(np.clip(img,0,None) + ronmask*ronmask)   # [e-]
         
-        # (2) remove cosmic rays (ERRORS REMAIN UNCHANGED)
-        # cosmic_cleaned_img = remove_cosmics(img, ronmask, obsname, path, Flim=3.0, siglim=5.0, maxiter=1, savemask=True, savefile=True, save_err=False, verbose=True, timit=True)   # [e-]
-        #adjust errors?
-        
+        ## (2) remove cosmic rays (ERRORS MUST REMAIN UNCHANGED)
+        ## check if there are multiple exposures for this epoch (if yes, we can do the much simpler "median_remove_cosmics")
+        # if len(epoch_list) == 1:
+        #     cosmic_cleaned_img = remove_cosmics(img, ronmask, obsname, path, Flim=3.0, siglim=5.0, maxiter=1, savemask=True, savefile=True, save_err=False, verbose=True, timit=True)   # [e-]
+        ## adjust errors?
+        # else:
+        # make list of actual images (maybe this needs to be done outside the function?)
+        img_list = []
+        for file in epoch_list:
+            img_list.append(correct_for_bias_and_dark_from_filename(file, MB, MD, gain=gain, scalable=False, savefile=False))
+        # index indicating which one of the files in the epoch list is the one to be cosmic cleaned
+        main_index = np.where(np.array(epoch_ix) == i)[0][0]
+        median_remove_cosmics(img_list, main_index=main_index, thresh=8., debug_level=0)
+
         # (3) fit and remove background (ERRORS REMAIN UNCHANGED)
         # bg_corrected_img = remove_background(cosmic_cleaned_img, P_id, obsname, path, degpol=5, slit_height=slit_height, save_bg=True, savefile=True, save_err=False,
         #                                      exclude_top_and_bottom=True, verbose=True, timit=True)   # [e-]

@@ -88,7 +88,7 @@ def create_toi_velobs_dict(path='/Users/christoph/OneDrive - UNSW/observations/'
         print('ERROR: you broke the world!')
         return -1
         
-    assert os.path.isdir(src_path), "ERROR: directory containing the reduced data does not exist!!!"
+    assert os.path.isdir(src_path), "ERROR: directory containing the " + rawred + " data does not exist!!!"
 
 
     # read input file
@@ -118,7 +118,7 @@ def create_toi_velobs_dict(path='/Users/christoph/OneDrive - UNSW/observations/'
         if src.lower() in ['red', 'reduced']:
             fn_list = [fn for fn in all_obs_list if ((fn.split('/')[-1]).split('_')[0]).split('+')[0] in synonyms]
         elif src.lower() == 'raw':
-            fn_list = [fn for fn,targ in zip(all_obs_list, all_target_list) if targ in synonyms]
+            fn_list = [fn for fn,targ in zip(all_obs_list, all_target_list) if targ.split('+')[0] in synonyms]
 #             fn_list = [fn for fn in all_obs_list if (pyfits.getval(fn, 'OBJECT')).split('+')[0] in synonyms]
         fn_list.sort()
 
@@ -166,8 +166,9 @@ def create_toi_velobs_dict(path='/Users/christoph/OneDrive - UNSW/observations/'
 
 
 
-def plot_toi_phase(toi, saveplot=False, outpath=None):
-    vo = np.load(path + 'velobs_raw.npy').item()
+def plot_toi_phase(toi, vo=None, saveplot=False, outpath=None):
+    if vo is None:
+        vo = np.load('/Users/christoph/OneDrive - UNSW/observations/velobs_raw.npy').item()
     # representative plot of a normalized circular orbit with the orbital phases of the obstimes indicated
     plt.figure()
     x = np.linspace(0, 1, 1000)
@@ -190,10 +191,15 @@ def plot_toi_phase(toi, saveplot=False, outpath=None):
 
 
 
-def plot_all_toi_phases(path='/Users/christoph/OneDrive - UNSW/observations/', saveplots=True):
-    vo = np.load(path + 'velobs_raw.npy').item()
+def plot_all_toi_phases(src='raw', path='/Users/christoph/OneDrive - UNSW/observations/', saveplots=True):
+    if src.lower() == 'raw':
+        vo = np.load(path + 'velobs_raw.npy').item()
+    elif src.lower() in ['red', 'reduced']:
+        vo = np.load(path + 'velobs_reduced.npy').item()
+    else:
+        return -1
     for toi in sorted(vo.keys()):
-        plot_toi_phase(toi, saveplot=True, outpath = path + 'plots/')
+        plot_toi_phase(toi, vo=vo, saveplot=True, outpath = path + 'plots/')
     return
 
 
@@ -229,7 +235,6 @@ def get_reduced_obslist(laptop=False):
 #     unique_targets = set(all_target_list)
 
     return all_obs_list
-
 
 
 
@@ -276,15 +281,17 @@ def get_raw_obslist(return_targets=False, laptop=False, verbose=True):
 
 
 
-# # make latex file
-# for i,toi in enumerate(sorted(raw_vo.keys())):
-#     if np.mod(i,2) == 0:
-#         outfile.write(r'\begin{figure}[H]' + '\n')
-#     outfile.write(r'\includegraphics[width=0.99\linewidth]{' + toi + '_orbital_phase_coverage.eps}' + '\n')
-#     if np.mod(i,2) != 0:
-#         outfile.write(r'\end{figure}' + '\n')
-#         outfile.write(r'\newpage' + '\n')
-# outfile.close()
+def make_text_file_for_latex():
+    outfile = open('/Users/christoph/OneDrive - UNSW/observations/plots/dumdum.txt', 'w')
+    for i,toi in enumerate(sorted(raw_vo.keys())):
+        if np.mod(i,2) == 0:
+            outfile.write(r'\begin{figure}[H]' + '\n')
+        outfile.write(r'\includegraphics[width=0.99\linewidth]{' + toi + '_orbital_phase_coverage.eps}' + '\n')
+        if np.mod(i,2) != 0:
+            outfile.write(r'\end{figure}' + '\n')
+            outfile.write(r'\newpage' + '\n')
+    outfile.close()
+    return
 
 
 

@@ -18,6 +18,79 @@ from scipy.signal import medfilt
 # xcen = pyfits.getdata(xcenname)
 
 
+
+def median_remove_cosmics(img_list, err_img_list=None, ronmask=None, main_index=0, thresh=5., debug_level=0):
+    """
+    If there are multiple exposures of a star per epoch, then simply remove the cosmics by comparing to median of the scaled images.
+    If there are exactly two exposures per epoch, then look at the deviation from the lower one (after scaling).
+
+    INPUT:
+    "file_list"  - list of filenames of all exposures for a given epoch of a star
+
+    TODO:
+    use the overall scaling for the master white as well!?!?!?
+    do I even need the err_img_list here?
+    """
+
+
+    if len(img_list) == 1:
+        if debug_level > 1:
+            print('Only one exposure for this epoch - have to remove cosmics the hard way...')
+            print('Skipping this routine...')
+        return
+
+    if ronmask is None:
+        ronmask = np.ones(img_list[0].shape) * 4.   # 4 e- per pixel is a sensible guess for the read noise
+
+    if err_img_list is None:
+        err_img_list = [np.sqrt(np.clip(img,0,None) + ronmask*ronmask) for img in img_list]     # [e-]
+
+    # this is the image that we want to rid of cosmic rays
+    img = img_list[main_index]
+
+    # median image
+    medimg = np.median(np.array(img_list), axis=0)
+    # make sure we don't have negativel values for the SQRT (can happen eg b/c of bad pixels in bias subtraction)
+    medimg = np.clip(medimg, 0, None)
+    # "expected" STDEV for the median image (NOT the proper error of the median); (from LB Eq 2.1)
+    med_sig_arr = np.sqrt(medimg + ronmask * ronmask)
+
+    # get the difference image
+    diff_img = img - medimg
+
+    # Now, although it is unlikely, it is not impossible for some pixels to be affected by a cosmic ray in two or more
+    # images! we want to make sure that if that's the case we want to the median of the rest or the lowest pixel value
+    # and not the (corrupted) median pixel value!
+    ########## ARGH!!! The ThXe lines (and to a lesser extent the LFC lines) throw this off!!! ##########
+    # # minimum image (ie the minimum in each pixel)
+    # minimg = np.min(np.array(img_list), axis=0)
+    # # make sure we don't have negativel values for the SQRT (can happen eg b/c of bad pixels in bias subtraction)
+    # minimg = np.clip(minimg, 0, None)
+    # # "expected" STDEV for the median image (NOT the proper error of the median); (from LB Eq 2.1)
+    # min_sig_arr = np.sqrt(minimg + ronmask * ronmask)
+    # minmed_diff_img = medimg - minimg
+
+    # identify cosmic-ray affected pixels
+    bad = diff_img > thresh * med_sig_arr
+
+    # replace cosmic-ray affected pixels by the pixel values in the median image
+    cleaned = img.copy()
+    cleaned[bad] = medimg[bad]
+
+    # now simply speaking that's it - however, we can try and be smart and also check for ramps of cosmics, ie check
+    # if there are pixels in the immediate vicinity of the pixels identified as cosmics above that are at least a lower
+    # threshold times the expected sigma away from the median
+
+
+
+
+    return cleaned
+
+
+
+
+
+
 def onedim_medfilt_cosmic_ray_removal(f, err, w=15, thresh=8., debug_level=0):
     f_clean = f.copy()
     f_sm = medfilt(f, w)
@@ -29,6 +102,8 @@ def onedim_medfilt_cosmic_ray_removal(f, err, w=15, thresh=8., debug_level=0):
         plt.plot(f - f_sm, 'b-')
     f_clean[badix] = f_sm[badix]
     return f_clean
+
+
 
 
 
@@ -122,8 +197,6 @@ def remove_cosmics(img, ronmask, obsname, path, Flim=3.0, siglim=5.0, maxiter=20
         print('Total time elapsed: '+str(np.round(time.time() - start_time,1))+' seconds')
         
     return cleaned
-
-
 
 
 
@@ -234,8 +307,6 @@ def identify_cosmics(img, ronmask, Flim=3.0, siglim=5.0, verbose=False, timit=Fa
     
     #return the final cosmic mask       ; todo: and total number of cosmics found, and, b/c this is done iteratively the number and locations of cosmics found in the particular iteration
     return final_mask
-
-
 
 
 
@@ -371,9 +442,7 @@ def clean_cosmics(img, mask, badpixmask=None, method='median', boxsize=5, verbos
         #return the cleaned image
         return cleaned    
             
-      
-      
-            
+
    
 def subsample(a): # this is more a generic function then a method ...
     """
@@ -401,9 +470,7 @@ def subsample(a): # this is more a generic function then a method ...
     indices = coordinates.astype('i')   #choose the biggest smaller integer index
     return a[tuple(indices)]
     
-    
-    
-    
+
 
 def rebin(a, newshape):
     """
@@ -421,8 +488,6 @@ def rebin(a, newshape):
     evList = ['a.reshape('] + ['newshape[%d],factor[%d],'%(i,i) for i in range(lenShape)] + [')'] + ['.sum(%d)'%(i+1) for i in range(lenShape)] + ['/factor[%d]'%i for i in range(lenShape)]
 
     return eval(''.join(evList))
-
-
 
 
 

@@ -543,10 +543,10 @@ def make_norm_profiles_6(x, col, fppo, integrate=False, fibs='stellar', slope=Fa
         userange = np.arange(22, 25, 1)
     elif fibs == 'sky2':
         # nfib = 2
-        userange = np.arange(1,3,1)
+        userange = np.arange(1, 3, 1)
     elif fibs == 'allsky':
         # nfib = 5
-        userange = np.r_[np.arange(1,3,1), np.arange(22, 25, 1)]
+        userange = np.r_[np.arange(1, 3, 1), np.arange(22, 25, 1)]
     else:
         print('ERROR: fibre selection not recognised!!!')
         return
@@ -586,7 +586,7 @@ def make_norm_profiles_6(x, col, fppo, integrate=False, fibs='stellar', slope=Fa
     if offset and slope:
         phi[:, -2] = 1.
         phi[:, -1] = x - x[0]
-        userange = np.append(userange, np.array([nfib,nfib+1]))
+        userange = np.append(userange, np.array([nfib, nfib+1]))
 
     # deprecate phi-array to only use wanted fibres
     phi = phi[:, userange]

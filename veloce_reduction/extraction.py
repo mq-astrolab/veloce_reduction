@@ -664,6 +664,7 @@ def optimal_extraction_from_indices(img, stripe_indices, err_img=None, ronmask=N
 
     if fibs.lower() == 'all':
         nfib = 24
+#         nfib = 26
     elif fibs.lower() == 'stellar':
         nfib = 19
     elif fibs.lower() == 'sky2':
@@ -679,6 +680,7 @@ def optimal_extraction_from_indices(img, stripe_indices, err_img=None, ronmask=N
     else:
         print('WARNING: input for "fibs" not recognized - using all 24 fibres as a default...')
         nfib = 24
+#         nfib = 26
 
     # read in polynomial coefficients of best-fit individual-fibre-profile parameters
     if simu:
@@ -820,7 +822,7 @@ def optimal_extraction_from_indices(img, stripe_indices, err_img=None, ronmask=N
                     # phi = make_norm_profiles(sr[:,i], ord, i, fibparms)
                     # phi = make_norm_profiles_temp(sr[:,i], ord, i, fibparms)
                     # phi = make_norm_single_profile_temp(sr[:,i], ord, i, fibparms)
-                    phi = make_norm_profiles_5(sr[:, i], i, fppo, integrate=integrate_profiles, slope=slope, offset=offset, fibs=fibs)
+                    phi = make_norm_profiles_6(sr[:, i], i, fppo, integrate=integrate_profiles, slope=slope, offset=offset, fibs=fibs)
 
             # print('WARNING: TEMPORARY offset correction is not commented out!!!')
             # # subtract the median as the offset if BG is not properly corrected for
