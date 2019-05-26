@@ -19,7 +19,7 @@ from scipy.signal import medfilt
 
 
 
-def median_remove_cosmics(img_list, err_img_list=None, ronmask=None, main_index=0, thresh=5., debug_level=0):
+def median_remove_cosmics(img_list, ronmask=None, main_index=0, thresh=5., low_thresh=3., debug_level=0):
     """
     If there are multiple exposures of a star per epoch, then simply remove the cosmics by comparing to median of the scaled images.
     If there are exactly two exposures per epoch, then look at the deviation from the lower one (after scaling).
@@ -29,7 +29,6 @@ def median_remove_cosmics(img_list, err_img_list=None, ronmask=None, main_index=
 
     TODO:
     use the overall scaling for the master white as well!?!?!?
-    do I even need the err_img_list here?
     """
 
 
@@ -41,9 +40,6 @@ def median_remove_cosmics(img_list, err_img_list=None, ronmask=None, main_index=
 
     if ronmask is None:
         ronmask = np.ones(img_list[0].shape) * 4.   # 4 e- per pixel is a sensible guess for the read noise
-
-    if err_img_list is None:
-        err_img_list = [np.sqrt(np.clip(img,0,None) + ronmask*ronmask) for img in img_list]     # [e-]
 
     # this is the image that we want to rid of cosmic rays
     img = img_list[main_index]
@@ -71,18 +67,25 @@ def median_remove_cosmics(img_list, err_img_list=None, ronmask=None, main_index=
     # minmed_diff_img = medimg - minimg
 
     # identify cosmic-ray affected pixels
-    bad = diff_img > thresh * med_sig_arr
+    cosmics = diff_img > thresh * med_sig_arr
 
     # replace cosmic-ray affected pixels by the pixel values in the median image
     cleaned = img.copy()
-    cleaned[bad] = medimg[bad]
+    cleaned[cosmics] = medimg[cosmics]
 
     # now simply speaking that's it - however, we can try and be smart and also check for ramps of cosmics, ie check
     # if there are pixels in the immediate vicinity of the pixels identified as cosmics above that are at least a lower
     # threshold times the expected sigma away from the median
 
+    # "grow" the cosmics by 1 pixel in each direction (as in LACosmic)
+    growkernel = np.ones((3, 3))
+    extended_cosmics = np.cast['bool'](ndimage.convolve(np.cast['float32'](cosmics), growkernel))
+    cosmic_edges = np.logical_or(cosmics, extended_cosmics)
+    # now check only for these pixels surrounding the cosmics whether they are affected (but use lower threshold)
+    bad_edges = np.logical_and(diff_img > low_thresh * med_sig_arr, cosmic_edges)
 
-
+    # replace cosmic-ray affected pixels by the pixel values in the median image
+    cleaned[bad_edges] = medimg[bad_edges]
 
     return cleaned
 
