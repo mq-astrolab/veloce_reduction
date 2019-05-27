@@ -11,7 +11,7 @@ import os
 
 from veloce_reduction.veloce_reduction.helper_functions import binary_indices
 from veloce_reduction.veloce_reduction.calibration import correct_for_bias_and_dark_from_filename
-from veloce_reduction.veloce_reduction.cosmic_ray_removal import remove_cosmics
+from veloce_reduction.veloce_reduction.cosmic_ray_removal import remove_cosmics, median_remove_cosmics
 from veloce_reduction.veloce_reduction.background import remove_background
 from veloce_reduction.veloce_reduction.order_tracing import extract_stripes
 from veloce_reduction.veloce_reduction.extraction import extract_spectrum, extract_spectrum_from_indices
@@ -238,22 +238,22 @@ def process_science_images(imglist, P_id, mask=None, sampling_size=25, slit_heig
         print('WARNING: output file directory not provided!!!')
         print('Using same directory as input file...')
         dum = imglist[0].split('/')
-        path = imglist[0][0:-len(dum[-1])]
+        path = imglist[0][0 : -len(dum[-1])]
     if MB is None:
         #no need to fix orientation, this is already a processed file [ADU]
-        MB = pyfits.getdata(path+'master_bias.fits')
+        MB = pyfits.getdata(path + 'master_bias.fits')
     if ronmask is None:
         #no need to fix orientation, this is already a processed file [e-]
-        ronmask = pyfits.getdata(path+'read_noise_mask.fits')
+        ronmask = pyfits.getdata(path + 'read_noise_mask.fits')
     if MD is None:
         if scalable:
             #no need to fix orientation, this is already a processed file [e-]
-            MD = pyfits.getdata(path+'master_dark_scalable.fits', 0)
-#             err_MD = pyfits.getdata(path+'master_dark_scalable.fits', 1)
+            MD = pyfits.getdata(path + 'master_dark_scalable.fits', 0)
+#             err_MD = pyfits.getdata(path + 'master_dark_scalable.fits', 1)
         else:
             #no need to fix orientation, this is already a processed file [e-]
-            MD = pyfits.getdata(path+'master_dark_t'+str(int(np.round(texp,0)))+'.fits', 0)
-#             err_MD = pyfits.getdata(path+'master_dark_t'+str(int(np.round(texp,0)))+'.fits', 1)
+            MD = pyfits.getdata(path + 'master_dark_t' + str(int(np.round(texp, 0))) + '.fits', 0)
+#             err_MD = pyfits.getdata(path + 'master_dark_t' + str(int(np.round(texp, 0))) + '.fits', 1)
     
     if not from_indices:
         ron_stripes = extract_stripes(ronmask, P_id, return_indices=False, slit_height=slit_height, savefiles=False, timit=True)
@@ -273,6 +273,8 @@ def process_science_images(imglist, P_id, mask=None, sampling_size=25, slit_heig
         # list of all the observations belonging to this epoch
         epoch_ix = [sublist for sublist in all_epoch_list if i in sublist]
         epoch_list = list(np.array(imglist)[epoch_ix])
+        # list of individual exposure times for this epoch
+        epoch_texp_list = [pyfits.getval(file, 'ELAPSED') for file in epoch_list]
 
         # (1) call routine that does all the bias and dark correction stuff and proper error treatment
         img = correct_for_bias_and_dark_from_filename(filename, MB, MD, gain=gain, scalable=scalable, savefile=saveall, path=path, timit=True)   #[e-]
@@ -284,15 +286,17 @@ def process_science_images(imglist, P_id, mask=None, sampling_size=25, slit_heig
         ## check if there are multiple exposures for this epoch (if yes, we can do the much simpler "median_remove_cosmics")
         # if len(epoch_list) == 1:
         #     cosmic_cleaned_img = remove_cosmics(img, ronmask, obsname, path, Flim=3.0, siglim=5.0, maxiter=1, savemask=True, savefile=True, save_err=False, verbose=True, timit=True)   # [e-]
-        ## adjust errors?
+        ## adjust errors??? --> I think not...
         # else:
-        # make list of actual images (maybe this needs to be done outside the function?)
+        # make list of actual images
         img_list = []
         for file in epoch_list:
             img_list.append(correct_for_bias_and_dark_from_filename(file, MB, MD, gain=gain, scalable=False, savefile=False))
         # index indicating which one of the files in the epoch list is the one to be cosmic cleaned
         main_index = np.where(np.array(epoch_ix) == i)[0][0]
-        median_remove_cosmics(img_list, main_index=main_index, thresh=8., debug_level=0)
+        scales = np.array(epoch_texp_list) / epoch_texp_list[main_index]
+        cosmic_cleaned_img = median_remove_cosmics(img_list, main_index=main_index, scales=scales, ronmask=ronmask, debug_level=1, timit=True)
+
 
         # (3) fit and remove background (ERRORS REMAIN UNCHANGED)
         # bg_corrected_img = remove_background(cosmic_cleaned_img, P_id, obsname, path, degpol=5, slit_height=slit_height, save_bg=True, savefile=True, save_err=False,

@@ -19,7 +19,7 @@ from scipy.signal import medfilt
 
 
 
-def median_remove_cosmics(img_list, ronmask=None, main_index=0, thresh=5., low_thresh=3., debug_level=0, timit=False):
+def median_remove_cosmics(img_list, main_index=0, scales=None, ronmask=None, thresh=5., low_thresh=3., debug_level=0, timit=False):
     """
     If there are multiple exposures of a star per epoch, then simply remove the cosmics by comparing to median of the scaled images.
     If there are exactly two exposures per epoch, then look at the deviation from the lower one (after scaling).
@@ -40,14 +40,35 @@ def median_remove_cosmics(img_list, ronmask=None, main_index=0, thresh=5., low_t
             print('Skipping this routine...')
         return
 
+    if scales is None:
+        scales = np.ones(len(img_list))
+
     if ronmask is None:
         ronmask = np.ones(img_list[0].shape) * 4.   # 4 e- per pixel is a sensible guess for the read noise
 
     # this is the image that we want to rid of cosmic rays
     img = img_list[main_index]
 
+    ####################################################################################################################
+    ##### CRAP: this does not work if the relative intensities between the fibres is varying a lot between individual exposures of a given epoch!!! #####
+    # # first we need to scale the images (different exposure times, but also different SNR due to clouds or seeing)
+    # # let's just say we scale everything to the "main_index-image" (ie the one we want to rid of cosmics)
+    # scales = np.zeros(len(img_list))
+    #
+    # pospos = np.logical_and(img_list[0][testmask] > 0, img_list[1][testmask] > 0)
+    # ratio_12 = np.median(img_list[0][pospos] / img_list[1][pospos])
+    #
+    # postestmask = (img_list[0] > 0) & (img_list[1] > 0) & testmask
+    # img_ratio_12 = np.clip(img_list[0],1,None) / np.clip(img_list[1],1,None)
+    # ratio_12 = np.median(img_list[0][postestmask] / img_list[1][postestmask])
+    ####################################################################################################################
+    # so let's just scale by exposure time for now (using "scales" variable, ie relative to the main-index-exposure)
+
+
+
     # median image
-    medimg = np.median(np.array(img_list), axis=0)
+    # medimg = np.median(np.array(img_list), axis=0)
+    medimg = np.median(np.array(img_list) / scales.reshape(len(img_list), 1, 1), axis=0)
     # make sure we don't have negativel values for the SQRT (can happen eg b/c of bad pixels in bias subtraction)
     medimg = np.clip(medimg, 0, None)
     # "expected" STDEV for the median image (NOT the proper error of the median); (from LB Eq 2.1)
