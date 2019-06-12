@@ -16,7 +16,7 @@ def read_and_overscan_correct(infile, overscan=53, discard_ramp=17,
     quadshape = (4,newshape[0]//2, newshape[1]//2)
     quads = np.zeros(quadshape)
     corrected = np.zeros(newshape)
-    overscans = np.zeros( (4,dd.shape[0]//2, overscan))
+    overscans = np.zeros((4,dd.shape[0]//2, overscan))
     
     #Split the y axis in 2
     for y0, y1, qix in zip([0, dd.shape[0]//2], [dd.shape[0]//2, dd.shape[0]], [0,2]):

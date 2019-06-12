@@ -49,6 +49,7 @@ def quick_extract(stripes, err_stripes, slit_height=25, verbose=False, timit=Fal
     err = {}
     pixnum = {}
     
+    # loop over all orders
     for ord in sorted(stripes.keys()):
         if verbose:
             print('OK, now processing order '+str(ord)+'...')
@@ -64,8 +65,8 @@ def quick_extract(stripes, err_stripes, slit_height=25, verbose=False, timit=Fal
         # get dimensions of the box
         ny,nx = sc.shape
         
-        flux[ord] = np.sum(sc,axis=0)
-        err[ord] = np.sqrt(np.sum(err_sc*err_sc,axis=0))
+        flux[ord] = np.sum(sc, axis=0)
+        err[ord] = np.sqrt(np.sum(err_sc*err_sc, axis=0))
         pixnum[ord] = np.arange(nx) + 1
     
         if timit:

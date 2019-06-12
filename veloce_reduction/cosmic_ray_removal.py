@@ -63,13 +63,13 @@ def median_remove_cosmics(img_list, main_index=0, scales=None, ronmask=None, thr
     # ratio_12 = np.median(img_list[0][postestmask] / img_list[1][postestmask])
     ####################################################################################################################
     # so let's just scale by exposure time for now (using "scales" variable, ie relative to the main-index-exposure)
-
-
+    # POSSIBLE IMPROVEMENTS: use CHIPMASK (showing locations of bg , calib, sky, and stellar light), use relints for stellar/sky, just exp time for rest
 
     # median image
     # medimg = np.median(np.array(img_list), axis=0)
     medimg = np.median(np.array(img_list) / scales.reshape(len(img_list), 1, 1), axis=0)
-    # make sure we don't have negativel values for the SQRT (can happen eg b/c of bad pixels in bias subtraction)
+
+    # make sure we don't have negative values for the SQRT (can happen eg b/c of bad pixels in bias subtraction)
     medimg = np.clip(medimg, 0, None)
     # "expected" STDEV for the median image (NOT the proper error of the median); (from LB Eq 2.1)
     med_sig_arr = np.sqrt(medimg + ronmask * ronmask)
@@ -81,6 +81,7 @@ def median_remove_cosmics(img_list, main_index=0, scales=None, ronmask=None, thr
     # images! we want to make sure that if that's the case we want to the median of the rest or the lowest pixel value
     # and not the (corrupted) median pixel value!
     ########## ARGH!!! The ThXe lines (and to a lesser extent the LFC lines) throw this off!!! ##########
+    ########## especially if the calib sources changed (try and use CHIPMASK!?!?!?             ##########
     # # minimum image (ie the minimum in each pixel)
     # minimg = np.min(np.array(img_list), axis=0)
     # # make sure we don't have negativel values for the SQRT (can happen eg b/c of bad pixels in bias subtraction)
@@ -93,6 +94,8 @@ def median_remove_cosmics(img_list, main_index=0, scales=None, ronmask=None, thr
     cosmics = diff_img > thresh * med_sig_arr
 
     # replace cosmic-ray affected pixels by the pixel values in the median image
+    if debug_level > 1:
+        print('Cleaning ' + str(np.sum(cosmics)) + 'cosmic-ray affected pixels...')
     cleaned = img.copy()
     cleaned[cosmics] = medimg[cosmics]
 
@@ -108,10 +111,12 @@ def median_remove_cosmics(img_list, main_index=0, scales=None, ronmask=None, thr
     bad_edges = np.logical_and(diff_img > low_thresh * med_sig_arr, cosmic_edges)
 
     # replace cosmic-ray affected pixels by the pixel values in the median image
+    if debug_level > 1:
+        print('Cleaning additional' + str(np.sum(bad_edges)) + 'cosmic-ray affected pixels (edges of CRs)...')
     cleaned[bad_edges] = medimg[bad_edges]
 
     if timit:
-        print('Total time elapsed: '+str(np.round(time.time() - start_time,1))+' seconds')
+        print('Total time elapsed: ' + str(np.round(time.time() - start_time,1)) + ' seconds')
 
     return cleaned
 

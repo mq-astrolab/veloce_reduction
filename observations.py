@@ -59,7 +59,7 @@ def calculate_orbital_phase(toi, jd=None, PT0_dict=None, t_ref = 2457000.):
 
 
 
-def create_toi_velobs_dict(path='/Users/christoph/OneDrive - UNSW/observations/', savefile=True, src='reduced', laptop=False):
+def create_toi_velobs_dict(path='/Users/christoph/OneDrive - UNSW/observations/', savefile=True, src='raw', laptop=False):
 
     """
     TODO:

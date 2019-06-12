@@ -55,34 +55,36 @@ def process_whites(white_list, MB=None, ronmask=None, MD=None, gain=None, scalab
     if debug_level >= 1:
         print('Creating master white frame from '+str(len(white_list))+' fibre flats...')
 
-    #if INPUT arrays are not given, read them from default files
+    # if INPUT arrays are not given, read them from default files
     if path is None:
         print('WARNING: output file directory not provided!!!')
         print('Using same directory as input file...')
         dum = white_list[0].split('/')
         path = white_list[0][0:-len(dum[-1])]
     if MB is None:
-        #no need to fix orientation, this is already a processed file [ADU]
-        MB = pyfits.getdata(path+'master_bias.fits')
+        # no need to fix orientation, this is already a processed file [ADU]
+#         MB = pyfits.getdata(path+'master_bias.fits')
+        MB = pyfits.getdata(path + 'median_bias.fits')
     if ronmask is None:
-        #no need to fix orientation, this is already a processed file [e-]
-        ronmask = pyfits.getdata(path+'read_noise_mask.fits')
+        # no need to fix orientation, this is already a processed file [e-]
+        ronmask = pyfits.getdata(path + 'read_noise_mask.fits')
     if MD is None:
         if scalable:
-            #no need to fix orientation, this is already a processed file [e-]
-            MD = pyfits.getdata(path+'master_dark_scalable.fits', 0)
+            # no need to fix orientation, this is already a processed file [e-]
+            MD = pyfits.getdata(path + 'master_dark_scalable.fits', 0)
 #             err_MD = pyfits.getdata(path+'master_dark_scalable.fits', 1)
         else:
-            #no need to fix orientation, this is already a processed file [e-]
-            MD = pyfits.getdata(path+'master_dark_t'+str(int(np.round(texp,0)))+'.fits', 0)
+            # no need to fix orientation, this is already a processed file [e-]
+            texp = pyfits.getval(white_list[0])
+            MD = pyfits.getdata(path + 'master_dark_t' + str(int(np.round(texp,0))) + '.fits', 0)
 #             err_MD = pyfits.getdata(path+'master_dark_t'+str(int(np.round(texp,0)))+'.fits', 1)
 
 
-    #prepare arrays
+    # prepare arrays
     allimg = []
     allerr = []
 
-    #loop over all files in "white_list"; correct for bias and darks on the fly
+    # loop over all files in "white_list"; correct for bias and darks on the fly
     for n,fn in enumerate(sorted(white_list)):
         if debug_level >=1:
             print('Now processing file: '+str(fn))
@@ -90,33 +92,33 @@ def process_whites(white_list, MB=None, ronmask=None, MD=None, gain=None, scalab
         # if the darks have a different exposure time than the whites, then we need to re-scale the master dark
         texp = pyfits.getval(white_list[0], 'TOTALEXP')
 
-        #call routine that does all the bias and dark correction stuff and converts from ADU to e-
+        # call routine that does all the bias and dark correction stuff and converts from ADU to e-
         if scalable:
             img = correct_for_bias_and_dark_from_filename(fn, MB, MD*texp, gain=gain, scalable=scalable, savefile=saveall,
                                                           path=path, timit=timit)     #these are now bias- & dark-corrected images; units are e-
         else:
             img = correct_for_bias_and_dark_from_filename(fn, MB, MD, gain=gain, scalable=scalable, savefile=saveall,
-                                                          path=path, timit=timit)  # these are now bias- & dark-corrected images; units are e-
+                                                          path=path, timit=timit)     # these are now bias- & dark-corrected images; units are e-
 
         if debug_level >=2:
             print('min(img) = '+str(np.min(img)))
         allimg.append(img)
 #         allerr.append(err)
 #         allerr.append( np.sqrt(img + ronmask*ronmask) )   # [e-]
-        #dumb fix for negative pixel values that can occur, if we haven't masked out bad pixels yet
+        # dumb fix for negative pixel values that can occur, if we haven't masked out bad pixels yet
         allerr.append( np.sqrt(np.abs(img) + ronmask*ronmask) )   # [e-]
 
 
     #########################################################################
     ### now we do essentially what "CREATE_MASTER_IMG" does for whites... ###
     #########################################################################
-    #add individual-image errors in quadrature (need it either way, not only for fancy method)
+    # add individual-image errors in quadrature (need it either way, not only for fancy method)
     err_summed = np.sqrt(np.sum((np.array(allerr)**2), axis=0))
-    #get median image
+    # get median image
     medimg = np.median(np.array(allimg), axis=0)
 
     if fancy:
-        #need to create a co-added frame if we want to do outlier rejection the fancy way
+        # need to create a co-added frame if we want to do outlier rejection the fancy way
         summed = np.sum((np.array(allimg)), axis=0)
         if diffimg:
             diff = np.zeros(summed.shape)
@@ -126,43 +128,43 @@ def process_whites(white_list, MB=None, ronmask=None, MD=None, gain=None, scalab
         # make sure we do not have any negative pixels for the sqrt
         medimgpos = medimg.copy()
         medimgpos[medimgpos < 0] = 0.
-        med_sig_arr = np.sqrt(medimgpos + ronmask*ronmask)       #expected STDEV for the median image (from LB Eq 2.1); still in ADUs
+        med_sig_arr = np.sqrt(medimgpos + ronmask*ronmask)       #e xpected STDEV for the median image (from LB Eq 2.1); still in ADUs
         for n,img in enumerate(allimg):
-            #outie_mask = np.abs(img - medimg) > clip*med_sig_arr
-            outie_mask = (img - medimg) > clip*med_sig_arr      #do we only want HIGH outliers, ie cosmics?
-            #save info about which image contributes the outlier pixel using unique binary numbers technique
+            # outie_mask = np.abs(img - medimg) > clip*med_sig_arr
+            outie_mask = (img - medimg) > clip*med_sig_arr      # do we only want HIGH outliers, ie cosmics?
+            # save info about which image contributes the outlier pixel using unique binary numbers technique
             master_outie_mask += (outie_mask * 2**n).astype(int)
-        #see which image(s) produced the outlier(s) and replace outies by mean of pixel value from remaining images
+        # see which image(s) produced the outlier(s) and replace outies by mean of pixel value from remaining images
         n_outie = np.sum(master_outie_mask > 0)
         print('Correcting '+str(n_outie)+' outliers...')
-        #loop over all outliers
+        # loop over all outliers
         for i,j in zip(np.nonzero(master_outie_mask)[0],np.nonzero(master_outie_mask)[1]):
-            #access binary numbers and retrieve component(s)
-            outnum = binary_indices(master_outie_mask[i,j])   #these are the indices (within allimg) of the images that contain outliers
+            # access binary numbers and retrieve component(s)
+            outnum = binary_indices(master_outie_mask[i,j])   # these are the indices (within allimg) of the images that contain outliers
             dumix = np.arange(len(white_list))
-            #remove the images containing the outliers in order to compute mean from the remaining images
+            # remove the images containing the outliers in order to compute mean from the remaining images
             useix = np.delete(dumix,outnum)
             if diffimg:
                 diff[i,j] = summed[i,j] - ( len(outnum) * np.mean( np.array([allimg[q][i,j] for q in useix]) ) + np.sum( np.array([allimg[q][i,j] for q in useix]) ) )
-            #now replace value in master image by the sum of all pixel values in the unaffected pixels
-            #plus the number of affected images times the mean of the pixel values in the unaffected images
+            # now replace value in master image by the sum of all pixel values in the unaffected pixels
+            # plus the number of affected images times the mean of the pixel values in the unaffected images
             summed[i,j] = len(outnum) * np.mean( np.array([allimg[q][i,j] for q in useix]) ) + np.sum( np.array([allimg[q][i,j] for q in useix]) )
-        #once we have finished correcting the outliers, we want to "normalize" (ie divide by number of frames) the master image and the corresponding error array
+        # once we have finished correcting the outliers, we want to "normalize" (ie divide by number of frames) the master image and the corresponding error array
         master = summed / len(white_list)
         err_master = err_summed / len(white_list)
     else:
-        #ie not fancy, just take the median image to remove outliers       
-        #now set master image equal to median image
+        # ie not fancy, just take the median image to remove outliers       
+        # now set master image equal to median image
         master = medimg.copy()
         nw = len(white_list)     # number of whites 
-#         #estimate of the corresponding error array (estimate only!!!)
+#         # estimate of the corresponding error array (estimate only!!!)
 #         err_master = err_summed / nw     # I don't know WTF I was thinking here...
         # if roughly Gaussian distribution of values: error of median ~= 1.253*error of mean
         err_master = 1.253 * np.std(allimg, axis=0) / np.sqrt(nw-1)     # normally it would be sigma/sqrt(n), but np.std is dividing by sqrt(n), not by sqrt(n-1)
         # err_master = np.sqrt( np.sum( (np.array(allimg) - np.mean(np.array(allimg), axis=0))**2 / (nw*(nw-1)) , axis=0) )   # that is equivalent, but slower
 
 
-    #now save master white to file
+    # now save master white to file
     if savefile:
         outfn = path+'master_white.fits'
         pyfits.writeto(outfn, master, clobber=True)
@@ -233,25 +235,28 @@ def process_science_images(imglist, P_id, mask=None, sampling_size=25, slit_heig
     ### (1) bias and dark subtraction ###
     #####################################
     
-    #if INPUT arrays are not given, read them from default files
+    # if INPUT arrays are not given, read them from default files
     if path is None:
         print('WARNING: output file directory not provided!!!')
         print('Using same directory as input file...')
         dum = imglist[0].split('/')
-        path = imglist[0][0 : -len(dum[-1])]
+        path = imglist[0][0: -len(dum[-1])]
     if MB is None:
-        #no need to fix orientation, this is already a processed file [ADU]
-        MB = pyfits.getdata(path + 'master_bias.fits')
+        # no need to fix orientation, this is already a processed file [ADU]
+#         MB = pyfits.getdata(path + 'master_bias.fits')
+        MB = pyfits.getdata(path + 'median_bias.fits')
     if ronmask is None:
-        #no need to fix orientation, this is already a processed file [e-]
+        # no need to fix orientation, this is already a processed file [e-]
         ronmask = pyfits.getdata(path + 'read_noise_mask.fits')
     if MD is None:
         if scalable:
-            #no need to fix orientation, this is already a processed file [e-]
+            # no need to fix orientation, this is already a processed file [e-]
             MD = pyfits.getdata(path + 'master_dark_scalable.fits', 0)
 #             err_MD = pyfits.getdata(path + 'master_dark_scalable.fits', 1)
         else:
-            #no need to fix orientation, this is already a processed file [e-]
+            # no need to fix orientation, this is already a processed file [e-]
+            print('WARNING: scalable KW not properly implemented (stellar_list can have different exposure times...)')
+            texp = 600.
             MD = pyfits.getdata(path + 'master_dark_t' + str(int(np.round(texp, 0))) + '.fits', 0)
 #             err_MD = pyfits.getdata(path + 'master_dark_t' + str(int(np.round(texp, 0))) + '.fits', 1)
     
@@ -277,9 +282,9 @@ def process_science_images(imglist, P_id, mask=None, sampling_size=25, slit_heig
         epoch_texp_list = [pyfits.getval(file, 'ELAPSED') for file in epoch_list]
 
         # (1) call routine that does all the bias and dark correction stuff and proper error treatment
-        img = correct_for_bias_and_dark_from_filename(filename, MB, MD, gain=gain, scalable=scalable, savefile=saveall, path=path, timit=True)   #[e-]
+        img = correct_for_bias_and_dark_from_filename(filename, MB, MD, gain=gain, scalable=scalable, savefile=saveall, path=path, timit=True)   # [e-]
         #err = np.sqrt(img + ronmask*ronmask)   # [e-]
-        #TEMPFIX:
+        #TEMPFIX: (how should I be doing this properly???)
         err_img = np.sqrt(np.clip(img,0,None) + ronmask*ronmask)   # [e-]
         
         ## (2) remove cosmic rays (ERRORS MUST REMAIN UNCHANGED)
@@ -294,8 +299,8 @@ def process_science_images(imglist, P_id, mask=None, sampling_size=25, slit_heig
             img_list.append(correct_for_bias_and_dark_from_filename(file, MB, MD, gain=gain, scalable=False, savefile=False))
         # index indicating which one of the files in the epoch list is the one to be cosmic cleaned
         main_index = np.where(np.array(epoch_ix) == i)[0][0]
-        scales = np.array(epoch_texp_list) / epoch_texp_list[main_index]
-        cosmic_cleaned_img = median_remove_cosmics(img_list, main_index=main_index, scales=scales, ronmask=ronmask, debug_level=1, timit=True)
+        scaled_texp = np.array(epoch_texp_list) / epoch_texp_list[main_index]
+        cosmic_cleaned_img = median_remove_cosmics(img_list, main_index=main_index, scales=scaled_texp, ronmask=ronmask, debug_level=1, timit=True)
 
 
         # (3) fit and remove background (ERRORS REMAIN UNCHANGED)

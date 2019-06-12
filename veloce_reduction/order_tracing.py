@@ -341,7 +341,6 @@ def find_gaps(flat, deg_polynomial=2, gauss_filter_sigma=3., min_peak=0.05, mask
 
 
 
-
 def make_P_id_old(P):
     Ptemp = {}
     ordernames = []
@@ -470,7 +469,8 @@ def extract_stripes(img, P_id, slit_height=25, return_indices=True, savefiles=Fa
 #         # copy extraction parameters to result file
 #         if output_file is not None:
 #             utils.save_dict_to_hdf5(P_id, output_file, 'extraction_parameters/')
-
+    
+    # loop over all orders
     for o, p in sorted(P_id.items()):
         if return_indices:
             stripe,indices = extract_single_stripe(img, p, slit_height=slit_height, return_indices=True, debug_level=debug_level)

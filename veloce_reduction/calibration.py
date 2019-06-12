@@ -17,16 +17,17 @@ from veloce_reduction.veloce_reduction.helper_functions import correct_orientati
 
 
 
-def make_median_image(imglist, MB=None, scalable=False, raw=False):
+def make_median_image(imglist, MB=None, correct_OS=True, scalable=False, raw=False):
     """
     Make a median image from a given list of images.
 
     INPUT:
-    'imglist'  : list of files (incl. directories)
-    'MB'       : master bias frame - if provided, it will be subtracted from every image before median image is computed
-    'scalable' : boolean - do you want to scale this to an exposure time of 1s (AFTER the bias is subtracted!!!!!)
-    'raw'      : boolean - set to TRUE if you want to retain the original size and orientation;
-                 otherwise the image will be brought to the 'correct' orientation and the overscan regions will be cropped
+    'imglist'     : list of files (incl. directories)
+    'MB'          : master bias frame - if provided, it will be subtracted from every image before median image is computed
+    'correct_OS'  : boolean - do you want to subtract the overscan levels?
+    'scalable'    : boolean - do you want to scale this to an exposure time of 1s (AFTER the bias and overscan are subtracted!!!!!)
+    'raw'         : boolean - set to TRUE if you want to retain the original size and orientation;
+                    otherwise the image will be brought to the 'correct' orientation and the overscan regions will be cropped
 
     OUTPUT:
     'medimg'   : median image
@@ -42,16 +43,30 @@ def make_median_image(imglist, MB=None, scalable=False, raw=False):
         
         # read in dark image
         img = pyfits.getdata(file)
+        
+        if correct_OS:
+            # get the overscan levels so we can subtract them later
+            os_levels = get_bias_and_readnoise_from_overscan(img, gain=None, return_oslevels_only=True)
         if not raw:
             # bring to "correct" orientation
             img = correct_orientation(img)
             # remove the overscan region
             img = crop_overscan_region(img)
+        if correct_OS:
+            # make (4k x 4k) frame of the offsets
+            ny,nx = img.shape
+            offmask = np.ones((ny,nx))
+            # define four quadrants via masks
+            q1,q2,q3,q4 = make_quadrant_masks(nx,ny)
+            for q,osl in zip([q1,q2,q3,q4], os_levels):
+                offmask[q] = offmask[q] * osl
+            # subtract overscan levels
+            img = img - offmask           
         if MB is not None:
             # subtract master bias (if provided)
             img = img - MB
         if scalable:
-            texp = pyfits.getval(file, 'TOTALEXP')
+            texp = pyfits.getval(file, 'ELAPSED')
             img /= texp
 
         # add image to list
@@ -83,7 +98,7 @@ def make_quadrant_masks(nx, ny):
 
 
 
-def crop_overscan_region(img):
+def crop_overscan_region(img, overscan=53):
     """
     As of July 2018, Veloce uses an e2v CCD231-84-1-E74 4kx4k chip.
     Image dimensions are 4096 x 4112 pixels, but the recorded images size including the overscan region is 4202 x 4112 pixels.
@@ -93,16 +108,15 @@ def crop_overscan_region(img):
     img = correct_orientation(raw_img)     -->        img.shape = (4202, 4112)
     """
 
-    #correct orientation if needed
+    #correct orientation if not already done
     if img.shape == (4112, 4202):
         img = correct_orientation(img)
 
-    if img.shape != (4202, 4112):
-        print('ERROR: wrong image size encountered!!!')
-        return
+    assert img.shape == (4202, 4112), 'ERROR: wrong image size encountered!!!'
 
     #crop overscan region
-    good_img = img[53:4149,:]
+#     good_img = img[53:4149,:]
+    good_img = img[overscan : 4096 + overscan, : ]
 
     return good_img
 
@@ -110,7 +124,7 @@ def crop_overscan_region(img):
 
 
 
-def extract_overscan_region(img):
+def extract_overscan_region(img, overscan=53):
     """
     As of July 2018, Veloce uses an e2v CCD231-84-1-E74 4kx4k chip.
     Image dimensions are 4096 x 4112 pixels, but the recorded images size including the overscan region is 4202 x 4112 pixels.
@@ -120,21 +134,19 @@ def extract_overscan_region(img):
     img = correct_orientation(raw_img)     -->        img.shape = (4202, 4112)
     """
 
-    #correct orientation if needed
+    #correct orientation if not already done
     if img.shape == (4112, 4202):
         img = correct_orientation(img)
 
-    if img.shape != (4202, 4112):
-        print('ERROR: wrong image size encountered!!!')
-        return
+    assert img.shape == (4202, 4112), 'ERROR: wrong image size encountered!!!'
 
     ny,nx = img.shape
 
     #define overscan regions
-    os1 = img[:53,:nx//2]
-    os2 = img[:53,nx//2:]
-    os3 = img[ny-53:,nx//2:]
-    os4 = img[ny-53:,:nx//2]   
+    os1 = img[:overscan , :nx//2]
+    os2 = img[:overscan , nx//2:]
+    os3 = img[ny-overscan: , nx//2:]
+    os4 = img[ny-overscan: , :nx//2]   
     
     return os1,os2,os3,os4
 
@@ -363,29 +375,292 @@ def measure_gains(filelist, MB, MD=None, scalable=True, timit=False, debug_level
 
 
 
-def get_bias_and_readnoise_from_overscan(img, timit=False):
+def get_bias_and_readnoise_from_overscan(img, ramps=[35, 35, 35, 35], gain=None, degpol=5, clip=5, add=0, return_oslevels_only=False, timit=False):
+    """
+    PURPOSE:
+    get an estimate of the bias and the read noise from a selected sub-region of the overscan region for each quadrant
+    
+    INPUT:
+    'img'     - the (raw, ie 4202x4112) image for which to determine the bias and read noise from the overscan region
+    'ramps'   - the number of pixels from the edeg to exclude b/c of the weird shape in the overscan region in cross-dispersion direction 
+    'gain'    - array of gains for each quadrant (in units of e-/ADU)
+    'degpol'  - degree of the polynomial used to fit the medians in dispersion direction
+    'clip'    - threshold for sigma clipping
+    'add'     - number of ADUs to add (from comparing a number of bias frames with the bias estimate from the overscan regions, there sometimes seems to be a ~1ADU offset)
+    'return_oslevels_only'  - boolean - do you want to return the overscan levels only?
+    'timit'   - boolean - do you want to measure execution run time?
+    
+    OUTPUT:
+    'bias'       - 4096 x 4112 array containing the estimated bias level plus the overscan levls for every "real" pixel [ADU]
+    'bias_only'  - 4096 x 4112 array containing the estimated bias level only for every "real" pixel [ADU]
+    'offsets'    - the 4 constant offsets per quadrant (ie the overscan levels) [ADU]
+    'rons'       - 4-element array containing the read noise for each quadrant [e-]
+    """
     
     if timit:
         start_time = time.time()
 
     print('Determining offset levels and read-out noise properties from overscan regions for 4 quadrants...')
-    
-    
-    # now get sigma of RON for ALL DIFFERENT COMBINATIONS of length 2 of the images in 'bias_list'
-    # by using the difference images we are less susceptible to funny pixels (hot, warm, cosmics, etc.)
-    list_of_combinations = list(combinations(bias_list, 2))
-    
-    #loop over all combinations of files
-    
+
+    # get image dimensions
+    ny, nx = crop_overscan_region(correct_orientation(img)).shape
+
+    # extract all four overscan regions
     os1, os2, os3, os4 = extract_overscan_region(img)
 
-    return offsets,rons
+    # code defensively...
+    assert os1.shape == (53, 2056), 'ERROR: Overscan region has the wrong shape!'
+    assert (os1.shape == os2.shape) and (os1.shape == os3.shape) and (os1.shape == os4.shape), 'ERROR: not all 4 overscan regions have the same dimensions!'
+
+    nxq = os1.shape[1]
+
+    # define good / usable regions within each overscan region (ie where I consider it flat enough)
+    good_os1 = os1[ramps[0]:, :]
+    # xmeds1 = np.nanmedian(os1, axis=1)
+    ymeds1 = np.nanmedian(good_os1, axis=0)
+    good_os2 = os2[ramps[1]:, :]
+    # xmeds2 = np.nanmedian(os2, axis=1)
+    ymeds2 = np.nanmedian(good_os2, axis=0)
+    good_os3 = os3[:-ramps[2], :]
+#     xmeds3 = np.nanmedian(os3, axis=1)
+    ymeds3 = np.nanmedian(good_os3, axis=0)
+    good_os4 = os4[:-ramps[3], :]
+#     xmeds4 = np.nanmedian(os4, axis=1)
+    ymeds4 = np.nanmedian(good_os4, axis=0)
+
+    # now fit polynomial to the medians in the cross-dispersion direction
+    # (ie we have a median value for the good part of the overscan region for all 2056 pixel columns per quadrant)
+    # note that we do not include the value of the first (Q1 & Q4) / last (Q2 & Q3) pixel column in the fit (replace it with the median value in the adjacent pixel column), 
+    # as it is significantly lower in the overscan (but not in the bias frames)
+    fit_os1 = np.poly1d(np.polyfit(np.arange(nxq), np.r_[ymeds1[1], ymeds1[1:]], degpol))     
+    model_os1_onedim = fit_os1(np.arange(nxq))     
+    model_os1 = np.tile(model_os1_onedim, (ny//2, 1))
+    fit_os2 = np.poly1d(np.polyfit(np.arange(nxq), np.r_[ymeds2[:-1], ymeds2[-2]], degpol))
+    model_os2_onedim = fit_os2(np.arange(nxq)) 
+    model_os2 = np.tile(model_os2_onedim, (ny//2, 1))
+    fit_os3 = np.poly1d(np.polyfit(np.arange(nxq), np.r_[ymeds3[:-1], ymeds3[-2]], degpol))
+    model_os3_onedim = fit_os3(np.arange(nxq)) 
+    model_os3 = np.tile(model_os3_onedim, (ny//2, 1))
+    fit_os4 = np.poly1d(np.polyfit(np.arange(nxq), np.r_[ymeds4[1], ymeds4[1:]], degpol))
+    model_os4_onedim = fit_os4(np.arange(nxq)) 
+    model_os4 = np.tile(model_os4_onedim, (ny//2, 1))
+
+    # get the overscan levels, ie the constant offsets (excluding the first/last dodgy pixel column)
+    # NOTE: this is usually within +/- 1 ADU of the median of the bias level as measured from bias frames !!! (tested by looking at the OS region of bias frames)
+    os_level_1 = np.nanmedian(sigma_clip(good_os1[:, 1:].flatten(), clip))
+    os_level_2 = np.nanmedian(sigma_clip(good_os2[:, :-1].flatten(), clip))
+    os_level_3 = np.nanmedian(sigma_clip(good_os3[:, :-1].flatten(), clip))
+    os_level_4 = np.nanmedian(sigma_clip(good_os4[:, 1:].flatten(), clip))
+    offsets = np.array([os_level_1, os_level_2, os_level_3, os_level_4])
+    if return_oslevels_only:
+        return offsets
+    
+    # get estimate of the read noise (excluding the first/last dodgy pixel column)
+    ron1 = np.nanstd(sigma_clip(good_os1[:, 1:].flatten(), clip))
+    ron2 = np.nanstd(sigma_clip(good_os2[:, :-1].flatten(), clip))
+    ron3 = np.nanstd(sigma_clip(good_os3[:, :-1].flatten(), clip))
+    ron4 = np.nanstd(sigma_clip(good_os4[:, 1:].flatten(), clip))
+    rons = np.array([ron1, ron2, ron3, ron4])
+    # convert read-out noise (but NOT the bias image!!!) to units of electrons rather than ADUs by multiplying with the gain (which has units of e-/ADU)
+    assert gain is not None, 'ERROR: gain is not defined!'
+    rons = rons * gain
+  
+    # create "master bias" (4k x 4k) frame (incl. OS levels) from that (note the order is important, following the definition of the quadrants)
+    bias = np.vstack([np.hstack([model_os1, model_os2]), np.hstack([model_os4, model_os3])]) + add
+    
+    # make (4k x 4k) frame of the offsets
+    offmask = np.ones((ny,nx))
+    q1,q2,q3,q4 = make_quadrant_masks(nx,ny)
+    for q,offset in zip([q1,q2,q3,q4], offsets):
+        offmask[q] = offmask[q] * offset
+        
+    # subtract overscan levels
+    bias_only = bias - offmask
+    
+    if timit:
+        print('Time elapsed: '+str(np.round(time.time() - start_time,1))+' seconds')
+    
+    return bias, bias_only, offsets, rons
 
 
 
 
 
 def get_bias_and_readnoise_from_bias_frames(bias_list, degpol=5, clip=5, gain=None, save_medimg=True, debug_level=0, timit=False):
+    """
+    Calculate the median bias frame after subtracting the overscan levels, the remaining offsets in the four different quadrants
+    (assuming bias frames are flat within a quadrant), and the read-out noise per quadrant (ie the STDEV of the signal, but from difference images).
+    
+    INPUT:
+    'bias_list'    : list of raw bias image files (incl. directories)
+    'degpol'       : order of the polynomial (in each direction) to be used in the 2-dim polynomial surface fits to each quadrant's median bais frame
+    'clip'         : number of 'sigmas' used to identify outliers when 'cleaning' each quadrant's median bais frame before the surface fitting
+    'gain'         : array of gains for each quadrant (in units of e-/ADU)
+    'save_medimg'  : boolean - do you want to save the median image to a FITS file?
+    'debug_level'  : for debugging...
+    'timit'        : boolean - do you want to measure execution run time?
+    
+    OUTPUT:
+    'medimg'   : the median bias frame [ADU] (after subtracting the overscan levels)
+    'coeffs'   : the coefficients that describe the 2-dim polynomial surface fit to the 4 quadrants
+    'offsets'  : the remaining 4 constant offsets per quadrant (assuming bias frames are flat within a quadrant) [ADU]
+    'rons'     : read-out noise for the 4 quadrants [e-]
+    """
+    
+    if timit:
+        start_time = time.time()
+
+    print('Determining offset levels and read-out noise properties from bias frames for 4 quadrants...')
+    
+    # code defensively...
+    assert gain is not None, 'ERROR: gain is not defined!'
+
+    # get image dimensions    
+    ny,nx = crop_overscan_region(correct_orientation(pyfits.getdata(bias_list[0]))).shape
+    
+    # define four quadrants via masks
+    q1,q2,q3,q4 = make_quadrant_masks(nx,ny)
+
+    # prepare arrays
+    medians_q1 = []
+    sigs_q1 = []
+    medians_q2 = []
+    sigs_q2 = []
+    medians_q3 = []
+    sigs_q3 = []
+    medians_q4 = []
+    sigs_q4 = []
+    allimg = []
+
+    if debug_level >= 1:
+        print('Determining bias levels and read-out noise from '+str(len(bias_list))+' bias frames...')
+
+    # first get mean / median for all bias images (per quadrant)
+    for name in bias_list:
+        
+        if debug_level >= 1:
+            print('OK, reading file  "' + name + '"')
+        
+        img = pyfits.getdata(name)
+        
+        # get the overscan levels so we can subtract them later
+        os_levels = get_bias_and_readnoise_from_overscan(img, gain=gain, return_oslevels_only=True)
+        
+        # bring to "correct" orientation
+        img = correct_orientation(img)
+        # remove the overscan region
+        img = crop_overscan_region(img)
+        
+        # make (4k x 4k) frame of the offsets
+        offmask = np.ones((ny,nx))
+        for q,osl in zip([q1,q2,q3,q4], os_levels):
+            offmask[q] = offmask[q] * osl
+            
+        # subtract overscan levels
+        img = img - offmask
+        
+        # append quadrant-medians to lists
+        medians_q1.append(np.nanmedian(img[q1]))
+        medians_q2.append(np.nanmedian(img[q2]))
+        medians_q3.append(np.nanmedian(img[q3]))
+        medians_q4.append(np.nanmedian(img[q4]))
+        allimg.append(img)
+
+    # get RON from RMS for ALL DIFFERENT COMBINATIONS of length 2 of the images in 'bias_list'
+    # by using the difference images we are less susceptible to funny pixels (hot, warm, cosmics, etc.)
+    list_of_combinations = list(combinations(bias_list, 2))
+    for (name1,name2) in list_of_combinations:
+        
+        # read in observations and bring to right format
+        img1 = pyfits.getdata(name1)
+        img2 = pyfits.getdata(name2)
+
+        img1 = correct_orientation(img1)
+        img1 = crop_overscan_region(img1)
+        img2 = correct_orientation(img2)
+        img2 = crop_overscan_region(img2)
+
+        #take difference and do sigma-clipping
+        diff = img1.astype(long) - img2.astype(long)
+        sigs_q1.append(np.nanstd(sigma_clip(diff[q1], 5))/np.sqrt(2))
+        sigs_q2.append(np.nanstd(sigma_clip(diff[q2], 5))/np.sqrt(2))
+        sigs_q3.append(np.nanstd(sigma_clip(diff[q3], 5))/np.sqrt(2))
+        sigs_q4.append(np.nanstd(sigma_clip(diff[q4], 5))/np.sqrt(2))
+
+    # offset and read-out noise arrays
+    offsets = np.array([np.median(medians_q1), np.median(medians_q2), np.median(medians_q3), np.median(medians_q4)])
+    rons = np.array([np.median(sigs_q1), np.median(sigs_q2), np.median(sigs_q3), np.median(sigs_q4)])
+    
+    # get median image as well
+    medimg = np.median(np.array(allimg), axis=0)
+    # make a copy of that, which we will clean of bad pixels for the surface fits
+    clean_medimg = medimg.copy()
+    
+    ##### now fit a 2D polynomial surface to the median bias image (for each quadrant separately)
+        
+    # now, because all quadrants are the same size, they have the same "normalized coordinates", so only have to do that once
+    xq1 = np.arange(0,(nx/2))
+    yq1 = np.arange(0,(ny/2))
+    XX_q1,YY_q1 = np.meshgrid(xq1,yq1)
+    x_norm = (XX_q1.flatten() / ((len(xq1)-1)/2.)) - 1.
+    y_norm = (YY_q1.flatten() / ((len(yq1)-1)/2.)) - 1.
+    
+    # Quadrant 1
+    medimg_q1 = clean_medimg[:(ny/2), :(nx/2)]
+    # clean this, otherwise the surface fit will be rubbish
+    medimg_q1[np.abs(medimg_q1 - np.median(medians_q1)) > clip * np.median(sigs_q1)] = np.median(medians_q1)
+    coeffs_q1 = polyfit2d(x_norm, y_norm, medimg_q1.flatten(), order=degpol)
+    
+    # Quadrant 2
+    medimg_q2 = clean_medimg[:(ny/2), (nx/2):]
+    # clean this, otherwise the surface fit will be rubbish
+    medimg_q2[np.abs(medimg_q2 - np.median(medians_q2)) > clip * np.median(sigs_q2)] = np.median(medians_q2)
+#     xq2 = np.arange((nx/2),nx)
+#     yq2 = np.arange(0,(ny/2))
+#     XX_q2,YY_q2 = np.meshgrid(xq2,yq2)
+#     xq2_norm = (XX_q2.flatten() / ((len(xq2)-1)/2.)) - 3.   #not quite right
+#     yq2_norm = (YY_q2.flatten() / ((len(yq2)-1)/2.)) - 1.
+    coeffs_q2 = polyfit2d(x_norm, y_norm, medimg_q2.flatten(), order=degpol)
+    
+    # Quadrant 3
+    medimg_q3 = clean_medimg[(ny/2):, (nx/2):]
+    # clean this, otherwise the surface fit will be rubbish
+    medimg_q3[np.abs(medimg_q3 - np.median(medians_q3)) > clip * np.median(sigs_q3)] = np.median(medians_q3)
+    coeffs_q3 = polyfit2d(x_norm, y_norm, medimg_q3.flatten(), order=degpol)
+    
+    # Quadrant 4
+    medimg_q4 = clean_medimg[(ny/2):, :(nx/2)]
+    # clean this, otherwise the surface fit will be rubbish
+    medimg_q4[np.abs(medimg_q4 - np.median(medians_q4)) > clip * np.median(sigs_q4)] = np.median(medians_q4)
+    coeffs_q4 = polyfit2d(x_norm, y_norm, medimg_q4.flatten(), order=degpol)
+    
+    # return all coefficients as 4-element array
+    coeffs = np.array([coeffs_q1, coeffs_q2, coeffs_q3, coeffs_q4])            
+
+    # convert read-out noise (but NOT offsets!!!) to units of electrons rather than ADUs by multiplying with the gain (which has units of e-/ADU)
+    rons = rons * gain
+
+    print('Done!!!')
+    
+    if timit:
+        print('Time elapsed: '+str(np.round(time.time() - start_time,1))+' seconds')
+
+    if save_medimg:
+        # save median bias image
+        dum = bias_list[0].split('/')
+        path = bias_list[0][0:-len(dum[-1])]
+        # write median bias image to file
+        pyfits.writeto(path+'median_bias.fits', medimg, clobber=True)
+        pyfits.setval(path+'median_bias.fits', 'UNITS', value='ADU')
+        pyfits.setval(path+'median_bias.fits', 'HISTORY', value='   median BIAS frame - created '+time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())+' (GMT)')
+
+    return medimg, coeffs, offsets, rons
+
+
+
+
+
+def old_get_bias_and_readnoise_from_bias_frames(bias_list, degpol=5, clip=5, gain=None, save_medimg=True, debug_level=0, timit=False):
     """
     Calculate the median bias frame, the offsets in the four different quadrants (assuming bias frames are flat within a quadrant),
     and the read-out noise per quadrant (ie the STDEV of the signal, but from difference images).
@@ -413,22 +688,22 @@ def get_bias_and_readnoise_from_bias_frames(bias_list, degpol=5, clip=5, gain=No
 
     img = pyfits.getdata(bias_list[0])
 
-    #do some formatting things for real observations
-    #bring to "correct" orientation
+    # do some formatting things for real observations
+    # bring to "correct" orientation
     img = correct_orientation(img)
-    #remove the overscan region, which looks crap for actual bias images
+    # remove the overscan region, which looks crap for actual bias images
     img = crop_overscan_region(img)
 
 
     ny,nx = img.shape
 
-    #define four quadrants via masks
+    # define four quadrants via masks
     q1,q2,q3,q4 = make_quadrant_masks(nx,ny)
 
-    #co-add all bias frames
+    # co-add all bias frames
     #MB = create_master_img(bias_list, imgtype='bias', with_errors=False, savefiles=False, remove_outliers=True)
 
-    #prepare arrays
+    # prepare arrays
     #means_q1 = []
     medians_q1 = []
     sigs_q1 = []
@@ -446,7 +721,7 @@ def get_bias_and_readnoise_from_bias_frames(bias_list, degpol=5, clip=5, gain=No
     if debug_level >= 1:
         print('Determining bias levels and read-out noise from '+str(len(bias_list))+' bias frames...')
 
-    #first get mean / median for all bias images (per quadrant)
+    # first get mean / median for all bias images (per quadrant)
     for name in bias_list:
         
         if debug_level >= 1:
@@ -454,9 +729,9 @@ def get_bias_and_readnoise_from_bias_frames(bias_list, degpol=5, clip=5, gain=No
         
         img = pyfits.getdata(name)
         
-        #bring to "correct" orientation
+        # bring to "correct" orientation
         img = correct_orientation(img)
-        #remove the overscan region, which looks crap for actual bias images
+        # remove the overscan region
         img = crop_overscan_region(img)
         
         #means_q1.append(np.nanmean(img[q1]))
@@ -490,32 +765,34 @@ def get_bias_and_readnoise_from_bias_frames(bias_list, degpol=5, clip=5, gain=No
         sigs_q3.append(np.nanstd(sigma_clip(diff[q3], 5))/np.sqrt(2))
         sigs_q4.append(np.nanstd(sigma_clip(diff[q4], 5))/np.sqrt(2))
 
-    #now average over all images
+    # now average over all images
     #allmeans = np.array([np.median(medians_q1), np.median(medians_q2), np.median(medians_q3), np.median(medians_q4)])
     offsets = np.array([np.median(medians_q1), np.median(medians_q2), np.median(medians_q3), np.median(medians_q4)])
     rons = np.array([np.median(sigs_q1), np.median(sigs_q2), np.median(sigs_q3), np.median(sigs_q4)])
     
-    #get median image as well
+    # get median image as well
     medimg = np.median(np.array(allimg), axis=0)
+    # make a copy that we will clean of bad pixels for the surface fits
+    clean_medimg = medimg.copy()
     
     ##### now fit a 2D polynomial surface to the median bias image (for each quadrant separately)
         
-    #now, because all quadrants are the same size, they have the same "normalized coordinates", so only have to do that once
+    # now, because all quadrants are the same size, they have the same "normalized coordinates", so only have to do that once
     xq1 = np.arange(0,(nx/2))
     yq1 = np.arange(0,(ny/2))
     XX_q1,YY_q1 = np.meshgrid(xq1,yq1)
     x_norm = (XX_q1.flatten() / ((len(xq1)-1)/2.)) - 1.
     y_norm = (YY_q1.flatten() / ((len(yq1)-1)/2.)) - 1.
     
-    #Quadrant 1
-    medimg_q1 = medimg[:(ny/2), :(nx/2)]
-    #clean this, otherwise the surface fit will be rubbish
+    # Quadrant 1
+    medimg_q1 = clean_medimg[:(ny/2), :(nx/2)]
+    # clean this, otherwise the surface fit will be rubbish
     medimg_q1[np.abs(medimg_q1 - np.median(medians_q1)) > clip * np.median(sigs_q1)] = np.median(medians_q1)
     coeffs_q1 = polyfit2d(x_norm, y_norm, medimg_q1.flatten(), order=degpol)
     
-    #Quadrant 2
-    medimg_q2 = medimg[:(ny/2), (nx/2):]
-    #clean this, otherwise the surface fit will be rubbish
+    # Quadrant 2
+    medimg_q2 = clean_medimg[:(ny/2), (nx/2):]
+    # clean this, otherwise the surface fit will be rubbish
     medimg_q2[np.abs(medimg_q2 - np.median(medians_q2)) > clip * np.median(sigs_q2)] = np.median(medians_q2)
 #     xq2 = np.arange((nx/2),nx)
 #     yq2 = np.arange(0,(ny/2))
@@ -524,22 +801,22 @@ def get_bias_and_readnoise_from_bias_frames(bias_list, degpol=5, clip=5, gain=No
 #     yq2_norm = (YY_q2.flatten() / ((len(yq2)-1)/2.)) - 1.
     coeffs_q2 = polyfit2d(x_norm, y_norm, medimg_q2.flatten(), order=degpol)
     
-    #Quadrant 3
-    medimg_q3 = medimg[(ny/2):, (nx/2):]
-    #clean this, otherwise the surface fit will be rubbish
+    # Quadrant 3
+    medimg_q3 = clean_medimg[(ny/2):, (nx/2):]
+    # clean this, otherwise the surface fit will be rubbish
     medimg_q3[np.abs(medimg_q3 - np.median(medians_q3)) > clip * np.median(sigs_q3)] = np.median(medians_q3)
     coeffs_q3 = polyfit2d(x_norm, y_norm, medimg_q3.flatten(), order=degpol)
     
-    #Quadrant 4
-    medimg_q4 = medimg[(ny/2):, :(nx/2)]
-    #clean this, otherwise the surface fit will be rubbish
+    # Quadrant 4
+    medimg_q4 = clean_medimg[(ny/2):, :(nx/2)]
+    # clean this, otherwise the surface fit will be rubbish
     medimg_q4[np.abs(medimg_q4 - np.median(medians_q4)) > clip * np.median(sigs_q4)] = np.median(medians_q4)
     coeffs_q4 = polyfit2d(x_norm, y_norm, medimg_q4.flatten(), order=degpol)
     
-    #return all coefficients as 4-element array
+    # return all coefficients as 4-element array
     coeffs = np.array([coeffs_q1, coeffs_q2, coeffs_q3, coeffs_q4])            
 
-    #convert read-out noise (but NOT offsets!!!) to units of electrons rather than ADUs by multiplying with the gain (which has units of e-/ADU)
+    # convert read-out noise (but NOT offsets!!!) to units of electrons rather than ADUs by multiplying with the gain (which has units of e-/ADU)
     if gain is None:
         print('ERROR: gain(s) not set!!!')
         return
@@ -547,7 +824,7 @@ def get_bias_and_readnoise_from_bias_frames(bias_list, degpol=5, clip=5, gain=No
         rons = rons * gain
 
     if debug_level >= 1:
-        #plot stuff
+        # plot stuff
         print('plot the distributions for the four quadrants maybe!?!?!?')
 
     print('Done!!!')
@@ -555,15 +832,90 @@ def get_bias_and_readnoise_from_bias_frames(bias_list, degpol=5, clip=5, gain=No
         print('Time elapsed: '+str(np.round(time.time() - start_time,1))+' seconds')
 
     if save_medimg:
-        #save median bias image
+        # save median bias image
         dum = bias_list[0].split('/')
         path = bias_list[0][0:-len(dum[-1])]
-        #write median bias image to file
+        # write median bias image to file
         pyfits.writeto(path+'median_bias.fits', medimg, clobber=True)
         pyfits.setval(path+'median_bias.fits', 'UNITS', value='ADU')
         pyfits.setval(path+'median_bias.fits', 'HISTORY', value='   master BIAS frame - created '+time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())+' (GMT)')
 
-    return medimg,coeffs,offsets,rons
+    return medimg, coeffs, offsets, rons
+
+
+
+
+
+def make_ronmask(rons, nx, ny, nq=4, gain=None, savefile=False, path=None, timit=False):
+    """
+    This routine creates a 1-level or 4-level master bias frame of size (ny,nx)
+    
+    INPUT:
+    'rons'       : read-out noise level(s) from "get_offset_and_readnoise_from_bias_frames" [e-]
+    'nx'         : image dimensions
+    'ny'         : image dimensions
+    'nq'         : number of quadrants
+    'gain'       : array of gains for each quadrant (in units of e-/ADU) (only needed for writing the header really...)
+    'savefile'   : boolean - do you want to save the read-noise mask to a fits file?
+    'path'       : path to the output file directory (only needed if savefile is set to TRUE)
+    'timit'      : boolean - do you want to measure execution run time?
+    
+    OUTPUT:
+    'ronmask'  : read-out noise mask (or RON-image really...) [e-]
+    """
+
+    if timit:
+        start_time = time.time()
+
+    if nq == 1:
+        ronmask = np.ones((ny,nx)) * rons
+    elif nq == 4:
+        ronmask = np.ones((ny,nx))
+        q1,q2,q3,q4 = make_quadrant_masks(nx,ny)
+        for q,RON in zip([q1,q2,q3,q4],rons):
+            ronmask[q] = ronmask[q] * RON 
+    else:
+        print('ERROR: "offsets" must either be a scalar (for single-port readout) or a 4-element array/list (for four-port readout)!')
+        return
+            
+
+    if savefile:
+        #check if gain is set
+        if gain is None:
+            print('ERROR: gain(s) not set!!!')
+            return
+                
+        if path is None:
+            print('ERROR: output file directory not provided!!!')
+            return
+        else:
+
+            # make read-out noise mask and save to fits file
+            pyfits.writeto(path+'read_noise_mask.fits', ronmask, clobber=True)
+            pyfits.setval(path+'read_noise_mask.fits', 'UNITS', value='ELECTRONS')
+            pyfits.setval(path+'read_noise_mask.fits', 'HISTORY', value='   read-noise frame - created '+time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())+' (GMT)')
+            if nq == 1:
+                pyfits.setval(path+'read_noise_mask.fits', 'OFFSET', value=offsets, comment='in ADU')
+                pyfits.setval(path+'read_noise_mask.fits', 'GAIN', value=gain, comment='in e-/ADU')
+                pyfits.setval(path+'read_noise_mask.fits', 'RNOISE', value=rons, comment='in ELECTRONS')
+            elif nq == 4:
+                pyfits.setval(path+'read_noise_mask.fits', 'OFFSET_1', value=offsets[0], comment='in ADU')
+                pyfits.setval(path+'read_noise_mask.fits', 'OFFSET_2', value=offsets[1], comment='in ADU')
+                pyfits.setval(path+'read_noise_mask.fits', 'OFFSET_3', value=offsets[2], comment='in ADU')
+                pyfits.setval(path+'read_noise_mask.fits', 'OFFSET_4', value=offsets[3], comment='in ADU')
+                pyfits.setval(path+'read_noise_mask.fits', 'RNOISE_1', value=rons[0], comment='in ELECTRONS')
+                pyfits.setval(path+'read_noise_mask.fits', 'RNOISE_2', value=rons[1], comment='in ELECTRONS')
+                pyfits.setval(path+'read_noise_mask.fits', 'RNOISE_3', value=rons[2], comment='in ELECTRONS')
+                pyfits.setval(path+'read_noise_mask.fits', 'RNOISE_4', value=rons[3], comment='in ELECTRONS')
+                pyfits.setval(path+'read_noise_mask.fits', 'GAIN_1', value=gain[0], comment='in e-/ADU')
+                pyfits.setval(path+'read_noise_mask.fits', 'GAIN_2', value=gain[1], comment='in e-/ADU')
+                pyfits.setval(path+'read_noise_mask.fits', 'GAIN_3', value=gain[2], comment='in e-/ADU')
+                pyfits.setval(path+'read_noise_mask.fits', 'GAIN_4', value=gain[3], comment='in e-/ADU')
+
+    if timit:
+        print('Time elapsed: '+str(np.round(time.time() - start_time,1))+' seconds')
+
+    return ronmask
 
 
 
@@ -740,10 +1092,10 @@ def make_master_bias_from_coeffs(coeffs, nx, ny, savefile=False, path=None, timi
 
 
 
-def make_master_dark(dark_list, MB, gain=None, scalable=False, savefile=True, path=None, debug_level=0, timit=False):
+def make_master_dark(dark_list, MB, gain=None, scalable=False, noneg=False, savefile=True, path=None, debug_level=0, timit=False):
     """
-    This routine creates a "MASTER DARK" frame from a given list of dark frames. It also subtracts the MASTER BIAS from each dark frame before 
-    combining them into the master dark frame.
+    This routine creates a "MASTER DARK" frame from a given list of dark frames. It also subtracts the MASTER BIAS and the overscan levels 
+    from each dark frame before combining them into the master dark frame.
     NOTE: the output is in units of ELECTRONS!!!
     
     INPUT:
@@ -751,6 +1103,7 @@ def make_master_dark(dark_list, MB, gain=None, scalable=False, savefile=True, pa
     'MB'           : the master bias frame [ADU]
     'gain'         : the gains for each quadrant [e-/ADU]
     'scalable'     : boolean - do you want to normalize the dark current to an exposure time of 1s? (ie do you want to make it "scalable"?)
+    'noneg'        : boolean - do you want to allow negative pixels? (True=no, False=yes) 
     'savefile'     : boolean - do you want to save the master dark frame to a fits file?
     'path'         : path to the output file directory (only needed if savefile is set to TRUE)
     'debug_level'  : for debugging...
@@ -759,44 +1112,15 @@ def make_master_dark(dark_list, MB, gain=None, scalable=False, savefile=True, pa
     OUTPUT:
     'MD'  : the master dark frame [e-]
     """
-    
-    #CMB - I removed the 'return_errors' keyword functionality, don't think that was quite right
-    #also removed 'ronmask' from INPUT
 
     if timit:
         start_time = time.time()
 
-    #THIS IS NOW DONE VIA A FUNCTION CALL TO "make_median_image"
-#     #prepare arrays
-#     allimg = []
-# #     allerr = []
-# 
-#     #loop over all files in "dark_list"
-#     for name in dark_list:
-#         #read in dark image
-#         img = pyfits.getdata(name)
-#         if not simu:
-#             #bring to "correct" orientation
-#             img = correct_orientation(img)
-#             #remove the overscan region
-#             img = crop_overscan_region(img)
-# #         #calculate noise
-# #         err_img = np.sqrt(img.astype(float) + ronmask*ronmask)   #this is still in ADU
-#         #subtract master bias and store in list (ignoring tiny uncertainties (~<0.01 ADU) in the bias level)
-#         img_bc = img - MB
-#         allimg.append(img_bc)
-# #         #adjust errors and store in list
-# #         err_img_bc = np.sqrt(err_img*err_img + ronmask*ronmask)   #this is still in ADU
-# #        #NO! the RON is not the error in the bias level; so don't adjust error, just save it
-# #        allerr.append(err_img)
-# 
-#     #get median image
-#     MD = np.median(np.array(allimg), axis=0)
-# #     err_summed = np.sqrt(np.sum((np.array(allerr)**2),axis=0))
-# #     err_MD = err_summed / len(dark_list)
-
     if debug_level >= 1:
-        print('Creating master dark frame from '+str(len(dark_list))+' dark frames...')       
+        print('Creating master dark frame from '+str(len(dark_list))+' dark frames...')      
+        
+    # code defensively...
+    assert gain is not None, 'ERROR: gain is not defined!' 
 
     # get a list of all the exposure times first
     exp_times = []
@@ -808,44 +1132,40 @@ def make_master_dark(dark_list, MB, gain=None, scalable=False, savefile=True, pa
     if debug_level >= 1 and len(unique_exp_times) > 1:
         print('WARNING: not all dark frames have the same exposure times! Found '+str(len(unique_exp_times))+' unique exposure times!!!')
 
-
     # create median dark files
     if scalable:
-        #get median image (including subtraction of master bias) and scale to texp=1s
-        MD = make_median_image(dark_list, MB=MB, scalable=scalable, raw=False)
-        if gain is None:
-            print('ERROR: gain(s) not given!!!')
-            return
-        else:
-            ny,nx = MD.shape
-            q1,q2,q3,q4 = make_quadrant_masks(nx,ny)
-            MD[q1] = gain[0] * MD[q1]
-            MD[q2] = gain[1] * MD[q2]
-            MD[q3] = gain[2] * MD[q3]
-            MD[q4] = gain[3] * MD[q4]
+        # get median image (including subtraction of master bias) and scale to texp=1s 
+        MD = make_median_image(dark_list, MB=MB, correct_OS=True, scalable=scalable, raw=False)
+        ny,nx = MD.shape
+        q1,q2,q3,q4 = make_quadrant_masks(nx,ny)
+        # convert to units of electrons
+        MD[q1] = gain[0] * MD[q1]
+        MD[q2] = gain[1] * MD[q2]
+        MD[q3] = gain[2] * MD[q3]
+        MD[q4] = gain[3] * MD[q4]
+        if noneg:
+            MD = np.clip(MD, 0, None)
     else:
         # make dark "sublists" for all unique exposure times
         all_dark_lists = []
         for i in range(len(unique_exp_times)):
             all_dark_lists.append( np.array(dark_list)[np.argwhere(exp_times == unique_exp_times[i]).flatten()] )
-        #get median image (including subtraction of master bias) for each "sub-list"
+        # get median image (including subtraction of master bias) for each "sub-list"
         MD = []
         for sublist in all_dark_lists:
             sub_MD = make_median_image(sublist, MB=MB, scalable=scalable, raw=False)
-            #now convert to units of electrons
-            if gain is None:
-                print('ERROR: gain(s) not given!!!')
-                return
-            else:
-                ny,nx = sub_MD.shape
-                q1,q2,q3,q4 = make_quadrant_masks(nx,ny)
-                sub_MD[q1] = gain[0] * sub_MD[q1]
-                sub_MD[q2] = gain[1] * sub_MD[q2]
-                sub_MD[q3] = gain[2] * sub_MD[q3]
-                sub_MD[q4] = gain[3] * sub_MD[q4]
+            ny,nx = sub_MD.shape
+            q1,q2,q3,q4 = make_quadrant_masks(nx,ny)
+            # convert to units of electrons
+            sub_MD[q1] = gain[0] * sub_MD[q1]
+            sub_MD[q2] = gain[1] * sub_MD[q2]
+            sub_MD[q3] = gain[2] * sub_MD[q3]
+            sub_MD[q4] = gain[3] * sub_MD[q4]
+            if noneg:
+                MD = np.clip(MD, 0, None)
             MD.append(sub_MD)
 
-
+    # save to FITS file
     if savefile:
         if path is None:
             print('WARNING: output file directory not provided!!!')
@@ -870,22 +1190,131 @@ def make_master_dark(dark_list, MB, gain=None, scalable=False, savefile=True, pa
                 h['TOTALEXP'] = (unique_exp_times[i], 'exposure time [s]')
                 h['UNITS'] = 'ELECTRONS'
                 pyfits.writeto(outfn, submd, h, clobber=True)
-#         if return_errors:
-#             h_err = h.copy()
-#             h_err['HISTORY'] = 'estimated uncertainty in MASTER DARK frame - created '+time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())+' (GMT)'
-#             pyfits.append(outfn, err_MD, h_err, clobber=True)
 
     if timit:
         print('Time elapsed: '+str(np.round(time.time() - start_time,1))+' seconds')
 
-#     if return_errors:
-#         return MD,err_MD
-#     else:
     return MD
 
 
 
 
+
+def correct_for_bias_and_dark_from_filename(imgname, MB, MD, gain=None, scalable=False, savefile=False, path=None, simu=False, timit=False):
+    """
+    This routine subtracts both the MASTER BIAS frame [in ADU], and the MASTER DARK frame [in e-] from a given (single!) image.
+    It also corrects the orientation of the image and crops the overscan regions.
+    NOTE: the input image has units of ADU, but the output image has units of electrons!!!
+    Clone of "correct_for_bias_and_dark", but this one allows us to save output files
+    
+    INPUT:
+    'imgname'   : filename of raw science image (incl. directory)
+    'MB'        : the master bias frame [ADU]
+    'MD'        : the master dark frame [e-]
+    'gain'      : the gains for each quadrant [e-/ADU]
+    'scalable'  : boolean - do you want to normalize the dark current to an exposure time of 1s? (ie do you want to make it "scalable"?)
+    'savefile'  : boolean - do you want to save the bias- & dark-corrected image (and corresponding error array) to a FITS file?
+    'path'      : output file directory
+    'simu'      : boolean - are you using Echelle++ simulated observations?
+    'timit'     : boolean - do you want to measure the execution run time?
+    
+    OUTPUT:
+    'dc_bc_img'  : the bias- & dark-corrected image [e-] (also has been brought to 'correct' orientation and overscan regions cropped) 
+    
+    MODHIST:
+    # CMB - I removed the 'ronmask' and 'err_MD' INPUTs
+    # CMB (12 Jun 2019) - implemented separate overscan and bias removal
+    
+    """
+    if timit:
+        start_time = time.time()
+
+    # code defensively...
+    assert gain is not None, 'ERROR: gain is not defined!' 
+
+    ### (0) read in raw image [ADU] 
+    img = pyfits.getdata(imgname)
+    
+    # get the overscan levels so we can subtract them later
+    os_levels = get_bias_and_readnoise_from_overscan(img, gain=None, return_oslevels_only=True)
+    
+    if not simu:
+        # bring to "correct" orientation
+        img = correct_orientation(img)
+        # remove the overscan region
+        img = crop_overscan_region(img)
+
+    # make (4k x 4k) frame of the offsets
+    ny,nx = img.shape
+    offmask = np.ones((ny,nx))
+    # define four quadrants via masks
+    q1,q2,q3,q4 = make_quadrant_masks(nx,ny)
+    for q,osl in zip([q1,q2,q3,q4], os_levels):
+        offmask[q] = offmask[q] * osl
+
+
+    ### (1) BIAS AND OVERSCAN SUBTRACTION [ADU]
+    # bias-corrected_image
+    bc_img = img - offmask - MB
+
+
+    ### (2) conversion to ELECTRONS and DARK SUBTRACTION [e-]
+    # if the darks have a different exposure time than the image we are trying to correct, we need to re-scale the master dark
+    if scalable:
+        try:
+            texp = pyfits.getval(imgname, 'ELAPSED')
+            MD = MD * texp
+#             #cannot have an error estimate lower than the read-out noise; this is dodgy but don't know what else to do
+#             err_MD = np.maximum(err_MD * texp, ronmask)
+        except:
+            print('ERROR: "texp" has to be provided when "scalable" is set to TRUE')
+            return -1
+    # convert image to electrons now    
+    bc_img[q1] = gain[0] * bc_img[q1]
+    bc_img[q2] = gain[1] * bc_img[q2]
+    bc_img[q3] = gain[2] * bc_img[q3]
+    bc_img[q4] = gain[3] * bc_img[q4]
+    # now subtract master dark frame [e-] to create dark- & bias- & overscan-corrected image [e-]
+    dc_bc_img = bc_img - MD
+
+
+    # if desired, write bias- & dark-corrected image (and error array???) to fits file
+    if savefile:
+        dum = imgname.split('/')
+        dum2 = dum[-1].split('.')
+        shortname = dum2[0]
+        if path is None:
+            print('WARNING: output file directory not provided!!!')
+            print('Using same directory as input file...')
+            path = imgname[0: -len(dum[-1])]
+#         outfn = path+shortname+'_bias_and_dark_corrected.fits'
+        outfn = path+shortname+'_BD.fits'
+        # get header from the original image FITS file
+        h = pyfits.getheader(imgname)
+        h['UNITS'] = 'ELECTRONS'
+        h['HISTORY'] = '   BIAS- & DARK-corrected image - created ' + time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime()) + ' (GMT)'
+        pyfits.writeto(outfn, dc_bc_img, h, clobber=True)
+#         h_err = h.copy()
+#         h_err['HISTORY'] = 'estimated uncertainty in BIAS- & DARK-corrected image - created '+time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())+' (GMT)'
+#         pyfits.append(outfn, err_dc_bc_img, h_err, clobber=True)
+
+    if timit:
+        print('Time elapsed: ' + str(np.round(time.time() - start_time,1)) + ' seconds')
+
+#     return dc_bc_img, err_dc_bc_img
+    return dc_bc_img
+
+
+
+
+
+########################################3
+########################################3
+########################################3
+########################################3
+########################################3
+
+#below are old code snippets, currently not in use!!!
 
 def correct_for_bias_and_dark(img, MB, MD, gain=None, scalable=False, texp=None, timit=False):
     """
@@ -933,142 +1362,6 @@ def correct_for_bias_and_dark(img, MB, MD, gain=None, scalable=False, texp=None,
 
 
 
-
-
-def correct_for_bias_and_dark_from_filename(imgname, MB, MD, gain=None, scalable=False, savefile=False, path=None, simu=False, timit=False):
-    """
-    This routine subtracts both the MASTER BIAS frame [in ADU], and the MASTER DARK frame [in e-] from a given image.
-    It also corrects the orientation of the image and crops the overscan regions.
-    NOTE: the input image has units of ADU, but the output image has units of electrons!!!
-    
-    INPUT:
-    'imgname'   : filename of raw science image (incl. directory)
-    'MB'        : the master bias frame [ADU]
-    'MD'        : the master dark frame [e-]
-    'gain'      : the gains for each quadrant [e-/ADU]
-    'scalable'  : boolean - do you want to normalize the dark current to an exposure time of 1s? (ie do you want to make it "scalable"?)
-    'savefile'  : boolean - do you want to save the bias- & dark-corrected image (and corresponding error array) to a FITS file?
-    'path'      : output file directory
-    'simu'      : boolean - are you using Echelle++ simulated observations?
-    'timit'     : boolean - do you want to measure the execution run time?
-    
-    OUTPUT:
-    'dc_bc_img'  : the bias- & dark-corrected image [e-] (also has been brought to 'correct' orientation and overscan regions cropped) 
-    
-    MODHIST:
-    #CMB - I removed the 'ronmask' and 'err_MD' INPUTs
-    clone of "correct_for_bias_and_dark", but this one allows us to save output files
-    """
-    if timit:
-        start_time = time.time()
-
-    #(0) read in raw image [ADU] 
-    img = pyfits.getdata(imgname)
-    if not simu:
-        #bring to "correct" orientation
-        img = correct_orientation(img)
-        #remove the overscan region
-        img = crop_overscan_region(img)
-
-    #(1) BIAS SUBTRACTION [ADU]
-    #bias-corrected_image
-    bc_img = img - MB
-
-
-    #(2) conversion to ELECTRONS and DARK SUBTRACTION [e-]
-    #if the darks have a different exposure time than the images you are trying to correct, we need to re-scale the master dark
-    if scalable:
-        # texp = pyfits.getval(imgname, 'exptime')
-        texp = pyfits.getval(imgname, 'TOTALEXP')
-        if texp is not None:
-            MD = MD * texp
-#             #cannot have an error estimate lower than the read-out noise; this is dodgy but don't know what else to do
-#             err_MD = np.maximum(err_MD * texp, ronmask)
-        else:
-            print('ERROR: "texp" has to be provided when "scalable" is set to TRUE')
-            return
-    #convert image to electrons now    
-    ny,nx = bc_img.shape
-    q1,q2,q3,q4 = make_quadrant_masks(nx,ny)
-    bc_img[q1] = gain[0] * bc_img[q1]
-    bc_img[q2] = gain[1] * bc_img[q2]
-    bc_img[q3] = gain[2] * bc_img[q3]
-    bc_img[q4] = gain[3] * bc_img[q4]
-    #now subtract master dark frame [e-] to create dark- & bias-corrected image [e-]
-    dc_bc_img = bc_img - MD
-
-
-    #if desired, write bias- & dark-corrected image and error array to fits files
-    if savefile:
-        dum = imgname.split('/')
-        dum2 = dum[-1].split('.')
-        shortname = dum2[0]
-        if path is None:
-            print('WARNING: output file directory not provided!!!')
-            print('Using same directory as input file...')
-            path = imgname[0:-len(dum[-1])]
-        #outfn = path+shortname+'_bias_and_dark_corrected.fits'
-        outfn = path+shortname+'_BD.fits'
-        #get header from the original image FITS file
-        h = pyfits.getheader(imgname)
-        h['UNITS'] = 'ELECTRONS'
-        h['HISTORY'] = '   BIAS- & DARK-corrected image - created '+time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())+' (GMT)'
-        pyfits.writeto(outfn, dc_bc_img, h, clobber=True)
-#         h_err = h.copy()
-#         h_err['HISTORY'] = 'estimated uncertainty in BIAS- & DARK-corrected image - created '+time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())+' (GMT)'
-#         pyfits.append(outfn, err_dc_bc_img, h_err, clobber=True)
-
-    if timit:
-        print('Time elapsed: '+str(np.round(time.time() - start_time,1))+' seconds')
-
-#     return dc_bc_img, err_dc_bc_img
-    return dc_bc_img
-
-
-
-
-
-def read_and_overscan_correct(infile, overscan=53, discard_ramp=17):
-    """Read in fits file and overscan correct. Assume that
-    the overscan region is independent of binning."""
-    dd = pyfits.getdata(infile)
-    newshape = (dd.shape[0], dd.shape[1] - 2 * overscan)
-    corrected = np.zeros(newshape)
-
-    # Split the y axis in 2
-    for y0, y1 in zip([0, dd.shape[0] // 2], [dd.shape[0] // 2, dd.shape[0]]):
-        loverscan = dd[y0:y1, :overscan]
-        overscan_ramp = np.median(loverscan + \
-                                  np.random.random(size=loverscan.shape) - 0.5, axis=0)
-        overscan_ramp -= overscan_ramp[-1]
-        for i in range(len(loverscan)):
-            loverscan[i] = loverscan[i] - overscan_ramp
-            corrected[y0 + i, :newshape[1] // 2] = dd[y0 + i, overscan:overscan + newshape[1] // 2] - \
-                                                   np.median(
-                                                       loverscan[i] + np.random.random(size=loverscan[i].shape) - 0.5)
-        roverscan = dd[y0:y1, -overscan:]
-        overscan_ramp = np.median(roverscan + \
-                                  np.random.random(size=loverscan.shape) - 0.5, axis=0)
-        overscan_ramp -= overscan_ramp[0]
-        for i in range(len(roverscan)):
-            roverscan[i] = roverscan[i] - overscan_ramp
-            corrected[y0 + i, newshape[1] // 2:] = dd[y0 + i, dd.shape[1] // 2:dd.shape[1] - overscan] - \
-                                                   np.median(
-                                                       roverscan[i] + np.random.random(size=loverscan[i].shape) - 0.5)
-    return corrected
-
-
-# if __name__ == "__main__":
-#     corrected = read_and_overscan_correct('bias1.fits')
-#     corrected[np.where(np.abs(corrected) > 20)] = 0
-#     print(np.std(corrected))
-
-
-########################################3
-
-#below are old code snippets, currently not in use!!!
-
-
 def bias_subtraction(imglist, MB, noneg=True, savefile=True):
     """
     DUMMY ROUTINE; NOT CURRENTLY USED
@@ -1084,6 +1377,7 @@ def bias_subtraction(imglist, MB, noneg=True, savefile=True):
             h = pyfits.getheader(file)
             pyfits.writeto(path+'bc_'+dum[-1], mod_img, h, clobber=True)
     return
+
 
 
 def dark_subtraction(imglist, MD, noneg=True, savefile=True):
@@ -1103,4 +1397,38 @@ def dark_subtraction(imglist, MD, noneg=True, savefile=True):
     return
 
 
+
+def read_and_overscan_correct(infile, overscan=53, discard_ramp=17):
+    """Read in fits file and overscan correct. Assume that
+    the overscan region is independent of binning."""
+    dd = pyfits.getdata(infile)
+    newshape = (dd.shape[0], dd.shape[1] - 2 * overscan)
+    corrected = np.zeros(newshape)
+
+    # Split the y axis in 2
+    for y0, y1 in zip([0, dd.shape[0] // 2], [dd.shape[0] // 2, dd.shape[0]]):
+        # left overscan region
+        loverscan = dd[y0:y1, :overscan]
+        overscan_ramp = np.median(loverscan + np.random.random(size=loverscan.shape) - 0.5, axis=0)
+        overscan_ramp -= overscan_ramp[-1]
+        for i in range(len(loverscan)):
+            loverscan[i] = loverscan[i] - overscan_ramp
+            corrected[y0 + i, :newshape[1] // 2] = dd[y0 + i, overscan:overscan + newshape[1] // 2] - \
+                                                   np.median(loverscan[i] + np.random.random(size=loverscan[i].shape) - 0.5)
+        # right overscan region                                           
+        roverscan = dd[y0:y1, -overscan:]
+        overscan_ramp = np.median(roverscan + np.random.random(size=loverscan.shape) - 0.5, axis=0)
+        overscan_ramp -= overscan_ramp[0]
+        for i in range(len(roverscan)):
+            roverscan[i] = roverscan[i] - overscan_ramp
+            corrected[y0 + i, newshape[1] // 2:] = dd[y0 + i, dd.shape[1] // 2:dd.shape[1] - overscan] - \
+                                                   np.median(roverscan[i] + np.random.random(size=loverscan[i].shape) - 0.5)
+    
+    return corrected
+
+
+# if __name__ == "__main__":
+#     corrected = read_and_overscan_correct('bias1.fits')
+#     corrected[np.where(np.abs(corrected) > 20)] = 0
+#     print(np.std(corrected))
 

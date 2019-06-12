@@ -19,7 +19,7 @@ import copy
 
 from veloce_reduction.veloce_reduction.get_info_from_headers import get_obstype_lists_temp
 from veloce_reduction.veloce_reduction.helper_functions import short_filenames
-from veloce_reduction.veloce_reduction.calibration import get_bias_and_readnoise_from_bias_frames, make_offmask_and_ronmask, make_master_bias_from_coeffs, make_master_dark, correct_orientation, crop_overscan_region
+from veloce_reduction.veloce_reduction.calibration import get_bias_and_readnoise_from_bias_frames, make_ronmask, make_master_bias_from_coeffs, make_master_dark, correct_orientation, crop_overscan_region
 from veloce_reduction.veloce_reduction.order_tracing import find_stripes, make_P_id, make_mask_dict, extract_stripes
 from veloce_reduction.veloce_reduction.spatial_profiles import fit_profiles, fit_profiles_from_indices
 from veloce_reduction.veloce_reduction.extraction import *
@@ -86,10 +86,9 @@ if len(bias_list) > 9:
 else:
     bias_list = sorted(bias_list)
 medbias,coeffs,offsets,rons = get_bias_and_readnoise_from_bias_frames(bias_list, degpol=5, clip=5., gain=gain, save_medimg=True, debug_level=1, timit=True)
-#or from the overscan regions
 
 # create MASTER BIAS frame and read-out noise mask (units = ADUs)
-offmask,ronmask = make_offmask_and_ronmask(offsets, rons, nx, ny, gain=gain, savefiles=True, path=path, timit=True)
+ronmask = make_ronmask(rons, nx, ny, gain=gain, savefile=True, path=path, timit=True)
 MB = make_master_bias_from_coeffs(coeffs, nx, ny, savefile=True, path=path, timit=True)
 # or
 # MB = offmask.copy()
@@ -131,10 +130,10 @@ np.save(path + 'mask.npy', mask)
 
 # extract stripes of user-defined width from the science image, centred on the polynomial fits defined in step (1)
 MW_stripes,MW_indices = extract_stripes(MW, P_id, return_indices=True, slit_height=30)
-pix,flux,err = extract_spectrum_from_indices(MW, err_MW, MW_indices, method='quick', slit_height=30, RON=ronmask,
+pix,flux,err = extract_spectrum_from_indices(MW, err_MW, MW_indices, method='quick', slit_height=30, ronmask=ronmask,
                                              savefile=True, filetype='fits', obsname='master_white', path=path, timit=True)
 pix,flux,err = extract_spectrum_from_indices(MW, err_MW, MW_indices, method='optimal', slope=True, offset=True, fibs='all', slit_height=30,
-                                             RON=ronmask, savefile=True, filetype='fits', obsname='master_white', date=date, path=path, timit=True)
+                                             ronmask=ronmask, savefile=True, filetype='fits', obsname='master_white', date=date, path=path, timit=True)
 #####################################################################################################################################################
 
 
