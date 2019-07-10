@@ -11,7 +11,7 @@ import time
 import matplotlib.pyplot as plt
 
 from veloce_reduction.veloce_reduction.helper_functions import correct_orientation, sigma_clip, polyfit2d, polyval2d
-#from . import *
+
 
 
 
@@ -30,7 +30,7 @@ def make_median_image(imglist, MB=None, correct_OS=True, scalable=False, raw=Fal
                     otherwise the image will be brought to the 'correct' orientation and the overscan regions will be cropped
 
     OUTPUT:
-    'medimg'   : median image
+    'medimg'   : median image (bias- & overscan-corrected) [still in ADU]
     """
 
     # from veloce_reduction.calibration import crop_overscan_region
@@ -375,7 +375,7 @@ def measure_gains(filelist, MB, MD=None, scalable=True, timit=False, debug_level
 
 
 
-def get_bias_and_readnoise_from_overscan(img, ramps=[35, 35, 35, 35], gain=None, degpol=5, clip=5, add=0, return_oslevels_only=False, timit=False):
+def get_bias_and_readnoise_from_overscan(img, ramps=[35, 35, 35, 35], gain=None, degpol=5, clip=5, add=0, return_oslevels_only=False, verbose=False, timit=False):
     """
     PURPOSE:
     get an estimate of the bias and the read noise from a selected sub-region of the overscan region for each quadrant
@@ -388,6 +388,7 @@ def get_bias_and_readnoise_from_overscan(img, ramps=[35, 35, 35, 35], gain=None,
     'clip'    - threshold for sigma clipping
     'add'     - number of ADUs to add (from comparing a number of bias frames with the bias estimate from the overscan regions, there sometimes seems to be a ~1ADU offset)
     'return_oslevels_only'  - boolean - do you want to return the overscan levels only?
+    'verbose' - boolean - do you want to print user info to screen?
     'timit'   - boolean - do you want to measure execution run time?
     
     OUTPUT:
@@ -400,7 +401,8 @@ def get_bias_and_readnoise_from_overscan(img, ramps=[35, 35, 35, 35], gain=None,
     if timit:
         start_time = time.time()
 
-    print('Determining offset levels and read-out noise properties from overscan regions for 4 quadrants...')
+    if verbose:
+        print('Determining offset levels and read-out noise properties from overscan regions for 4 quadrants...')
 
     # get image dimensions
     ny, nx = crop_overscan_region(correct_orientation(img)).shape
@@ -873,11 +875,7 @@ def make_ronmask(rons, nx, ny, nq=4, gain=None, savefile=False, path=None, timit
         ronmask = np.ones((ny,nx))
         q1,q2,q3,q4 = make_quadrant_masks(nx,ny)
         for q,RON in zip([q1,q2,q3,q4],rons):
-            ronmask[q] = ronmask[q] * RON 
-    else:
-        print('ERROR: "offsets" must either be a scalar (for single-port readout) or a 4-element array/list (for four-port readout)!')
-        return
-            
+            ronmask[q] = ronmask[q] * RON
 
     if savefile:
         #check if gain is set
@@ -895,14 +893,9 @@ def make_ronmask(rons, nx, ny, nq=4, gain=None, savefile=False, path=None, timit
             pyfits.setval(path+'read_noise_mask.fits', 'UNITS', value='ELECTRONS')
             pyfits.setval(path+'read_noise_mask.fits', 'HISTORY', value='   read-noise frame - created '+time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())+' (GMT)')
             if nq == 1:
-                pyfits.setval(path+'read_noise_mask.fits', 'OFFSET', value=offsets, comment='in ADU')
                 pyfits.setval(path+'read_noise_mask.fits', 'GAIN', value=gain, comment='in e-/ADU')
                 pyfits.setval(path+'read_noise_mask.fits', 'RNOISE', value=rons, comment='in ELECTRONS')
             elif nq == 4:
-                pyfits.setval(path+'read_noise_mask.fits', 'OFFSET_1', value=offsets[0], comment='in ADU')
-                pyfits.setval(path+'read_noise_mask.fits', 'OFFSET_2', value=offsets[1], comment='in ADU')
-                pyfits.setval(path+'read_noise_mask.fits', 'OFFSET_3', value=offsets[2], comment='in ADU')
-                pyfits.setval(path+'read_noise_mask.fits', 'OFFSET_4', value=offsets[3], comment='in ADU')
                 pyfits.setval(path+'read_noise_mask.fits', 'RNOISE_1', value=rons[0], comment='in ELECTRONS')
                 pyfits.setval(path+'read_noise_mask.fits', 'RNOISE_2', value=rons[1], comment='in ELECTRONS')
                 pyfits.setval(path+'read_noise_mask.fits', 'RNOISE_3', value=rons[2], comment='in ELECTRONS')
@@ -1209,7 +1202,7 @@ def correct_for_bias_and_dark_from_filename(imgname, MB, MD, gain=None, scalable
     
     INPUT:
     'imgname'   : filename of raw science image (incl. directory)
-    'MB'        : the master bias frame [ADU]
+    'MB'        : the master bias frame (bias only, excluding overscan) [ADU]
     'MD'        : the master dark frame [e-]
     'gain'      : the gains for each quadrant [e-/ADU]
     'scalable'  : boolean - do you want to normalize the dark current to an exposure time of 1s? (ie do you want to make it "scalable"?)

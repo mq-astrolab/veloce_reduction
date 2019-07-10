@@ -60,10 +60,10 @@ def quick_extract(stripes, err_stripes, slit_height=25, verbose=False, timit=Fal
         stripe = stripes[ord]
         err_stripe = err_stripes[ord]
         # find and fill the "order-box"
-        sc,sr = flatten_single_stripe(stripe,slit_height=slit_height,timit=False)
-        err_sc,err_sr = flatten_single_stripe(err_stripe,slit_height=slit_height,timit=False)
+        sc, sr = flatten_single_stripe(stripe, slit_height=slit_height, timit=False)
+        err_sc, err_sr = flatten_single_stripe(err_stripe, slit_height=slit_height, timit=False)
         # get dimensions of the box
-        ny,nx = sc.shape
+        ny, nx = sc.shape
         
         flux[ord] = np.sum(sc, axis=0)
         err[ord] = np.sqrt(np.sum(err_sc*err_sc, axis=0))

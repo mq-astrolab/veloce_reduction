@@ -3,6 +3,8 @@ from astropy.coordinates import SkyCoord
 from astroquery.gaia import Gaia
 import astropy.io.fits as pyfits
 import barycorrpy
+import numpy as np
+from readcol import readcol
 
 
 # starnames = ['HD10700', 'HD190248', 'Gl87', 'GJ1132', 'GJ674', 'HD194640', 'HD212301']
@@ -40,7 +42,89 @@ def define_target_dict(starnames):
 
 
 
-def get_barycentric_correction(fn, starname='tauceti', h=0.01, w=0.01):
+def create_gaiadr2_id_dict(path='/Users/christoph/OneDrive - UNSW/observations/', savefile=True):
+
+    # prepare dictionary
+    gaia_dict = {}
+
+    # read input file for ALL targets (excluding B-stars)
+    targets, T0, P, g2id = readcol(path + 'PT0_gaiadr2_list.txt', twod=False, verbose=False)
+    
+    # fill dictionary with other targets
+    for i in range(len(targets)):
+        gaia_dict[targets[i]] = {'gaia_dr2_id':g2id[i][1:]}
+
+    if savefile:
+        np.save(path + 'gaiadr2_id_dict.npy', gaia_dict)
+
+    return gaia_dict
+
+
+
+def get_barycentric_correction(fn, rvabs=None, obs_path='/Users/christoph/OneDrive - UNSW/observations/'):
+    """
+    wrapper routine for using barycorrpy with Gaia DR2 coordinates
+    """
+    
+    # use 2015.5 as an epoch (Gaia DR2)
+    epoch = 2457206.375
+    
+    # get UT obs start time
+    utmjd = pyfits.getval(fn, 'UTMJD') + 2.4e6 + 0.5   # the fits header has 2,400,000.5 subtracted!!!!!
+    # add half the exposure time in days
+    texp = pyfits.getval(fn, 'ELAPSED')
+    utmjd = utmjd + (texp/2.)/86400.
+    
+    # read in Gaia DR2 IDs
+    gaia_dict = np.load(obs_path + 'gaiadr2_id_dict.npy').item()    
+
+    # check what kind of target it is
+    targ_raw = pyfits.getval(fn, 'OBJECT')
+    targ = targ_raw.split('+')[0]
+    typ = targ[-3:]   
+
+    try:
+        # for TOIs
+        if typ == '.01':
+            gaia_dr2_id = gaia_dict['TOI'+targ[:3]]['gaia_dr2_id']
+        # for other targets
+        else:
+            if targ.lower() in ['gj674', 'gl87', 'proxima', 'KELT-15b', 'WASP-54b']:
+                gaia_dr2_id = gaia_dict[targ]['gaia_dr2_id']
+            elif targ.lower()[:2] == 'hd':
+                gaia_dr2_id = gaia_dict[targ]['gaia_dr2_id']
+            else:
+                gaia_dr2_id = gaia_dict['HD'+targ]['gaia_dr2_id']
+    except:
+        print('ERROR: could not find Gaia DR2 ID for target: ', targ)
+        return -1
+        
+#     coord = SkyCoord(ra=ra, dec=dec, unit=(u.degree, u.degree), frame='icrs')
+#     width = u.Quantity(w, u.deg)
+#     height = u.Quantity(h, u.deg)
+
+#     gaia_data = Gaia.query_object_async(coordinate=coord, width=width, height=height)
+    q = Gaia.launch_job_async('SELECT * FROM gaiadr2.gaia_source WHERE source_id = ' + str(gaia_dr2_id))
+    gaia_data = q.results
+
+    # some targets don't have a RV from Gaia
+    if rvabs is None:
+        rvabs = gaia_data['radial_velocity']
+        if np.isnan(rvabs.data.data)[0]:
+            rvabs = 0.
+
+    bc = barycorrpy.get_BC_vel(JDUTC=utmjd, ra=gaia_data['ra'], dec=gaia_data['dec'], pmra=gaia_data['pmra'], pmdec=gaia_data['pmdec'],
+                               px=gaia_data['parallax'], rv=rvabs, epoch=epoch, obsname='AAO', ephemeris='de430')
+    # bc = barycorrpy.get_BC_vel(JDUTC=utmjd, ra=ra, dec=dec, pmra=gaia_data['pmra'], pmdec=gaia_data['pmdec'],
+    #                            px=gaia_data['parallax'], rv=gaia_data['radial_velocity']*1e3, obsname='AAO', ephemeris='de430')
+    # bc = barycorrpy.get_BC_vel(JDUTC=utmjd, ra=ra, dec=dec, pmra=pmra, pmdec=pmdec,
+    #                            px=px, rv=rv, obsname='AAO', ephemeris='de430')
+
+    return bc[0][0]
+
+
+
+def old_get_barycentric_correction(fn, starname='tauceti', h=0.01, w=0.01):
 
     # wrapper routine for using barycorrpy with Gaia DR2 coordinates
 
@@ -50,12 +134,13 @@ def get_barycentric_correction(fn, starname='tauceti', h=0.01, w=0.01):
     # get UT obs start time
     utmjd = pyfits.getval(fn, 'UTMJD') + 2.4e6 + 0.5   # the fits header has 2,400,000.5 subtracted!!!!!
     # add half the exposure time in days
-    texp = pyfits.getval(fn, 'TOTALEXP')
+    texp = pyfits.getval(fn, 'ELAPSED')
     utmjd = utmjd + (texp/2.)/86400.
     
     # ra = pyfits.getval(fn, 'MEANRA')
     # dec = pyfits.getval(fn, 'MEANDEC')
     if starname.lower() == 'tauceti':
+        gaia_dr2_id = 2452378776434276992
         ra = 26.00930287666994
         dec = -15.933798650941204
         rv = -16.68e3
@@ -67,6 +152,9 @@ def get_barycentric_correction(fn, starname='tauceti', h=0.01, w=0.01):
         rv = 21.04070239e3
         h=0.005
         w=0.005
+    elif starname.lower() == 'gj674':
+        gaia_dr2_id = 5951824121022278144
+        rv = -2.73
     else:
         fu=1
         assert fu != 1, 'ERROR: need to implement that first...'
@@ -75,9 +163,11 @@ def get_barycentric_correction(fn, starname='tauceti', h=0.01, w=0.01):
     width = u.Quantity(w, u.deg)
     height = u.Quantity(h, u.deg)
 
-    gaia_data = Gaia.query_object_async(coordinate=coord, width=width, height=height)
+#     gaia_data = Gaia.query_object_async(coordinate=coord, width=width, height=height)
+    q = Gaia.launch_job_async('SELECT * FROM gaiadr2.gaia_source WHERE source_id = ' + str(gaia_dr2_id))
+    gaia_data = q.results
 
-    bc = barycorrpy.get_BC_vel(JDUTC=utmjd, ra=ra, dec=dec, pmra=gaia_data['pmra'], pmdec=gaia_data['pmdec'],
+    bc = barycorrpy.get_BC_vel(JDUTC=utmjd, ra=gaia_data['ra'], dec=gaia_data['dec'], pmra=gaia_data['pmra'], pmdec=gaia_data['pmdec'],
                                px=gaia_data['parallax'], rv=rv, epoch=epoch, obsname='AAO', ephemeris='de430')
     # bc = barycorrpy.get_BC_vel(JDUTC=utmjd, ra=ra, dec=dec, pmra=gaia_data['pmra'], pmdec=gaia_data['pmdec'],
     #                            px=gaia_data['parallax'], rv=gaia_data['radial_velocity']*1e3, obsname='AAO', ephemeris='de430')

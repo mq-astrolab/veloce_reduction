@@ -22,21 +22,21 @@ files_jan = glob.glob(path + 'jan2019/' + '*10700*')
 
 files = []
 # sort list of files
-# for tempfiles in [files_sep, files_nov, files_jan]:
-all_shortnames = []
-for i,filename in enumerate(tempfiles):
-    dum = filename.split('/')
-    dum2 = dum[-1].split('.')
-    dum3 = dum2[0]
-    dum4 = dum3.split('_')
-    shortname = dum4[1]
-    all_shortnames.append(shortname)
-sortix = np.argsort(all_shortnames)
-tempfiles = np.array(tempfiles)
-tempfiles = tempfiles[sortix]
-all_obsnames = np.array(all_shortnames)
-all_obsnames = all_obsnames[sortix]
-# files = files + list(tempfiles)
+for tempfiles in [files_sep, files_nov, files_jan]:
+    all_shortnames = []
+    for i,filename in enumerate(tempfiles):
+        dum = filename.split('/')
+        dum2 = dum[-1].split('.')
+        dum3 = dum2[0]
+        dum4 = dum3.split('_')
+        shortname = dum4[1]
+        all_shortnames.append(shortname)
+    sortix = np.argsort(all_shortnames)
+    tempfiles = np.array(tempfiles)
+    tempfiles = tempfiles[sortix]
+    all_obsnames = np.array(all_shortnames)
+    all_obsnames = all_obsnames[sortix]
+    files = files + list(tempfiles)
 
 
 ########################################################################################################################
@@ -67,7 +67,7 @@ for i,filename in enumerate(files):
     dum3 = dum2[0]
     dum4 = dum3.split('_')
     shortname = dum4[1]
-    bc = get_barycentric_correction(filename)
+    bc = get_barycentric_correction(filename, rvabs=-16.68)
     pyfits.setval(filename, 'BARYCORR', value=bc[0], comment='barycentric velocity correction [m/s]')
     all_bc.append(bc[0])
     jd = pyfits.getval(filename, 'UTMJD') + 2.4e6 + 0.5
@@ -149,8 +149,9 @@ date_0 = '20180920'
 # obsname_0 = '24sep30078'     # that's the highest SNR observation for Sep 18
 # obsname_0 = '16nov30128'     # that's the highest SNR observation for Nov 18
 # obsname_0 = '25nov30084'     # that's the 2nd highest SNR observation for Nov 18
-wldict0,wl0 = get_dispsol_for_all_fibs(obsname_0, date=date_0, fudge=fudge, signflip_shift=signflip_shift,
-                                       signflip_slope=signflip_slope, signflip_secord=signflip_secord)
+# wldict0,wl0 = get_dispsol_for_all_fibs(obsname_0, date=date_0, fudge=fudge, signflip_shift=signflip_shift,
+#                                        signflip_slope=signflip_slope, signflip_secord=signflip_secord)
+wldict0,wl0 = get_dispsol_for_all_fibs(obsname_0, date=date_0, fibs='stellar', refit=False, fibtofib=True, nightly_coeffs=True)
 # wldict0,wl0 = get_dispsol_for_all_fibs_2(obsname_0)
 
 # use a synthetic template?
@@ -161,7 +162,11 @@ f0 = pyfits.getdata('/Users/christoph/OneDrive - UNSW/synthetic_templates/phoeni
 for i,filename in enumerate(files):
     print('Processing RV for tau Ceti observation ' + str(i+1) + '/' + str(len(files)))
     f = pyfits.getdata(filename, 0)
-    # err = pyfits.getdata(file, 1)
+    err = pyfits.getdata(file, 1)
+    f_clean = f.copy()
+    for o in range(f.shape[0]):
+        f_clean[o,:],ncos = onedim_medfilt_cosmic_ray_removal(f[o,fib,:], err[o,fib,:], w=31, thresh=5., low_thresh=3.)
+    f_dblz, err_dblz = deblaze_orders(f_clean, wl, smoothed_flat, maskdict, err=err, degpol=2, gauss_filter_sigma=3., maxfilter_size=100)    
     wl = pyfits.getdata(filename, 2)
     # wl = pyfits.getdata('/Users/christoph/OneDrive - UNSW/dispsol/individual_fibres_dispsol_poly7_21sep30019.fits')
     all_xc.append(make_ccfs(f, wl, f0, wl0, bc=all_bc[i], bc0=all_bc[6], mask=None, smoothed_flat=None, delta_log_wl=1e-6, relgrid=False,
@@ -172,6 +177,8 @@ for i,filename in enumerate(files):
     all_sumrv[i] = sumrv
     xcsums[i,:] = xcsum
 xcsums = np.array(xcsums)
+
+
 
 ########################################################################################################################
 ########################################################################################################################

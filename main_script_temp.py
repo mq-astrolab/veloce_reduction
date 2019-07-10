@@ -17,13 +17,13 @@ import numpy as np
 import datetime
 import copy
 
-from veloce_reduction.veloce_reduction.get_info_from_headers import get_obstype_lists_temp
+from veloce_reduction.veloce_reduction.get_info_from_headers import get_obstype_lists
 from veloce_reduction.veloce_reduction.helper_functions import short_filenames
 from veloce_reduction.veloce_reduction.calibration import get_bias_and_readnoise_from_bias_frames, make_ronmask, make_master_bias_from_coeffs, make_master_dark, correct_orientation, crop_overscan_region
 from veloce_reduction.veloce_reduction.order_tracing import find_stripes, make_P_id, make_mask_dict, extract_stripes
 from veloce_reduction.veloce_reduction.spatial_profiles import fit_profiles, fit_profiles_from_indices
 from veloce_reduction.veloce_reduction.extraction import *
-from veloce_reduction.veloce_reduction.process_scripts import process_whites, process_science_images
+from process_scripts import process_whites, process_science_images
 
 
 date = '20180917'
@@ -45,7 +45,7 @@ path = '/Users/christoph/data/raw_goodonly/' + date + '/'
 # white_list = glob.glob(path + 'Light*.fits')
 # stellar_list = glob.glob(path + 'Light*.fits')
 ###END TEMP###
-acq_list, bias_list, dark_list, flat_list, skyflat_list, domeflat_list, arc_list, thxe_list, laser_list, laser_and_thxe_list, stellar_list, unknown_list = get_obstype_lists_temp(path)
+acq_list, bias_list, dark_list, flat_list, skyflat_list, domeflat_list, arc_list, thxe_list, laser_list, laser_and_thxe_list, stellar_list, unknown_list = get_obstype_lists(path)
 assert len(unknown_list) == 0, "WARNING: unknown files encountered!!!"
 obsnames = short_filenames(bias_list)
 dumimg = crop_overscan_region(correct_orientation(pyfits.getdata(bias_list[0])))
@@ -89,11 +89,11 @@ medbias,coeffs,offsets,rons = get_bias_and_readnoise_from_bias_frames(bias_list,
 
 # create MASTER BIAS frame and read-out noise mask (units = ADUs)
 ronmask = make_ronmask(rons, nx, ny, gain=gain, savefile=True, path=path, timit=True)
-MB = make_master_bias_from_coeffs(coeffs, nx, ny, savefile=True, path=path, timit=True)
+# MB = make_master_bias_from_coeffs(coeffs, nx, ny, savefile=True, path=path, timit=True)
 # or
 # MB = offmask.copy()
 # #or
-# MB = medbias.copy()
+MB = medbias.copy()
 #XXXalso save read-noise and offsets for all headers to write later!?!?!?
 
 
@@ -112,7 +112,7 @@ MW,err_MW = process_whites(flat_list, MB=medbias, ronmask=ronmask, MD=MDS, gain=
 
 
 # (3) ORDER TRACING #################################################################################################################################
-# find orders roughly
+# find rough order locations
 #P,tempmask = find_stripes(MW, deg_polynomial=2, min_peak=0.05, gauss_filter_sigma=3., simu=False)
 P,tempmask = find_stripes(MW, deg_polynomial=2, min_peak=0.05, gauss_filter_sigma=10., simu=False, maskthresh = 400)
 # if the bad pixel column is found as an order:
@@ -157,9 +157,33 @@ pix,flux,err = extract_spectrum_from_indices(MW, err_MW, MW_indices, method='opt
 
 
 
-# (4) PROCESS SCIENCE IMAGES
-dum = process_science_images(arc_list, P_id, mask=mask, sampling_size=25, slit_height=30, gain=gain, MB=medbias, ronmask=ronmask, MD=MDS, scalable=True,
-                             saveall=False, path=path, ext_method='optimal', offset='True', slope='True', fibs='all', date=date, from_indices=True, timit=True)
+### (4) PROCESS SCIENCE IMAGES
+# figure out the configuration of the calibration lamps for the ARC exposures
+arc_sublists = {'lfc':[], 'thxe':[], 'both':[], 'neither':[]}
+for file in arc_list:
+    lc = 0
+    thxe = 0
+    h = pyfits.getheader(file)
+    if 'LCEXP' in h.keys():
+        lc = 1
+    if h['SIMCALTT'] > 0:
+        thxe = 1
+    assert lc+thxe in [0,1,2], 'ERROR: could not establish status of LFC and simultaneous ThXe for the exposures in this list!!!'    
+    if lc+thxe == 0:
+        arc_sublists['neither'].append(file)
+    if lc+thxe == 1:
+        if lc == 1:
+            arc_sublists['lfc'].append(file)
+        else:
+            arc_sublists['thxe'].append(file)
+    elif lc+thxe == 2:
+        arc_sublists['both'].append(file)
+        
+# (4a) PROCESS ARC IMAGES
+for subl in arc_sublists.keys():
+    dum = process_science_images(arc_sublists[subl], P_id, mask=mask, sampling_size=25, slit_height=30, gain=gain, MB=medbias, ronmask=ronmask, MD=MDS, scalable=True,
+                                 saveall=False, path=path, ext_method='optimal', offset='True', slope='True', fibs='all', date=date, from_indices=True, timit=True)
+# (4b) PROCESS STELLAR IMAGES
 dum = process_science_images(stellar_list, P_id, mask=mask, sampling_size=25, slit_height=24, gain=gain, MB=medbias, ronmask=ronmask, MD=MDS, scalable=True, 
                              saveall=False, path=path, ext_method='optimal', offset='True', slope='True', fibs='stellar', date=date, from_indices=True, timit=True)
 

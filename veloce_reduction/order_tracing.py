@@ -175,7 +175,6 @@ def find_stripes(flat, deg_polynomial=2, gauss_filter_sigma=3., min_peak=0.05, m
 
 
 
-
 def find_gaps(flat, deg_polynomial=2, gauss_filter_sigma=3., min_peak=0.05, maskthresh=100., weighted_fits=True, slowmask=False, simu=False, timit=False, debug_level=0):
     """
     BASED ON JULIAN STUERMER'S MAROON_X PIPELINE:
@@ -517,40 +516,39 @@ def flatten_single_stripe(stripe, slit_height=25, timit=False):
     take out the curvature of the order/stripe, potentially useful for further processing.
 
     INPUT:
-    "stripe": sparse 4096x4096 matrix, non-zero for just one stripe/order of user defined width (=2*slit_height in "extract_stripes")
+    "stripe"  : sparse 4096x4096 matrix, non-zero for just one stripe/order of user defined width (=2*slit_height in "extract_stripes")
     
     OUTPUT:
-    "stripe_columns": dense rectangular matrix containing only the non-zero elements of "stripe". This has
-                      dimensions of (2*slit_height, 4096)
-    "stripe_rows":    row indices (ie rows being in dispersion direction) of the original image for the columns (ie the "cutouts")
+    "stripe_columns" : dense rectangular matrix containing only the non-zero elements of "stripe". This has
+                       dimensions of (2*slit_height, 4096)
+    "stripe_rows" :    row indices (ie rows being in dispersion direction) of the original image for the columns (ie the "cutouts")
     """
-    #input is sth like this
-    #stripe = stripes['fibre_01']['order_01']
-    #TODO: sort the dictionary by order number...
+    # input is sth like this: stripe = stripes['fibre_01']['order_01']
+    # TODO: sort the dictionary by order number...
     
     if timit:
         start_time = time.time()    
     
     ny, nx = stripe.todense().shape
     
-    #find the non-zero parts of the sparse matrix
-    #format is:
-    #contents[0] = row indices
-    #contents[1] = column indices
-    #contents[2] = values
+    # find the non-zero parts of the sparse matrix
+    # format is:
+    # contents[0] = row indices
+    # contents[1] = column indices
+    # contents[2] = values
     contents = sparse.find(stripe)
-    #the individual columns correspond to the unique values of the x-indices, stored in contents[1]    
+    # the individual columns correspond to the unique values of the x-indices, stored in contents[1]    
     col_values, col_indices, counts = np.unique(contents[1], return_index=True, return_counts=True)     
-    #stripe_columns = np.zeros((int(len(contents[0]) / len(col_indices)),len(col_indices)))
-    #stripe_flux = np.zeros((2*slit_height, 4096))
+#     stripe_columns = np.zeros((int(len(contents[0]) / len(col_indices)),len(col_indices)))
+#     stripe_flux = np.zeros((2*slit_height, 4096))
     stripe_flux = np.zeros((2*slit_height, nx)) - 1.     #negative flux can be used to identify pixel-positions that fall outside the chip later
-    #stripe_rows = np.zeros((int(len(contents[0]) / len(col_indices)),len(col_indices)))
+#     stripe_rows = np.zeros((int(len(contents[0]) / len(col_indices)),len(col_indices)))
     stripe_rows = np.zeros((2*slit_height, nx))
     
-    #check if whole order falls on CCD in dispersion direction
+    # check if whole order falls on CCD in dispersion direction
     if len(col_indices) != nx:
         print('WARNING: Not the entire order falls on the CCD:'),    
-        #parts of order missing on LEFT side of chip?
+        # parts of order missing on LEFT side of chip?
         if contents[1][0] != 0:
             print('some parts of the order are missing on LEFT side of chip...')
             #this way we also know how many pixels are defined (ie on the CCD) for each column of the stripe

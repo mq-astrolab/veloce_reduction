@@ -83,6 +83,106 @@ def identify_obstypes(path):
 
 
 
+def get_obstype_lists(path, pattern=None, weeding=True):
+
+    if pattern is None:
+        file_list = glob.glob(path + "*.fits")
+    else:
+        file_list = glob.glob(path + '*' + pattern + '*.fits')
+    
+    
+    # first weed out binned observations
+    if weeding:
+        unbinned = []
+        binned = []
+        for file in file_list:
+            xdim = pyfits.getval(file, 'NAXIS2')
+            if xdim == 4112:
+                unbinned.append(file)
+            else:
+                binned.append(file)
+    else:
+        unbinned = file_list
+
+    # prepare output lists
+    if weeding:
+        acq_list = binned[:]
+    else:
+        acq_list = []
+    bias_list = []
+    dark_list = []
+    flat_list = []
+    skyflat_list = []
+    domeflat_list = []
+    arc_list = []
+    thxe_list = []
+    laser_list = []
+    laser_and_thxe_list = []
+    stellar_list = []
+    unknown_list = []
+
+    for file in unbinned:
+        obj_type = pyfits.getval(file, 'OBJECT')
+
+        if obj_type.lower() == 'acquire':
+            if not weeding:
+                acq_list.append(file)
+        elif obj_type.lower().startswith('bias'):
+            bias_list.append(file)
+        elif obj_type.lower().startswith('dark'):
+            dark_list.append(file)
+        elif obj_type.lower().startswith('flat'):
+            flat_list.append(file)
+        elif obj_type.lower().startswith('skyflat'):
+            skyflat_list.append(file)
+        elif obj_type.lower().startswith('domeflat'):
+            domeflat_list.append(file)
+        elif obj_type.lower().startswith('arc'):
+            arc_list.append(file)
+        elif obj_type.lower() in ["thxe","thxe-only", "simth"]:
+            thxe_list.append(file)
+        elif obj_type.lower() in ["lc","lc-only","lfc","lfc-only", "simlc"]:
+            laser_list.append(file)
+        elif obj_type.lower() in ["thxe+lfc","lfc+thxe","lc+simthxe","lc+thxe"]:
+            laser_and_thxe_list.append(file)
+        elif obj_type.lower().startswith(("wasp","proxima","kelt","toi","tic","hd","hr","hip","gj","gl","ast","alpha","beta","gamma",
+                                          "delta","tau","ksi","ach","zeta","ek",'1', '2', '3', '4', '5', '6', '7', '8', '9')):
+            stellar_list.append(file)
+        else:
+            unknown_list.append(file)
+
+    
+    # sort out which calibration lamps were actually on for the exposures tagged as either "SimLC" or "SimTh"
+    laser_only_list = []
+    simth_only_list = []
+    laser_and_simth_list = []
+    calib_list = laser_list + thxe_list + laser_and_thxe_list
+    calib_list.sort()
+    for file in calib_list:
+        lc = 0
+        thxe = 0
+        h = pyfits.getheader(file)
+        if 'LCEXP' in h.keys():
+            lc = 1
+        if h['SIMCALTT'] > 0:
+            thxe = 1
+        if lc+thxe == 1:
+            if lc == 1:
+                laser_only_list.append(file)
+            else:
+                simth_only_list.append(file)
+        elif lc+thxe == 2:
+            laser_and_simth_list.append(file)
+        else:
+            unknown_list.append(file)
+        
+
+    return acq_list, bias_list, dark_list, flat_list, skyflat_list, domeflat_list, arc_list, simth_only_list, laser_only_list, laser_and_simth_list, stellar_list, unknown_list
+
+
+
+
+
 def get_obstype_lists_temp(path, pattern=None, weeding=True):
 
     if pattern is None:

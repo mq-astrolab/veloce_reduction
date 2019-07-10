@@ -10,7 +10,7 @@ import scipy.sparse as sparse
 from scipy.ndimage import label
 import astropy.io.fits as pyfits
 
-from veloce_reduction.veloce_reduction.helper_functions import polyfit2d, polyval2d, fit_poly_surface_2D
+from veloce_reduction.veloce_reduction.helper_functions import polyfit2d, polyval2d, fit_poly_surface_2D, sigma_clip
 
 
 # # #make simulated background
@@ -31,7 +31,7 @@ from veloce_reduction.veloce_reduction.helper_functions import polyfit2d, polyva
 
 
 
-def remove_background(img, P_id, obsname, path, degpol=5, slit_height=25, save_bg=True, savefile=True, save_err=False, exclude_top_and_bottom=False, verbose=True, timit=False):
+def remove_background(img, P_id, obsname, path, degpol=5, slit_height=25, save_bg=True, savefile=True, save_err=False, exclude_top_and_bottom=False, timit=False):
     """
     Top-level wrapper function to identify, extract, fit, and subtract the background for a given image.
     
@@ -46,7 +46,6 @@ def remove_background(img, P_id, obsname, path, degpol=5, slit_height=25, save_b
     'savefile'                : boolean - do you want to save the background-corrected science image?
     'save_err'                : boolean - do you want to save the corresponding error array as well? (remains unchanged though)
     'exclude_top_and_bottom'  : boolean - do you want to exclude the areas at top and bottom of chip, ie outside the useful orders but still containing some incomplete orders?
-    'verbose'                 : for user information / debugging...
     'timit'                   : boolean - do you want to measure execution run time?
     
     OUTPUT:
@@ -57,7 +56,7 @@ def remove_background(img, P_id, obsname, path, degpol=5, slit_height=25, save_b
         start_time = time.time()
     
     #(1) identify and extract background
-    bg = extract_background(img, P_id, slit_height=slit_height, exclude_top_and_bottom=exclude_top_and_bottom, verbose=verbose, timit=timit)
+    bg = extract_background(img, P_id, slit_height=slit_height, exclude_top_and_bottom=exclude_top_and_bottom, timit=timit)
     #(2) fit background
     bg_coeffs,bg_img = fit_background(bg, deg=degpol, return_full=True, timit=timit)
     #(3) subtract background
@@ -121,7 +120,7 @@ def remove_background(img, P_id, obsname, path, degpol=5, slit_height=25, save_b
 
 
 
-def extract_background(img, P_id, slit_height=25, return_mask=False, exclude_top_and_bottom=False, verbose=True, timit=False):
+def extract_background(img, P_id, slit_height=25, return_mask=False, exclude_top_and_bottom=True, timit=False):
     """
     This function marks all relevant pixels for extraction. Extracts the background (ie the inter-order regions = everything outside the order stripes)
     from the original 2D spectrum to a sparse matrix containing only relevant pixels.
@@ -132,7 +131,6 @@ def extract_background(img, P_id, slit_height=25, return_mask=False, exclude_top
     'slit_height'             : half the total slit height in pixels
     'return_mask'             : boolean - do you want to return the mask of the background locations as well?
     'exclude_top_and_bottom'  : boolean - do you want to exclude the top and bottom bits (where there are usually incomplete orders)
-    'verbose'                 : for user info / debugging...
     'timit'                   : for timing tests...
     
     OUTPUT:
@@ -143,9 +141,8 @@ def extract_background(img, P_id, slit_height=25, return_mask=False, exclude_top
     if timit:
         start_time = time.time()
     
-    #logging.info('Extracting background...')
-    if verbose:
-        print('Extracting background...')
+#     logging.info('Extracting background...')
+    print('Extracting background...')
 
     ny, nx = img.shape
     xx = np.arange(nx, dtype='f8')
@@ -155,34 +152,34 @@ def extract_background(img, P_id, slit_height=25, return_mask=False, exclude_top
 
     for o, p in sorted(P_id.items()):
         
-        #order trace
+        # order trace
         y = np.poly1d(p)(xx)
         
-        #distance from order trace
+        # distance from order trace
         distance = y_grid - y.repeat(ny).reshape((nx, ny)).T
         indices = abs(distance) > slit_height
         
-        #include in global mask
+        # include in global mask
         bg_mask *= indices
         
     
     final_bg_mask = bg_mask.copy()
-    #in case we want to exclude the top and bottom parts where incomplete orders are located
+    # in case we want to exclude the top and bottom parts where incomplete orders are located
     if exclude_top_and_bottom:
         print('WARNING: this fix works for the current Veloce CCD layout only!!!')
         labelled_mask,nobj = label(bg_mask)
-        #WARNING: this fix works for the current Veloce CCD layout only!!!
+        # WARNING: this fix works for the current Veloce CCD layout only!!!
         topleftnumber = labelled_mask[ny-1,0]
         toprightnumber = labelled_mask[ny-1,nx-1]
-        #bottomleftnumber = labelled_mask[0,0]
+#         bottomleftnumber = labelled_mask[0,0]
         bottomrightnumber = labelled_mask[0,nx-1]
         final_bg_mask[labelled_mask == topleftnumber] = False
         final_bg_mask[labelled_mask == toprightnumber] = False
         final_bg_mask[labelled_mask == bottomrightnumber] = False
     
     
-    mat = sparse.coo_matrix((img[final_bg_mask], (y_grid[final_bg_mask], x_grid[final_bg_mask])), shape=(ny, nx))
-    # return mat.tocsr()
+    mat = sparse.coo_matrix((np.squeeze(np.array(img[final_bg_mask])), (y_grid[final_bg_mask], x_grid[final_bg_mask])), shape=(ny, nx))
+#     return mat.tocsr()
     
     if timit:
         print('Elapsed time: ',time.time() - start_time,' seconds')
@@ -196,12 +193,13 @@ def extract_background(img, P_id, slit_height=25, return_mask=False, exclude_top
 
 
 
-def fit_background(bg, deg=5, return_full=True, timit=False):
+def fit_background(bg, deg=5, clip=10, return_full=True, timit=False):
     """ 
     
     INPUT:
     'bg'                      : sparse matrix containing the inter-order regions of the 2D image
     'deg'                     : the order of the polynomials to use in the fit (for both dimensions)
+    'clip'                    : threshold for sigma clipping (needed to get rid of hot pixels etc)
     'return_full'             : boolean - if TRUE, then the full image of the background model is returned; otherwise just the set of coefficients that describe it
     'timit'                   : time it...
     
@@ -216,29 +214,35 @@ def fit_background(bg, deg=5, return_full=True, timit=False):
     if timit:
         start_time = time.time()
         
-    #find the non-zero parts of the sparse matrix
-    #format is:
-    #contents[0] = row indices
-    #contents[1] = column indices
-    #contents[2] = values
+    # find the non-zero parts of the sparse matrix
+    # format is:
+    # contents[0] = row indices, ie y-values
+    # contents[1] = column indices, ie x-values
+    # contents[2] = values
     contents = sparse.find(bg)
     
     ny, nx = bg.todense().shape
     
-    #re-normalize to [-1,+1] - otherwise small errors in parms have huge effects
-    x_norm = (contents[0] / ((nx-1)/2.)) - 1.
-    y_norm = (contents[1] / ((ny-1)/2.)) - 1.
-    z = contents[2]
+    # perform sigma-clipping to get rid of hot pixels etc
+    z_clean, goodix, badix = sigma_clip(contents[2], clip, return_indices=True)
+    
+    # re-normalize to [-1,+1] - otherwise small errors in parms have huge effects
+#     x_norm = (contents[0] / ((nx-1)/2.)) - 1.
+#     y_norm = (contents[1] / ((ny-1)/2.)) - 1.
+#     z = contents[2]
+    y_norm = (contents[0][goodix] / ((nx-1)/2.)) - 1.
+    x_norm = (contents[1][goodix] / ((ny-1)/2.)) - 1.
+#     z_clean_2 = contents[2][goodix]   # I double-checked and it really is the same as output from sigma_clip!!!
     
     
-    #m = polyfit2d(contents[0]-int(ny/2), contents[1]-int(nx/2), contents[2], order=deg)
-    coeffs = polyfit2d(x_norm, y_norm, z, order=deg)
-    #The result (m) is an array of the polynomial coefficients in the model f  = sum_i sum_j a_ij x^i y^j, 
-    #eg:    m = [a00,a01,a02,a03,a10,a11,a12,a13,a20,.....,a33] for order=3
+#     m = polyfit2d(contents[0]-int(ny/2), contents[1]-int(nx/2), contents[2], order=deg)
+    coeffs = polyfit2d(x_norm, y_norm, z_clean, order=deg)
+    # The result (m) is an array of the polynomial coefficients in the model f  = sum_i sum_j a_ij x^i y^j, 
+    # eg:    m = [a00,a01,a02,a03,a10,a11,a12,a13,a20,.....,a33] for order=3
     
     
     if timit:
-        print('Time taken for fitting background model: '+np.round(time.time() - start_time,2).astype(str)+' seconds...')
+        print('Time taken for fitting background model: ' + np.round(time.time() - start_time, 2).astype(str) + ' seconds...')
         start_time_2 = time.time()
     
     if return_full:
@@ -247,12 +251,13 @@ def fit_background(bg, deg=5, return_full=True, timit=False):
         yy = np.arange(ny)
         yyn = (yy / ((ny-1)/2.)) - 1.
         X,Y = np.meshgrid(xxn,yyn)
-        #bkgd_img = polyval2d(X,Y,coeffs)
-        bkgd_img = polyval2d(Y,X,coeffs)    #IDKY, but the indices are the wrong way around if I do it like in the line above!!!!! 
+        bkgd_img = polyval2d(X,Y,coeffs)
+#         bkgd_img = polyval2d(Y,X,coeffs)    # IDKY, but the indices are the wrong way around if I do it like in the line above!!!!! 
+#         Ha!!! I know why! I had x_norm and y_norm mixed up above...
     
     if timit:
-        print('Time taken for constructing full background image: '+np.round(time.time() - start_time_2,2).astype(str)+' seconds...')
-        print('Total time elapsed: '+np.round(time.time() - start_time,2).astype(str)+' seconds...')
+        print('Time taken for constructing full background image: ' + np.round(time.time() - start_time_2, 2).astype(str) + ' seconds...')
+        print('Total time elapsed: ' + np.round(time.time() - start_time, 2).astype(str) + ' seconds...')
     
     if return_full:
         return coeffs, bkgd_img
@@ -263,13 +268,14 @@ def fit_background(bg, deg=5, return_full=True, timit=False):
  
  
  
-def fit_background_astropy(bg, poly_deg=5, polytype='chebyshev', return_full=True, timit=False):
+def fit_background_astropy(bg, poly_deg=5, clip=10, polytype='chebyshev', return_full=True, timit=False):
     """ 
     WARNING: While this works just fine, it is MUCH MUCH slower than 'fit_background' above. The astropy fitting/modelling must be to blame...
     
     INPUT:
     'bg'               : sparse matrix containing the inter-order regions of the 2D image
     'poly_deg'         : the order of the polynomials to use in the fit (for both dimensions)
+    'clip'             : threshold for sigma clipping (needed to get rid of hot pixels etc)
     'polytype'         : either 'polynomial' (default), 'legendre', or 'chebyshev' are accepted
     'return_full'      : boolean - if TRUE, then the background model for each pixel for each order is returned; otherwise just the set of coefficients that describe it
     'timit'            : time it...
@@ -289,22 +295,28 @@ def fit_background_astropy(bg, poly_deg=5, polytype='chebyshev', return_full=Tru
     if timit:
         start_time = time.time()
     
-    #find the non-zero parts of the sparse matrix
-    #format is:
-    #contents[0] = row indices
-    #contents[1] = column indices
-    #contents[2] = values
+    # find the non-zero parts of the sparse matrix
+    # format is:
+    # contents[0] = row indices, ie y-values
+    # contents[1] = column indices, ie x-values
+    # contents[2] = values
     contents = sparse.find(bg)
     
     ny, nx = bg.todense().shape
     
-    #re-normalize arrays to [-1,+1]    
-    x_norm = (contents[0] / ((nx-1)/2.)) - 1.
-    y_norm = (contents[1] / ((ny-1)/2.)) - 1.
-    z = contents[2]
+    # perform sigma-clipping to get rid of hot pixels etc
+    z_clean, goodix, badix = sigma_clip(contents[2], clip, return_indices=True)
+    
+    # re-normalize to [-1,+1] - otherwise small errors in parms have huge effects
+#     x_norm = (contents[0] / ((nx-1)/2.)) - 1.
+#     y_norm = (contents[1] / ((ny-1)/2.)) - 1.
+#     z = contents[2]
+    y_norm = (contents[0][goodix] / ((nx-1)/2.)) - 1.
+    x_norm = (contents[1][goodix] / ((ny-1)/2.)) - 1.
+#     z_clean_2 = contents[2][goodix]   # I double-checked and it really is the same as output from sigma_clip!!!
            
-    #call the surface fitting routine
-    bkgd_coeffs = fit_poly_surface_2D(x_norm, y_norm, z, weights=None, polytype = polytype, poly_deg=poly_deg)    
+    # call the surface fitting routine
+    bkgd_coeffs = fit_poly_surface_2D(x_norm, y_norm, z_clean, weights=None, polytype = polytype, poly_deg=poly_deg)    
 #     cheb_coeffs = fit_poly_surface_2D(x_norm, y_norm, z, weights=None, polytype = 'c', poly_deg=3, timit=True)  
 #     lege_coeffs = fit_poly_surface_2D(x_norm, y_norm, z, weights=None, polytype = 'l', poly_deg=3, timit=True)  
 #     poly_coeffs = fit_poly_surface_2D(x_norm, y_norm, z, weights=None, polytype = 'p', poly_deg=3, timit=True)
@@ -315,8 +327,9 @@ def fit_background_astropy(bg, poly_deg=5, polytype='chebyshev', return_full=Tru
         yy = np.arange(ny)
         yyn = (yy / ((ny-1)/2.)) - 1.
         X,Y = np.meshgrid(xxn,yyn)
-        #bkgd_img = bkgd_coeffs(X,Y)
-        bkgd_img = bkgd_coeffs(Y,X)     #IDKY, but the indices are the wrong way around if I do it like in the line above!!!!!
+        bkgd_img = bkgd_coeffs(X,Y)
+#         bkgd_img = bkgd_coeffs(Y,X)     #IDKY, but the indices are the wrong way around if I do it like in the line above!!!!!
+#         Ha!!! I know why! I had x_norm and y_norm mixed up above...
 
     if timit:
         print('Time elapsed: '+np.round(time.time() - start_time,2).astype(str)+' seconds...')    

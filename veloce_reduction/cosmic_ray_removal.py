@@ -10,6 +10,9 @@ import time
 import scipy.interpolate as ipol
 import astropy.io.fits as pyfits
 from scipy.signal import medfilt
+import matplotlib.pyplot as plt
+
+from veloce_reduction.veloce_reduction.helper_functions import sigma_clip
 
 # imgname = '/Users/christoph/UNSW/cosmics/image.fit'
 # img = pyfits.getdata(imgname)
@@ -28,6 +31,7 @@ def median_remove_cosmics(img_list, main_index=0, scales=None, ronmask=None, thr
     "file_list"  - list of filenames of all exposures for a given epoch of a star
 
     TODO:
+    how to deal with changing relints??? read paper by Croke 1995 PASP 107:1255
     use the overall scaling for the master white as well!?!?!?
     """
 
@@ -106,7 +110,7 @@ def median_remove_cosmics(img_list, main_index=0, scales=None, ronmask=None, thr
     # "grow" the cosmics by 1 pixel in each direction (as in LACosmic)
     growkernel = np.ones((3, 3))
     extended_cosmics = np.cast['bool'](ndimage.convolve(np.cast['float32'](cosmics), growkernel))
-    cosmic_edges = np.logical_or(cosmics, extended_cosmics)
+    cosmic_edges = np.logical_xor(cosmics, extended_cosmics)
     # now check only for these pixels surrounding the cosmics whether they are affected (but use lower threshold)
     bad_edges = np.logical_and(diff_img > low_thresh * med_sig_arr, cosmic_edges)
 
@@ -124,17 +128,57 @@ def median_remove_cosmics(img_list, main_index=0, scales=None, ronmask=None, thr
 
 
 
-
-def onedim_medfilt_cosmic_ray_removal(f, err, w=15, thresh=8., debug_level=0):
+def onedim_medfilt_cosmic_ray_removal(f, err, thresh=5., low_thresh=3., w=31, maxfilter_size=250, gauss_filter_sigma=15, debug_level=0):
+    
     f_clean = f.copy()
     f_sm = medfilt(f, w)
     err_sm = medfilt(err, w)
-    badix = (f - f_sm) / err_sm > thresh
+    cont_rough = ndimage.gaussian_filter(ndimage.maximum_filter(medfilt(f, w), size=maxfilter_size), gauss_filter_sigma)
+    # we also need to adjust the threshold according to the normalized scatter of f - f_sm
+    dum = (f - f_sm) / err_sm
+    scatter = np.std(sigma_clip(dum, 3))
+#     cosmics = (f - f_sm) / err_sm > thresh
+#     cosmics = (f - f_sm) / err_sm > thresh * scatter
+#     cosmics = (f - f_sm) / err_sm > thresh * np.max([1,scatter])
+    cosmics = ((f - f_sm) / err_sm > thresh * scatter) & (f > cont_rough)
+    f_clean[cosmics] = f_sm[cosmics]
+    
+    # "grow" the cosmics by 1 pixel in each direction (as in LACosmic)
+    growkernel = np.ones(3)
+    extended_cosmics = np.cast['bool'](ndimage.convolve(np.cast['float32'](cosmics), growkernel))
+    cosmic_edges = np.logical_xor(cosmics, extended_cosmics)
+    
+    # now check only for these pixels surrounding the cosmics whether they are affected (but use lower threshold)
+#     bad_edges = np.logical_and((f - f_sm) / err_sm > low_thresh, cosmic_edges)
+    bad_edges = np.logical_and((f - f_sm) / err_sm > low_thresh * scatter, cosmic_edges)
+#     bad_edges = np.logical_and((f - f_sm) / err_sm > low_thresh * np.max([1,scatter]), cosmic_edges)
+    f_clean[bad_edges] = f_sm[bad_edges]
+    
+    ncos = np.sum(cosmics) + np.sum(bad_edges)
+    
+    return f_clean, ncos
+
+
+
+
+
+def old_onedim_medfilt_cosmic_ray_removal(f, err, w=31, thresh=5., low_thresh=3., debug_level=0):
+    f_clean = f.copy()
+    f_sm = medfilt(f, w)
+    err_sm = medfilt(err, w)
+    cosmics = (f - f_sm) / err_sm > thresh
     if debug_level >= 1:
-        print('Number of bad pixels found: ', np.sum(badix))
-        plt.plot(badix * 1e5, color='orange')
+        print('Number of bad pixels found: ', np.sum(cosmics))
+        plt.plot(cosmics * 1e5, color='orange')
         plt.plot(f - f_sm, 'b-')
-    f_clean[badix] = f_sm[badix]
+    f_clean[cosmics] = f_sm[cosmics]
+    # "grow" the cosmics by 1 pixel in each direction (as in LACosmic)
+    growkernel = np.ones(3)
+    extended_cosmics = np.cast['bool'](ndimage.convolve(np.cast['float32'](cosmics), growkernel))
+    cosmic_edges = np.logical_xor(cosmics, extended_cosmics)
+    # now check only for these pixels surrounding the cosmics whether they are affected (but use lower threshold)
+    bad_edges = np.logical_and((f - f_sm) / err_sm > low_thresh, cosmic_edges)
+    f_clean[bad_edges] = f_sm[bad_edges]
     return f_clean
 
 

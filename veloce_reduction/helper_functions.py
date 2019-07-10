@@ -913,7 +913,7 @@ def sigma_clip(x, tl, th=None, centre='median', return_indices=False):
     implement return_indices keyword
     """
     
-    #make sure both boundaries are defined
+    # make sure both boundaries are defined
     if th is None:
         th = tl
     
@@ -922,7 +922,7 @@ def sigma_clip(x, tl, th=None, centre='median', return_indices=False):
     all_indices = np.arange(len(x))
     indices = np.arange(len(x))
     badix = []
-    #goodix = np.ones(len(x),dtype='bool')
+#     goodix = np.ones(len(x),dtype='bool')
     
     while True:    
         rms = np.std(clipped)
@@ -940,8 +940,8 @@ def sigma_clip(x, tl, th=None, centre='median', return_indices=False):
             break
         else:
             clipped = clipped[new_goodix]
-            badix = np.r_[badix,indices[~new_goodix]]
-            #badix.append(indices[~new_goodix])
+            badix = np.r_[badix, indices[~new_goodix]]
+#             badix.append(indices[~new_goodix])
             indices = indices[new_goodix]
 
     if return_indices:
@@ -1240,6 +1240,7 @@ def wsv(data, err):
     Finds the weighted sample variance of an array given it's uncertainties
     """
     return 1
+
 
 
 def xcorr(x, y, scale='none'):
