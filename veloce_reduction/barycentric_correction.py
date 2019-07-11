@@ -120,7 +120,7 @@ def get_barycentric_correction(fn, rvabs=None, obs_path='/Users/christoph/OneDri
     # bc = barycorrpy.get_BC_vel(JDUTC=utmjd, ra=ra, dec=dec, pmra=pmra, pmdec=pmdec,
     #                            px=px, rv=rv, obsname='AAO', ephemeris='de430')
 
-    return bc[0][0]
+    return bc[0][0][0]
 
 
 

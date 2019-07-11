@@ -194,7 +194,7 @@ def deblaze_orders(f, smoothed_flat, mask, err=None, wl=None, degpol=1, gauss_fi
         # loop over all orders
         for o in range(f.shape[0]):
             
-            if (not skip_first_order) or (o>0):
+            if (not skip_first_order) or (o > 0):
             
                 # make sure that they are either quick-extracted spectra (order, pixel), or optimal-extracted spectra (order, fibre, pixel)
                 assert len(f.shape) in [2,3], 'ERROR: shape of flat not recognized!!!'

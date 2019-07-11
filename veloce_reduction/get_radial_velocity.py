@@ -344,20 +344,13 @@ def get_RV_from_xcorr_2(f, wl, f0, wl0, bc=0, bc0=0, mask=None, smoothed_flat=No
 
     # make cross-correlation functions (list of length n_orders used)
     if not old_ccf:
-        xcs = make_ccfs(f, wl, f0, wl0, bc=bc, bc0=bc0, smoothed_flat=smoothed_flat, delta_log_wl=1e-6, flipped=False, individual_fibres=individual_fibres, 
+        xcs = make_ccfs(f, wl, f0, wl0, bc=bc, bc0=bc0, smoothed_flat=smoothed_flat, delta_log_wl=1e-6, flipped=flipped, individual_fibres=individual_fibres, 
                         synthetic_template=synthetic_template, debug_level=debug_level, timit=timit)
     else:
-        xcs = old_make_ccfs(f, wl, f0, wl0, bc=bc, bc0=bc0, mask=mask, smoothed_flat=smoothed_flat, delta_log_wl=delta_log_wl, relgrid=False,
+        xcs = old_make_ccfs(f, wl, f0, wl0, bc=bc, bc0=bc0, mask=mask, smoothed_flat=smoothed_flat, delta_log_wl=delta_log_wl, relgrid=False, osf=osf,
                             flipped=flipped, individual_fibres=individual_fibres, synthetic_template=synthetic_template, debug_level=debug_level, timit=timit)
 
-    # now fit Gaussian to central section of CCF for that order
-    if relgrid:
-        fitrangesize = osf * 6  # this factor was simply eye-balled
-    else:
-        # fitrangesize = 30
-        # fitrangesize = int(np.round(0.0036 * len(xc) / 2. - 1, 0))  # this factor was simply eye-balled
-        fitrangesize = fitrange
-
+    
     if individual_fibres:
 
         # make array only containing the central parts of the CCFs (which can have different total lengths) for fitting
@@ -387,7 +380,16 @@ def get_RV_from_xcorr_2(f, wl, f0, wl0, bc=0, bc0=0, mask=None, smoothed_flat=No
                 if debug_level >= 3:
                     print('order = ', o, ' ; fibre = ', f)
                 xc = xcarr[o, f, :]
-                xrange = np.arange(np.argmax(xc) - fitrangesize, np.argmax(xc) + fitrangesize + 1, 1)
+                
+                # find peaks (the highest of which we assume is the real one we want) in case the delta-rvabs is non-zero
+                peaks = np.r_[True, xc[1:] > xc[:-1]] & np.r_[xc[:-1] > xc[1:], True]
+                # filter out maxima too close to the edges to avoid problems
+                peaks[:5] = False
+                peaks[-5:] = False
+                guessloc = np.argmax(xc*peaks)
+                xrange = np.arange(guessloc - fitrange, guessloc + fitrange + 1, 1)
+#                 xrange = np.arange(np.argmax(xc) - fitrange, np.argmax(xc) + fitrange + 1, 1)
+                
                 # parameters: mu, sigma, amp, beta, offset, slope
                 guess = np.array((np.argmax(xc), 15, np.max(xc) - np.min(xc), 2., np.min(xc), 0.))
                 try:
@@ -428,16 +430,30 @@ def get_RV_from_xcorr_2(f, wl, f0, wl0, bc=0, bc0=0, mask=None, smoothed_flat=No
         for o in range(xcarr.shape[0]):
             xc = xcarr[o, :]
             # want to fit a symmetric region around the peak, not around the "centre" of the xc
-            # TODO: find peaks first in case the delta-rvabs is non-zero
-            xrange = np.arange(np.argmax(xc) - fitrangesize, np.argmax(xc) + fitrangesize + 1, 1)
+            
+            # find peaks (the highest of which we assume is the real one we want) in case the delta-rvabs is non-zero
+            peaks = np.r_[True, xc[1:] > xc[:-1]] & np.r_[xc[:-1] > xc[1:], True]
+            # filter out maxima too close to the edges to avoid problems
+            peaks[:5] = False
+            peaks[-5:] = False
+            guessloc = np.argmax(xc*peaks)
+            xrange = np.arange(guessloc - fitrange, guessloc + fitrange + 1, 1)
+#           xrange = np.arange(np.argmax(xc) - fitrange, np.argmax(xc) + fitrange + 1, 1)
+            
+            # make sure we have a dynamic range
+            xc -= np.min(xc[xrange])
+            # "normalize" it
+            xc /= np.max(xc)
+            xc *= 0.9
+            xc += 0.1
+            
             if fit_slope:
                 # parameters: mu, sigma, amp, beta, offset, slope
-                guess = np.array([len(xc) // 2, 10, (xc[np.argmax(xc)] - xc[np.argmax(xc) - fitrangesize]), 2.,
-                                  -(1. / 6.) * (xc[np.argmax(xc)] - xc[np.argmax(xc) - fitrangesize]), 0.])
+                guess = np.array([guessloc, fitrange//3, 0.9, 2., np.min(xc[xrange]), 0.])
+                
                 try:
                     # subtract the minimum of the fitrange so as to have a "dynamic range"
-                    popt, pcov = op.curve_fit(gausslike_with_amp_and_offset_and_slope, xrange,
-                                              xc[xrange] - np.min(xc[xrange]), p0=guess, maxfev=1000000)
+                    popt, pcov = op.curve_fit(gausslike_with_amp_and_offset_and_slope, xrange, xc[xrange], p0=guess, maxfev=1000000)
                     mu = popt[0]
                     mu_err = pcov[0, 0]
                     if debug_level >= 1:
@@ -449,13 +465,11 @@ def get_RV_from_xcorr_2(f, wl, f0, wl0, bc=0, bc0=0, mask=None, smoothed_flat=No
             else:
                 print('latest version OK')
                 # parameters: mu, sigma, amp, beta, offset
-#                 guess = np.array([np.argmax(xc), 10, (xc[np.argmax(xc)] - xc[np.argmax(xc) - fitrangesize]), 2., -(1./6.)*(xc[np.argmax(xc)] - xc[np.argmax(xc) - fitrangesize])])
-                guess = np.array([np.argmax(xc), 10, (xc[np.argmax(xc)] - xc[np.argmax(xc) - fitrangesize]), 2., xc[np.argmax(xc) - fitrangesize]])
+                guess = np.array([guessloc, fitrange//3, 0.9, 2., np.min(xc[xrange])])
 
                 try:
                     # subtract the minimum of the fitrange so as to have a "dynamic range"
-                    popt, pcov = op.curve_fit(gausslike_with_amp_and_offset, xrange, xc[xrange] - np.min(xc[xrange]),
-                                              p0=guess, maxfev=1000000)
+                    popt, pcov = op.curve_fit(gausslike_with_amp_and_offset, xrange, xc[xrange], p0=guess, maxfev=1000000)
                     mu = popt[0]
                     mu_err = np.sqrt(pcov[0, 0])
                     if debug_level >= 1:
@@ -565,7 +579,7 @@ def make_ccfs(f, wl, f0, wl0, bc=0., bc0=0., smoothed_flat=None, delta_log_wl=1e
 
     # read min and max of the wl ranges for the logwlgrid for the xcorr
     # HARD-CODED...UGLY!!!
-    dumord, min_wl_arr, max_wl_arr = readcol('/Users/christoph/OneDrive - UNSW/dispsol/veloce_xcorr_wlrange.txt', twod=False)
+    dumord, min_wl_arr, max_wl_arr = readcol('/Users/christoph/OneDrive - UNSW/dispsol/veloce_xcorr_wlrange.txt', twod=False, verbose=False)
 
     # prepare output variable
     xcs = []
@@ -609,7 +623,7 @@ def make_ccfs(f, wl, f0, wl0, bc=0., bc0=0., smoothed_flat=None, delta_log_wl=1e
         if (np.diff(logwl) < 0).any():
             logwl_sorted = logwl[:,::-1].copy()
             ord_f_sorted = f[o,:,::-1].copy()
-            ord_blaze_sorted = smoothed_flat[o,:,:-1].copy()
+            ord_blaze_sorted = smoothed_flat[o,:,::-1].copy()
             # ordmask_sorted = ordmask[::-1].copy()
             if not synthetic_template:
                 logwl0_sorted = logwl0[:,::-1].copy()
@@ -651,21 +665,23 @@ def make_ccfs(f, wl, f0, wl0, bc=0., bc0=0., smoothed_flat=None, delta_log_wl=1e
             ord_xcs = []
             for fib in range(n_fib):
                 if not flipped:
-                    xc = xcorr((rebinned_f0[fib,:] - 1.)*rebinned_blaze[fib,:], rebinned_f[fib,:] - 1., scale='unbiased')
+                    xc = xcorr(((rebinned_f0[fib,:]/np.max(rebinned_f0[fib,:])) - 1.)*(rebinned_blaze[fib,:]/np.max(rebinned_blaze[fib,:])), (rebinned_f[fib,:]/np.max(rebinned_f[fib,:])) - 1., scale='unbiased')
 #                     xc = np.correlate(rebinned_f0[fib, :], rebinned_f[fib, :], mode='full')
                 else:
-                    xc = xcorr(rebinned_f[fib,:] - 1., (rebinned_f0[fib,:] - 1.)*rebinned_blaze[fib,:], scale='unbiased')
+                    xc = xcorr((rebinned_f[fib,:]/np.max(rebinned_f[fib,:])) - 1., ((rebinned_f0[fib,:]/np.max(rebinned_f0[fib,:])) - 1.)*(rebinned_blaze[fib,:]/np.max(rebinned_blaze[fib,:])), scale='unbiased')
 #                     xc = np.correlate(rebinned_f[fib, :], rebinned_f0[fib, :], mode='full')
                 ord_xcs.append(xc)
             xcs.append(ord_xcs)
         else:
             rebinned_f = np.sum(rebinned_f, axis=0)
+            rebinned_f /= np.max(rebinned_f)
             rebinned_f0 = np.sum(rebinned_f0, axis=0)
+            rebinned_f0 /= np.max(rebinned_f0)
             if blaze_provided:
                 rebinned_blaze = np.sum(rebinned_blaze, axis=0)
+                rebinned_blaze /= np.max(rebinned_blaze)
             else:
                 rebinned_blaze = np.ones(rebinned_f.shape)
-            # xc = np.correlate(rebinned_f0 - np.median(rebinned_f0), rebinned_f - np.median(rebinned_f), mode='full')
             if not flipped:
                 xc = xcorr((rebinned_f0 - 1.)*rebinned_blaze, rebinned_f - 1., scale='unbiased')
 #                 xc = np.correlate(rebinned_f0, rebinned_f, mode='full')

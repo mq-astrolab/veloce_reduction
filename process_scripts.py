@@ -17,6 +17,7 @@ from veloce_reduction.veloce_reduction.order_tracing import extract_stripes
 from veloce_reduction.veloce_reduction.extraction import extract_spectrum, extract_spectrum_from_indices
 from veloce_reduction.veloce_reduction.relative_intensities import get_relints, get_relints_from_indices, append_relints_to_FITS
 from veloce_reduction.veloce_reduction.get_info_from_headers import get_obs_coords_from_header
+from veloce_reduction.veloce_reduction.barycentric_correction import get_barycentric_correction
 
 
 
@@ -88,7 +89,7 @@ def process_whites(white_list, MB=None, ronmask=None, MD=None, gain=None, scalab
     # loop over all files in "white_list"; correct for bias and darks on the fly
     for n,fn in enumerate(sorted(white_list)):
         if debug_level >=1:
-            print('Now processing file: '+str(fn))
+            print('Now processing file ' + str(n+1) + '/' + str(len(white_list)) + '   (' + fn + ')')
 
         # call routine that does all the bias and dark correction stuff and converts from ADU to e-
         if scalable:
@@ -103,11 +104,10 @@ def process_whites(white_list, MB=None, ronmask=None, MD=None, gain=None, scalab
         if debug_level >=2:
             print('min(img) = ' + str(np.min(img)))
         allimg.append(img)
-#         allerr.append(err)
-#         allerr.append( np.sqrt(img + ronmask*ronmask) )   # [e-]
-        # dumb fix for negative pixel values that can occur, if we haven't masked out bad pixels yet
-        allerr.append( np.sqrt(np.abs(img) + ronmask*ronmask) )   # [e-]
-
+#         err_img = np.sqrt(img + ronmask*ronmask)   # [e-]
+        # TEMPFIX: (how should I be doing this properly???)
+        err_img = np.sqrt(np.clip(img,0,None) + ronmask*ronmask)   # [e-]
+        allerr.append(err_img)
 
     # list of individual exposure times for all whites (should all be the same, but just in case...)
     texp_list = [pyfits.getval(file, 'ELAPSED') for file in white_list]
@@ -339,7 +339,7 @@ def process_science_images(imglist, P_id, mask=None, sampling_size=25, slit_heig
             lamp_config = 'both'
         texp = pyfits.getval(filename, 'ELAPSED')
 
-        # (1) call routine that does all the bias and dark correction stuff and proper error treatment
+        # (1) call routine that does all the overscan-, bias- & dark-correction stuff and proper error treatment
         img = correct_for_bias_and_dark_from_filename(filename, MB, MD, gain=gain, scalable=scalable, savefile=saveall, path=path)   # [e-]
         #err = np.sqrt(img + ronmask*ronmask)   # [e-]
         #TEMPFIX: (how should I be doing this properly???)
@@ -350,11 +350,11 @@ def process_science_images(imglist, P_id, mask=None, sampling_size=25, slit_heig
         if len(epoch_sublists[lamp_config]) == 1:
             # do it the hard way using LACosmic
             # identify and extract background
-            bg_raw = extract_background(img, P_id, slit_height=slit_height, exclude_top_and_bottom=True, timit=timit)
+            bg_raw = extract_background(img, P_id, slit_height=30, exclude_top_and_bottom=True, timit=timit)
             # remove cosmics, but only from background
             cosmic_cleaned_img = remove_cosmics(bg_raw.todense(), ronmask, obsname, path, Flim=3.0, siglim=5.0, maxiter=1, savemask=False, savefile=False, save_err=False, verbose=True, timit=True)   # [e-]
             # identify and extract background from cosmic-cleaned image
-            bg = extract_background(cosmic_cleaned_img, P_id, slit_height=slit_height, exclude_top_and_bottom=True, timit=timit)
+            bg = extract_background(cosmic_cleaned_img, P_id, slit_height=30, exclude_top_and_bottom=True, timit=timit)
             # fit background
             bg_coeffs, bg_img = fit_background(bg, clip=10, return_full=True, timit=timit)
         elif len(epoch_sublists[lamp_config]) == 2:
@@ -366,7 +366,7 @@ def process_science_images(imglist, P_id, mask=None, sampling_size=25, slit_heig
             img2 = correct_for_bias_and_dark_from_filename(epoch_sublists[lamp_config][1], MB, MD, gain=gain, scalable=scalable, savefile=False)
             min_img = np.minimum(img1/tscale[0], img2/tscale[1])
             # identify and extract background
-            bg = extract_background(min_img, P_id, slit_height=slit_height, exclude_top_and_bottom=True, timit=timit)
+            bg = extract_background(min_img, P_id, slit_height=30, exclude_top_and_bottom=True, timit=timit)
             del min_img
             # fit background
             bg_coeffs, bg_img = fit_background(bg, clip=10, return_full=True, timit=timit)
@@ -384,7 +384,7 @@ def process_science_images(imglist, P_id, mask=None, sampling_size=25, slit_heig
             med_img = np.median(np.array(img_list) / tscale.reshape(len(img_list), 1, 1), axis=0)
             del img_list
             # identify and extract background
-            bg = extract_background(med_img, P_id, slit_height=slit_height, exclude_top_and_bottom=True, timit=timit)
+            bg = extract_background(med_img, P_id, slit_height=30, exclude_top_and_bottom=True, timit=timit)
             del med_img
             # fit background
             bg_coeffs, bg_img = fit_background(bg, clip=10, return_full=True, timit=timit)
@@ -405,7 +405,7 @@ def process_science_images(imglist, P_id, mask=None, sampling_size=25, slit_heig
         # (4) remove pixel-to-pixel sensitivity variations (2-dim)
         #XXXXXXXXXXXXXXXXXXXXXXXXXXX
         #TEMPFIX
-        # final_img = bg_corrected_img.copy()   # [e-]
+        final_img = bg_corrected_img.copy()   # [e-]
 #         final_img = img.copy()   # [e-]
         #adjust errors?
         
@@ -436,19 +436,18 @@ def process_science_images(imglist, P_id, mask=None, sampling_size=25, slit_heig
 #         #XXXXX
 
 
-        # # (9) get barycentric correction
-        # bc = get_barycentric_correction(filename)
-        # outfn = path + obsname + '_extracted.fits'
-        # pyfits.setval(filename, 'BARYCORR', value=bc, comment='barycentric velocity correction [m/s]')
+        # (9) get barycentric correction
+        bc = get_barycentric_correction(filename)
+        bc = np.round(bc,2)
+        obj = pyfits.getval(filename, 'OBJECT')
+        outfn_list = glob.glob(path + '*' + obsname + '*extracted*')
+        for outfn in outfn_list:
+            pyfits.setval(outfn, 'BARYCORR', value=bc, comment='barycentric velocity correction [m/s]')
 
-#         lat, long, alt = get_obs_coords_from_header(fn)    # not really necessary, obsname='AAO' does the trick (agree to within ~0.01 cm/s!!!
-#         utmjd = pyfits.getval(fn, 'UTMJD') + 2.4e6
-#         ra = pyfits.getval(fn, 'MEANRA')
-#         dec = pyfits.getval(fn, 'MEANDEC')
-#         # HMMM...using hip_id=xxx and actual coordinates from header makes a huge difference (~11m/s for the tau Ceti example I tried)!!!
+# HMMM...using hip_id=xxx and actual coordinates from header makes a huge difference (~11m/s for the tau Ceti example I tried)!!!
 #         bc1 = barycorrpy.get_BC_vel(JDUTC=utmjd, hip_id=8102, obsname='AAO', ephemeris='de430')
 #         bc2 = barycorrpy.get_BC_vel(JDUTC=utmjd, ra=ra, dec=dec, obsname='AAO', ephemeris='de430')
-#
+
 #         #now append relints, wl-solution, and barycorr to extracted FITS file header
 #         outfn = path + obsname + '_extracted.fits'
 #         if os.path.isfile(outfn):
@@ -456,8 +455,7 @@ def process_science_images(imglist, P_id, mask=None, sampling_size=25, slit_heig
 #             dum = append_relints_to_FITS(relints, outfn, nfib=19)
 #             #wavelength solution
 #             #pyfits.setval(fn, 'RELINT' + str(i + 1).zfill(2), value=relints[i], comment='fibre #' + str(fibnums[i]) + ' - ' + fibinfo[i] + ' fibre')
-#             #barycentric correction
-#             pyfits.setval(outfn, 'BARYCORR', value=np.array(bc[0])[0], comment='barycentric correction [m/s]')
+
 
 
     if timit:
