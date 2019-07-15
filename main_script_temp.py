@@ -155,7 +155,8 @@ pix,flux,err = extract_spectrum_from_indices(MW, err_MW, MW_indices, method='opt
 # fp2 = fit_profiles_from_indices(P_id, MW, err_MW, MW_stripe_indices, mask=mask, stacking=True, slit_height=5, model='gausslike', return_stats=True, timit=True)
 # ###
 
-
+# create and save chipmask
+chipmask = make_chipmask('30033003', timit=True)
 
 ### (4) PROCESS SCIENCE IMAGES
 # figure out the configuration of the calibration lamps for the ARC exposures

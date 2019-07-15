@@ -4,8 +4,9 @@ Created on 8 Oct. 2018
 @author: christoph
 '''
 import numpy as np
-from scipy.ndimage import label
 import time
+from scipy.ndimage import label
+
 
 
 # fibparms = np.load('/Users/christoph/OneDrive - UNSW/fibre_profiles/fibre_profile_fits_20180925.npy').item()
@@ -218,7 +219,14 @@ def get_mean_fibre_separation(fibparms, nx=4112, nfib=24):
     return meansep
 
 
-def make_chipmask(date, savefile=True):
+
+def make_chipmask(date, savefile=True, timit=False):
+
+    print('Creating chipmask for ' + date + '...')
+
+    if timit:
+        start_time = time.time()
+
     object_list = ['stellar', 'sky2', 'sky3', 'thxe', 'lfc', 'bg']
 
     chipmask = {}
@@ -243,5 +251,8 @@ def make_chipmask(date, savefile=True):
 
     if savefile:
         np.save(outpath + 'chipmask_' + date + '.npy', chipmask)
+
+    if timit:
+        print('Time elapsed: ' + str(np.round(time.time() - start_time, 1)) + ' seconds')
 
     return chipmask
