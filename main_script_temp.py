@@ -16,12 +16,14 @@ import astropy.io.fits as pyfits
 import numpy as np
 import datetime
 import copy
+import os
 
 from veloce_reduction.veloce_reduction.get_info_from_headers import get_obstype_lists
 from veloce_reduction.veloce_reduction.helper_functions import short_filenames
 from veloce_reduction.veloce_reduction.calibration import get_bias_and_readnoise_from_bias_frames, make_ronmask, make_master_bias_from_coeffs, make_master_dark, correct_orientation, crop_overscan_region
 from veloce_reduction.veloce_reduction.order_tracing import find_stripes, make_P_id, make_mask_dict, extract_stripes
 from veloce_reduction.veloce_reduction.spatial_profiles import fit_profiles, fit_profiles_from_indices
+from veloce_reduction.veloce_reduction.chipmasks import make_chipmask
 from veloce_reduction.veloce_reduction.extraction import *
 from process_scripts import process_whites, process_science_images
 
@@ -34,6 +36,8 @@ date = '20180917'
 path = '/Users/christoph/data/raw_goodonly/' + date + '/'
 
 
+# some housekeeping...
+# check if files exist:
 
 
 
@@ -47,7 +51,7 @@ path = '/Users/christoph/data/raw_goodonly/' + date + '/'
 ###END TEMP###
 acq_list, bias_list, dark_list, flat_list, skyflat_list, domeflat_list, arc_list, thxe_list, laser_list, laser_and_thxe_list, stellar_list, unknown_list = get_obstype_lists(path)
 assert len(unknown_list) == 0, "WARNING: unknown files encountered!!!"
-obsnames = short_filenames(bias_list)
+# obsnames = short_filenames(bias_list)
 dumimg = crop_overscan_region(correct_orientation(pyfits.getdata(bias_list[0])))
 ny,nx = dumimg.shape
 del dumimg
@@ -78,22 +82,38 @@ del dumimg
 # gain = [0.88, 0.93, 0.99, 0.93]   # from "VELOCE_DETECTOR_REPORT_V1.PDF"
 # gain = [1., 1., 1., 1.]
 gain = [1., 1.095, 1.125, 1.]   # eye-balled from extracted flat fields
-# (i) BIAS 
-# get offsets and read-out noise
-#either from bias frames (units: [offsets] = ADUs; [RON] = e-)
-if len(bias_list) > 9:
-    bias_list = sorted(bias_list)[0:9]
-else:
-    bias_list = sorted(bias_list)
-medbias,coeffs,offsets,rons = get_bias_and_readnoise_from_bias_frames(bias_list, degpol=5, clip=5., gain=gain, save_medimg=True, debug_level=1, timit=True)
 
-# create MASTER BIAS frame and read-out noise mask (units = ADUs)
-ronmask = make_ronmask(rons, nx, ny, gain=gain, savefile=True, path=path, timit=True)
+# (i) BIAS and READ NOISE
+# check if MEDIAN BIAS already exists
+choice = 'r'
+if os.path.isfile(path + 'median_bias.fits'):
+    choice = raw_input("MEDIAN BIAS image for " + date + " already exists! Do you want to skip this step or recreate it? ['s' / 'r']")
+if choice.lower() == 's':
+    medbias = pyfits.getdata(path + 'median_bias.fits')
+else:
+    # get offsets and read-out noise from bias frames (units: [offsets] = ADUs; [RON] = e-)
+    if len(bias_list) > 9:
+        bias_list = sorted(bias_list)[0:9]
+    else:
+        bias_list = sorted(bias_list)
+    medbias,coeffs,offsets,rons = get_bias_and_readnoise_from_bias_frames(bias_list, degpol=5, clip=5., gain=gain, save_medimg=True, debug_level=1, timit=True)
+
+# check if read noise mask already exists
+choice = 'r'
+if os.path.isfile(path + 'read_noise_mask.fits'):
+    choice = raw_input("READ NOISE MASK for " + date + " already exists! Do you want to skip this step or recreate it? ['s' / 'r']")
+if choice.lower() == 's':
+    ronmask = pyfits.getdata(path + 'read_noise_mask.fits')
+else:
+    ronmask = make_ronmask(rons, nx, ny, gain=gain, savefile=True, path=path, timit=True)
+
+
+
 # MB = make_master_bias_from_coeffs(coeffs, nx, ny, savefile=True, path=path, timit=True)
 # or
 # MB = offmask.copy()
 # #or
-MB = medbias.copy()
+# MB = medbias.copy()
 #XXXalso save read-noise and offsets for all headers to write later!?!?!?
 
 
@@ -101,33 +121,57 @@ MB = medbias.copy()
 # create (bias-subtracted) MASTER DARK frame (units = electrons)
 # MD = make_master_dark(dark_list, MB=MB, gain=gain, scalable=False, savefile=True, path=path, timit=True)
 # MDS = make_master_dark(dark_list, MB=medbias, gain=gain, scalable=True, savefile=True, path=path, debug_level=1, timit=True)
-MDS = np.zeros(MB.shape)
+MDS = np.zeros(medbias.shape)
+
+
 
 # (iii) WHITES 
 #create (bias- & dark-subtracted) MASTER WHITE frame and corresponding error array (units = electrons)
-MW,err_MW = process_whites(flat_list, MB=medbias, ronmask=ronmask, MD=MDS, gain=gain, scalable=True, fancy=False,
-                           clip=5., savefile=True, saveall=False, diffimg=False, path=path, debug_level=1, timit=False)
+choice_mw = 'r'
+if os.path.isfile(path + 'master_white.fits'):
+    choice_mw = raw_input("MASTER WHITE image for " + date + " already exists! Do you want to skip this step or recreate it? ['s' / 'r']")
+if choice_mw.lower() == 's':
+    MW = pyfits.getdata(path + 'master_white.fits', 0)
+    err_MW = pyfits.getdata(path + 'master_white.fits', 1)
+else:
+    # this is a first iteration without background removal - just so we can do the tracing; then we come back and do it properly later
+    MW,err_MW = process_whites(flat_list, MB=medbias, ronmask=ronmask, MD=MDS, gain=gain, scalable=True, fancy=False, P_id=None,
+                               clip=5., savefile=False, saveall=False, diffimg=False, remove_bg=False, path=path, debug_level=1, timit=False)
 #####################################################################################################################################################
 
 
 
 # (3) ORDER TRACING #################################################################################################################################
-# find rough order locations
-#P,tempmask = find_stripes(MW, deg_polynomial=2, min_peak=0.05, gauss_filter_sigma=3., simu=False)
-P,tempmask = find_stripes(MW, deg_polynomial=2, min_peak=0.05, gauss_filter_sigma=10., simu=False, maskthresh = 400)
-# if the bad pixel column is found as an order:
-# del P[5]
-# tempmask = tempmask[np.r_[0:5, 6:40],:]
-# assign physical diffraction order numbers (this is only a dummy function for now) to order-fit polynomials and bad-region masks
-P_id_dum = make_P_id(P)
-assert len(P_id_dum) == 39, 'ERROR: not exactly 39 orders found!!!'
-mask = make_mask_dict(tempmask)
-P_id = copy.deepcopy(P_id_dum)
-# for o in P_id.keys():
-#     P_id[o][0] -= 2.
-np.save(path + 'P_id.npy', P_id)
-np.save(path + 'mask.npy', mask)
+choice = 'r'
+if os.path.isfile(path + 'P_id.npy') and os.path.isfile(path + 'mask.npy'):
+    choice = raw_input("ORDER TRACING has already been done for " + date + " ! Do you want to skip this step or recreate it? ['s' / 'r']")
+if choice.lower() == 's':
+    P_id = np.load(path + 'P_id.npy').item()
+    mask = np.load(path + 'mask.npy').item()
+else:
+    # find rough order locations
+    #P,tempmask = find_stripes(MW, deg_polynomial=2, min_peak=0.05, gauss_filter_sigma=3., simu=False)
+    P,tempmask = find_stripes(MW, deg_polynomial=2, min_peak=0.05, gauss_filter_sigma=10., simu=False, maskthresh = 400)
+    # if the bad pixel column is found as an order:
+    # del P[5]
+    # tempmask = tempmask[np.r_[0:5, 6:40],:]
+    # assign physical diffraction order numbers (this is only a dummy function for now) to order-fit polynomials and bad-region masks
+    P_id_dum = make_P_id(P)
+    assert len(P_id_dum) == 39, 'ERROR: not exactly 39 orders found!!!'
+    mask = make_mask_dict(tempmask)
+    P_id = copy.deepcopy(P_id_dum)
+    # for the dates where fibre 8 had a ~20% drop in throughput, do NOT subtract 2
+    if (int(date) <= 20190203) or (int(date) >= 20190619):
+        for o in P_id.keys():
+            P_id[o][0] -= 2.
+    np.save(path + 'P_id.npy', P_id)
+    np.save(path + 'mask.npy', mask)
+    
 
+# now redo the master white properly, incl background removal, and save to file
+if choice_mw.lower() == 'r':
+    MW,err_MW = process_whites(flat_list, MB=medbias, ronmask=ronmask, MD=MDS, gain=gain, scalable=True, fancy=False, P_id=P_id,
+                               clip=5., savefile=True, saveall=False, diffimg=False, remove_bg=True, path=path, debug_level=1, timit=False)
 # extract stripes of user-defined width from the science image, centred on the polynomial fits defined in step (1)
 MW_stripes,MW_indices = extract_stripes(MW, P_id, return_indices=True, slit_height=30)
 pix,flux,err = extract_spectrum_from_indices(MW, err_MW, MW_indices, method='quick', slit_height=30, ronmask=ronmask,
@@ -156,7 +200,7 @@ pix,flux,err = extract_spectrum_from_indices(MW, err_MW, MW_indices, method='opt
 # ###
 
 # create and save chipmask
-chipmask = make_chipmask('30033003', timit=True)
+chipmask = make_chipmask(date, savefile=True, timit=True)
 
 ### (4) PROCESS SCIENCE IMAGES
 # figure out the configuration of the calibration lamps for the ARC exposures
@@ -182,10 +226,10 @@ for file in arc_list:
         
 # (4a) PROCESS ARC IMAGES
 for subl in arc_sublists.keys():
-    dum = process_science_images(arc_sublists[subl], P_id, mask=mask, sampling_size=25, slit_height=30, gain=gain, MB=medbias, ronmask=ronmask, MD=MDS, scalable=True,
+    dum = process_science_images(arc_sublists[subl], P_id, chipmask, mask=mask, sampling_size=25, slit_height=30, gain=gain, MB=medbias, ronmask=ronmask, MD=MDS, scalable=True,
                                  saveall=False, path=path, ext_method='optimal', offset='True', slope='True', fibs='all', date=date, from_indices=True, timit=True)
 # (4b) PROCESS STELLAR IMAGES
-dum = process_science_images(stellar_list, P_id, mask=mask, sampling_size=25, slit_height=24, gain=gain, MB=medbias, ronmask=ronmask, MD=MDS, scalable=True, 
+dum = process_science_images(stellar_list, P_id, chipmask, mask=mask, sampling_size=25, slit_height=24, gain=gain, MB=medbias, ronmask=ronmask, MD=MDS, scalable=True, 
                              saveall=False, path=path, ext_method='optimal', offset='True', slope='True', fibs='stellar', date=date, from_indices=True, timit=True)
 
 

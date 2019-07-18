@@ -1029,7 +1029,7 @@ def extract_spectrum(stripes, err_stripes, ron_stripes, method='optimal', indivi
             
         # name of object
         try:
-            starname = pyfits.getval(path+obsname+'.fits', 'OBJECT')
+            starname = pyfits.getval(path + obsname + '.fits', 'OBJECT')
         except:
             starname = ''
                      
@@ -1061,7 +1061,7 @@ def extract_spectrum(stripes, err_stripes, ron_stripes, method='optimal', indivi
                 else:
                     h = pyfits.getheader(path+obsname+'.fits')   
                 #update the header and write to file
-                h['HISTORY'] = '   EXTRACTED SPECTRUM - created '+time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())+' (GMT)'
+                h['HISTORY'] = '   EXTRACTED SPECTRUM - created ' + time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime()) + ' (GMT)'
                 h['METHOD'] = (method, 'extraction method used')
                 topord = sorted(pix.keys())[0]
                 topordnum = int(topord[-2:])
@@ -1078,7 +1078,7 @@ def extract_spectrum(stripes, err_stripes, ron_stripes, method='optimal', indivi
                 pyfits.writeto(outfn, fluxarr, h, clobber=True)    
                 #now append the corresponding error array
                 h_err = h.copy()
-                h_err['HISTORY'] = 'estimated uncertainty in EXTRACTED SPECTRUM - created '+time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())+' (GMT)'
+                h_err['HISTORY'] = 'estimated uncertainty in EXTRACTED SPECTRUM - created ' + time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime()) + ' (GMT)'
                 pyfits.append(outfn, errarr, h_err, clobber=True)
                 
             if filetype in ['dict', 'both']:
@@ -1170,8 +1170,8 @@ def extract_spectrum_from_indices(img, err_img, stripe_indices, ronmask=None, me
     elif method.lower() == 'tramline':
         print('WARNING: need to update tramline finding routine first for new IFU layout - use method="quick" in the meantime')
         return
-        #tramlines = find_tramlines(fibre_profiles_02, fibre_profiles_03, fibre_profiles_21, fibre_profiles_22, mask_02, mask_03, mask_21, mask_22)
-        #pix,flux,err = collapse_extract_from_indices(img, err_img, stripe_indices, tramlines, slit_height=slit_height, verbose=verbose, timit=timit, debug_level=debug_level)
+#         tramlines = find_tramlines(fibre_profiles_02, fibre_profiles_03, fibre_profiles_21, fibre_profiles_22, mask_02, mask_03, mask_21, mask_22)
+#         pix,flux,err = collapse_extract_from_indices(img, err_img, stripe_indices, tramlines, slit_height=slit_height, verbose=verbose, timit=timit, debug_level=debug_level)
     elif method.lower() == 'optimal':
         pix,flux,err = optimal_extraction_from_indices(img, stripe_indices, err_img=err_img, ronmask=ronmask, slit_height=slit_height, individual_fibres=individual_fibres,
                                                        combined_profiles=combined_profiles, integrate_profiles=integrate_profiles, slope=slope, offset=offset, fibs=fibs, 
@@ -1180,7 +1180,7 @@ def extract_spectrum_from_indices(img, err_img, stripe_indices, ronmask=None, me
         print('ERROR: Nightmare! That should never happen  --  must be an error in the Matrix...')
         return    
         
-    #now save to FITS file or PYTHON DICTIONARY if desired
+    # now save to FITS file or PYTHON DICTIONARY if desired
     if savefile:
         
         # which extraction method was used exactly?
@@ -1196,7 +1196,7 @@ def extract_spectrum_from_indices(img, err_img, stripe_indices, ronmask=None, me
         
         # name of object
         try:
-            starname = pyfits.getval(path+obsname+'.fits', 'OBJECT')
+            starname = pyfits.getval(path + obsname + '.fits', 'OBJECT')
         except:
             starname = ''
                     
@@ -1235,8 +1235,8 @@ def extract_spectrum_from_indices(img, err_img, stripe_indices, ronmask=None, me
                     h = pyfits.getheader(path+obsname+'_BD.fits')
                 else:
                     h = pyfits.getheader(path+obsname+'.fits')   
-                #update the header and write to file
-                h['HISTORY'] = '   EXTRACTED SPECTRUM - created '+time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())+' (GMT)'
+                # update the header and write to file
+                h['HISTORY'] = '   EXTRACTED SPECTRUM - created ' + time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime()) + ' (GMT)'
                 h['METHOD'] = (method, 'extraction method used')
                 topord = sorted(pix.keys())[0]
                 topordnum = int(topord[-2:])
@@ -1248,17 +1248,20 @@ def extract_spectrum_from_indices(img, err_img, stripe_indices, ronmask=None, me
                     h['METHOD2'] = (submethod, 'exact optimal extraction method used')
                     h['SLOPE'] = (slope,)
                     h['OFFSET'] = (offset,)
-                #write to FITS file    
-                outfn = path + starname + '_' + obsname + '_' + method.lower() + submethod + '_extracted.fits'
+                # write to FITS file    
+                if starname == '':
+                    outfn = path + starname + obsname + '_' + method.lower() + submethod + '_extracted.fits'
+                else:
+                    outfn = path + starname + '_' + obsname + '_' + method.lower() + submethod + '_extracted.fits'
                 pyfits.writeto(outfn, fluxarr, h, clobber=True)    
-                #now append the corresponding error array
+                # now append the corresponding error array
                 h_err = h.copy()
-                h_err['HISTORY'] = 'estimated uncertainty in EXTRACTED SPECTRUM - created '+time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())+' (GMT)'
+                h_err['HISTORY'] = 'estimated uncertainty in EXTRACTED SPECTRUM - created ' + time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime()) + ' (GMT)'
                 pyfits.append(outfn, errarr, h_err, clobber=True)
                 
             if filetype in ['dict', 'both']:
-                #OK, save as a python dictionary
-                #create combined dictionary
+                # OK, save as a python dictionary
+                # create combined dictionary
                 extracted = {}
                 extracted['pix'] = pix
                 extracted['flux'] = flux

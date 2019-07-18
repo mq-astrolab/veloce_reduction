@@ -22,7 +22,7 @@ from veloce_reduction.veloce_reduction.barycentric_correction import get_barycen
 
 
 
-def process_whites(white_list, MB=None, ronmask=None, MD=None, gain=None, scalable=False, fancy=False, remove_bg=True, clip=5., savefile=True, saveall=False, diffimg=False, path=None, debug_level=0, timit=False):
+def process_whites(white_list, MB=None, ronmask=None, MD=None, gain=None, P_id=None, scalable=False, fancy=False, remove_bg=True, clip=5., savefile=True, saveall=False, diffimg=False, path=None, debug_level=0, timit=False):
     """
     This routine processes all whites from a given list of file. It corrects the orientation of the image and crops the overscan regions,
     and subtracts both the MASTER BIAS frame [in ADU], and the MASTER DARK frame [in e-] from every image before combining them to create a MASTER WHITE frame.
@@ -34,6 +34,7 @@ def process_whites(white_list, MB=None, ronmask=None, MD=None, gain=None, scalab
     'ronmask'     : the read-noise mask (or frame) [e-]
     'MD'          : the master dark frame [e-]
     'gain'        : the gains for each quadrant [e-/ADU]
+    'P_id'        : order tracing dictionary (only needed if remove_bg is set to TRUE)
     'scalable'    : boolean - do you want to normalize the dark current to an exposure time of 1s? (ie do you want to make it "scalable"?)
     'fancy'       : boolean - do you want to use the 'fancy' method for creating the master white frame? (otherwise a simple median image will be used)
     'remove_bg'   : boolean - do you want to remove the background from the output master white?
@@ -176,7 +177,7 @@ def process_whites(white_list, MB=None, ronmask=None, MD=None, gain=None, scalab
     # now subtract background (errors remain unchanged)
     if remove_bg:
         # identify and extract background
-        bg = extract_background(master, P_id, slit_height=slit_height, exclude_top_and_bottom=True, timit=timit)
+        bg = extract_background(master, P_id, slit_height=30, exclude_top_and_bottom=True, timit=timit)
         # fit background
         bg_coeffs, bg_img = fit_background(bg, clip=10, return_full=True, timit=timit)
         # subtract background
@@ -214,7 +215,7 @@ def process_whites(white_list, MB=None, ronmask=None, MD=None, gain=None, scalab
 
 
 
-def process_science_images(imglist, P_id, mask=None, sampling_size=25, slit_height=25, gain=[1.,1.,1.,1.], MB=None, ronmask=None, MD=None, scalable=False, saveall=False, path=None, ext_method='optimal', 
+def process_science_images(imglist, P_id, chipmask, mask=None, sampling_size=25, slit_height=25, gain=[1.,1.,1.,1.], MB=None, ronmask=None, MD=None, scalable=False, saveall=False, path=None, ext_method='optimal', 
                            from_indices=True, slope=True, offset=True, fibs='all', date=None, timit=False):
     """
     Process all science images. This includes:
@@ -440,6 +441,7 @@ def process_science_images(imglist, P_id, mask=None, sampling_size=25, slit_heig
         bc = get_barycentric_correction(filename)
         bc = np.round(bc,2)
         obj = pyfits.getval(filename, 'OBJECT')
+        # write the barycentric correction into the FITS header of both the quick-extracted and the optimal-extracted reduced spectrum files
         outfn_list = glob.glob(path + '*' + obsname + '*extracted*')
         for outfn in outfn_list:
             pyfits.setval(outfn, 'BARYCORR', value=bc, comment='barycentric velocity correction [m/s]')

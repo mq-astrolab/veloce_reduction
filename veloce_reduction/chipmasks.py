@@ -84,7 +84,7 @@ def make_single_chipmask(fibparms, meansep, masktype='stellar', exclude_top_and_
 
     # for the background we have to invert that mask and (optionally) exclude the top and bottom regions
     # which still include fainter orders etc (same as in "extract_background")
-    if masktype.lower() == 'background':
+    if masktype.lower() in ['bg', 'background']:
         chipmask = np.invert(chipmask)
         if exclude_top_and_bottom:
             if debug_level >= 1:
@@ -100,6 +100,7 @@ def make_single_chipmask(fibparms, meansep, masktype='stellar', exclude_top_and_
             chipmask[labelled_mask == bottomrightnumber] = False
 
     return chipmask
+
 
 
 def old_make_single_chipmask(fibparms, meansep, masktype='stellar', exclude_top_and_bottom=False, nx=4112, ny=4096):
@@ -201,6 +202,7 @@ def old_make_single_chipmask(fibparms, meansep, masktype='stellar', exclude_top_
     return chipmask
 
 
+
 def get_mean_fibre_separation(fibparms, nx=4112, nfib=24):
     # nord = len(fibparms)
     meansep = {}
@@ -220,7 +222,7 @@ def get_mean_fibre_separation(fibparms, nx=4112, nfib=24):
 
 
 
-def make_chipmask(date, savefile=True, timit=False):
+def make_chipmask(date, savefile=False, timit=False):
 
     print('Creating chipmask for ' + date + '...')
 

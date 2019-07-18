@@ -139,11 +139,11 @@ def get_obstype_lists(path, pattern=None, weeding=True):
             domeflat_list.append(file)
         elif obj_type.lower().startswith('arc'):
             arc_list.append(file)
-        elif obj_type.lower() in ["thxe","thxe-only", "simth"]:
+        elif obj_type.lower() in ["thxe", "thxe-only", "simth"]:
             thxe_list.append(file)
-        elif obj_type.lower() in ["lc","lc-only","lfc","lfc-only", "simlc"]:
+        elif obj_type.lower() in ["lc", "lc-only", "lfc", "lfc-only", "simlc"]:
             laser_list.append(file)
-        elif obj_type.lower() in ["thxe+lfc","lfc+thxe","lc+simthxe","lc+thxe"]:
+        elif obj_type.lower() in ["thxe+lfc", "lfc+thxe", "lc+simthxe", "lc+thxe"]:
             laser_and_thxe_list.append(file)
         elif obj_type.lower().startswith(("wasp","proxima","kelt","toi","tic","hd","hr","hip","gj","gl","ast","alpha","beta","gamma",
                                           "delta","tau","ksi","ach","zeta","ek",'1', '2', '3', '4', '5', '6', '7', '8', '9')):
@@ -162,8 +162,12 @@ def get_obstype_lists(path, pattern=None, weeding=True):
         lc = 0
         thxe = 0
         h = pyfits.getheader(file)
-        if 'LCEXP' in h.keys():
-            lc = 1
+        if 'LCNEXP' in h.keys():   # this indicates the latest version of the FITS headers
+            if 'LCEXP' in h.keys():   # this indicates the LFC actually was actually exposed
+                lc = 1
+        else:   # if not, just go with the OBJECT field
+            if file in laser_list + laser_and_thxe_list:
+                lc = 1
         if h['SIMCALTT'] > 0:
             thxe = 1
         if lc+thxe == 1:
