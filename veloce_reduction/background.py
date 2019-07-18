@@ -31,7 +31,93 @@ from veloce_reduction.veloce_reduction.helper_functions import polyfit2d, polyva
 
 
 
-def remove_background(img, P_id, obsname, path, degpol=5, slit_height=25, save_bg=True, savefile=True, save_err=False, exclude_top_and_bottom=False, timit=False):
+def remove_background(img, bgmask, obsname, path, degpol=5, save_bg=True, savefile=True, save_err=False, timit=False):
+    """
+    Top-level wrapper function to identify, extract, fit, and subtract the background for a given image.
+    
+    INPUT:
+    'img'                     : input image (2-dim numpy array)
+    'bgmask'                  : 2D boolean mask identifying the background pixels (= chipmask['bg'])
+    'obsname'                 : the obsname in "obsname.fits"
+    'path'                    : the directory of the files
+    'degpol'                  : degree (in each direction) of the 2-dim polynomial surface fit
+    'slit_height'             : height of the extraction slit (ie the pixel columns are 2*slit_height pixels long)
+    'save_bg'                 : boolean - do you want to save the background image?
+    'savefile'                : boolean - do you want to save the background-corrected science image?
+    'save_err'                : boolean - do you want to save the corresponding error array as well? (remains unchanged though)
+    'timit'                   : boolean - do you want to measure execution run time?
+    
+    OUTPUT:
+    'corrected_image'         : the background-corrected science image
+    """
+    
+    if timit:
+        start_time = time.time()
+    
+    #(1) identify and extract background
+    bg = extract_background(img, bgmask, timit=timit)
+    #(2) fit background
+    bg_coeffs, bg_img = fit_background(bg, deg=degpol, return_full=True, timit=timit)
+    #(3) subtract background
+    corrected_image = img - bg_img
+    #what about errors??????
+    
+    #save background image
+    if save_bg:
+        outfn = path+obsname+'_BG_img.fits'
+        #get header from the BIAS- & DARK-subtracted & cosmic-ray corrected image if it exists
+        try:
+            h = pyfits.getheader(path+obsname+'_BD_CR.fits')
+        except:
+            #otherwise try to get header from the BIAS- & DARK-subtracted image; otherwise from the original image FITS file
+            try: 
+                h = pyfits.getheader(path+obsname+'_BD.fits')
+            except:
+                h = pyfits.getheader(path+obsname+'.fits')
+                h['UNITS'] = 'ELECTRONS'
+        h['HISTORY'] = '   BACKGROUND image - created '+time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())+' (GMT)'
+        pyfits.writeto(outfn, bg_img, h, clobber=True)
+        
+    #save background-corrected image
+    if savefile:
+        outfn = path+obsname+'_BD_CR_BG.fits'
+        #get header from the BIAS- & DARK-subtracted & cosmic-ray corrected image if it exists
+        try:
+            h = pyfits.getheader(path+obsname+'_BD_CR.fits')
+        except:
+            #otherwise try to get header from the BIAS- & DARK-subtracted image; otherwise from the original image FITS file
+            try: 
+                h = pyfits.getheader(path+obsname+'_BD.fits')
+            except:
+                h = pyfits.getheader(path+obsname+'.fits')
+                h['UNITS'] = 'ELECTRONS'
+        h['HISTORY'] = '   BACKGROUND-corrected image - created '+time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())+' (GMT)'
+        pyfits.writeto(outfn, corrected_image, h, clobber=True)
+        #also save the error array if desired
+        if save_err:
+            try:
+                err = pyfits.getdata(path+obsname+'_BD_CR.fits', 1)
+                h_err = h.copy()
+                h_err['HISTORY'] = 'estimated uncertainty in BACKGROUND-corrected image - created '+time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())+' (GMT)'
+                pyfits.append(outfn, err, h_err, clobber=True)
+            except:
+                try:
+                    err = pyfits.getdata(path+obsname+'_BD.fits', 1)
+                    h_err = h.copy()
+                    h_err['HISTORY'] = 'estimated uncertainty in BACKGROUND-corrected image - created '+time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())+' (GMT)'
+                    pyfits.append(outfn, err, h_err, clobber=True)
+                except:
+                    print('WARNING: error array not found - cannot save error array')
+    
+    
+    if timit:
+        print('Total time elapsed: '+str(np.round(time.time() - start_time,1))+' seconds')
+    
+    return corrected_image
+
+
+
+def remove_background_pid(img, P_id, obsname, path, degpol=5, slit_height=25, save_bg=True, savefile=True, save_err=False, exclude_top_and_bottom=False, timit=False):
     """
     Top-level wrapper function to identify, extract, fit, and subtract the background for a given image.
     
@@ -56,7 +142,7 @@ def remove_background(img, P_id, obsname, path, degpol=5, slit_height=25, save_b
         start_time = time.time()
     
     #(1) identify and extract background
-    bg = extract_background(img, P_id, slit_height=slit_height, exclude_top_and_bottom=exclude_top_and_bottom, timit=timit)
+    bg = extract_background_pid(img, P_id, slit_height=slit_height, exclude_top_and_bottom=exclude_top_and_bottom, timit=timit)
     #(2) fit background
     bg_coeffs,bg_img = fit_background(bg, deg=degpol, return_full=True, timit=timit)
     #(3) subtract background
@@ -120,7 +206,41 @@ def remove_background(img, P_id, obsname, path, degpol=5, slit_height=25, save_b
 
 
 
-def extract_background(img, P_id, slit_height=25, return_mask=False, exclude_top_and_bottom=True, timit=False):
+def extract_background(img, bgmask, timit=False):
+    """
+    Extracts the background (ie the inter-order regions = everything outside the order stripes - as identified by a boolean mask)
+    from the original 2D spectrum to a sparse matrix containing only relevant pixels.
+    
+    INPUT:
+    'img'                     : 2D echelle spectrum [np.array]
+    'bgmask'                  : 2D boolean mask identifying the background pixels (= chipmask['bg'])
+    'timit'                   : for timing tests...
+    
+    OUTPUT:
+    'mat.tocsc()'  : scipy.sparse_matrix containing the locations and values of the inter-order regions    
+    """
+    
+    if timit:
+        start_time = time.time()
+    
+#     logging.info('Extracting background...')
+    print('Extracting background...')
+    
+    ny, nx = img.shape
+    xx = np.arange(nx, dtype='f8')
+    yy = np.arange(ny, dtype='f8')
+    x_grid, y_grid = np.meshgrid(xx, yy, copy=False)
+    
+    mat = sparse.coo_matrix((np.squeeze(np.array(img[bgmask])), (y_grid[bgmask], x_grid[bgmask])), shape=img.shape)
+    
+    if timit:
+        print('Elapsed time: ',time.time() - start_time,' seconds')
+    
+    return mat.tocsc()
+
+
+
+def extract_background_pid(img, P_id, slit_height=25, return_mask=False, exclude_top_and_bottom=True, timit=False):
     """
     This function marks all relevant pixels for extraction. Extracts the background (ie the inter-order regions = everything outside the order stripes)
     from the original 2D spectrum to a sparse matrix containing only relevant pixels.
@@ -195,7 +315,6 @@ def extract_background(img, P_id, slit_height=25, return_mask=False, exclude_top
 
 def fit_background(bg, deg=5, clip=10, return_full=True, timit=False):
     """ 
-    
     INPUT:
     'bg'                      : sparse matrix containing the inter-order regions of the 2D image
     'deg'                     : the order of the polynomials to use in the fit (for both dimensions)

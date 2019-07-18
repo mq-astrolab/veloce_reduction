@@ -13,7 +13,7 @@ from scipy.ndimage import label
 # meansep = get_mean_fibre_separation(fibparms)
 
 
-def make_single_chipmask(fibparms, meansep, masktype='stellar', exclude_top_and_bottom=False, nx=4112, ny=4096,
+def make_single_chipmask(fibparms, meansep, masktype='stellar', exclude_top_and_bottom=True, nx=4112, ny=4096,
                          debug_level=0, timit=False):
     if timit:
         start_time = time.time()

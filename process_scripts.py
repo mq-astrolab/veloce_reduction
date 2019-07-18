@@ -177,7 +177,7 @@ def process_whites(white_list, MB=None, ronmask=None, MD=None, gain=None, P_id=N
     # now subtract background (errors remain unchanged)
     if remove_bg:
         # identify and extract background
-        bg = extract_background(master, P_id, slit_height=30, exclude_top_and_bottom=True, timit=timit)
+        bg = extract_background_pid(master, P_id, slit_height=30, exclude_top_and_bottom=True, timit=timit)
         # fit background
         bg_coeffs, bg_img = fit_background(bg, clip=10, return_full=True, timit=timit)
         # subtract background
@@ -246,7 +246,7 @@ def process_science_images(imglist, P_id, chipmask, mask=None, sampling_size=25,
         obstype = 'stellar'
         # and the indices where the object changes (to figure out which observations belong to one epoch)
         changes = np.where(np.array(object_list)[:-1] != np.array(object_list)[1:])[0] + 1   # need the plus one to get the indices of the first occasion of a new object
-        # list of indices for individual epochs - surely there's an easier way to do this...
+        # list of indices for individual epochs - there's gotta be a smarter way to do this...
         all_epoch_list = []
         all_epoch_list.append(np.arange(0,changes[0]))
         for i in range(len(changes) - 1):
@@ -355,26 +355,28 @@ def process_science_images(imglist, P_id, chipmask, mask=None, sampling_size=25,
             # remove cosmics, but only from background
             cosmic_cleaned_img = remove_cosmics(bg_raw.todense(), ronmask, obsname, path, Flim=3.0, siglim=5.0, maxiter=1, savemask=False, savefile=False, save_err=False, verbose=True, timit=True)   # [e-]
             # identify and extract background from cosmic-cleaned image
-            bg = extract_background(cosmic_cleaned_img, P_id, slit_height=30, exclude_top_and_bottom=True, timit=timit)
+            bg = extract_background(cosmic_cleaned_img, chipmask['bg'], timit=timit)
+#             bg = extract_background_pid(cosmic_cleaned_img, P_id, slit_height=30, exclude_top_and_bottom=True, timit=timit)
             # fit background
             bg_coeffs, bg_img = fit_background(bg, clip=10, return_full=True, timit=timit)
         elif len(epoch_sublists[lamp_config]) == 2:
             # list of individual exposure times for this epoch
             subepoch_texp_list = [pyfits.getval(file, 'ELAPSED') for file in epoch_sublists[lamp_config]]
-            tscale = np.array(subepoch_texp_list)/texp
+            tscale = np.array(subepoch_texp_list) / texp
             # get background from the element-wise minimum-image of the two images
             img1 = correct_for_bias_and_dark_from_filename(epoch_sublists[lamp_config][0], MB, MD, gain=gain, scalable=scalable, savefile=False)
             img2 = correct_for_bias_and_dark_from_filename(epoch_sublists[lamp_config][1], MB, MD, gain=gain, scalable=scalable, savefile=False)
             min_img = np.minimum(img1/tscale[0], img2/tscale[1])
-            # identify and extract background
-            bg = extract_background(min_img, P_id, slit_height=30, exclude_top_and_bottom=True, timit=timit)
+            # identify and extract background from the minimum-image
+            bg = extract_background(min_img, chipmask['bg'], timit=timit)
+#             bg = extract_background_pid(min_img, P_id, slit_height=30, exclude_top_and_bottom=True, timit=timit)
             del min_img
             # fit background
             bg_coeffs, bg_img = fit_background(bg, clip=10, return_full=True, timit=timit)
         else:
             # list of individual exposure times for this epoch
             subepoch_texp_list = [pyfits.getval(file, 'ELAPSED') for file in epoch_sublists[lamp_config]]
-            tscale = np.array(subepoch_texp_list)/texp
+            tscale = np.array(subepoch_texp_list) / texp
             # make list of actual images
             img_list = []
             for file in epoch_sublists[lamp_config]:
@@ -384,8 +386,9 @@ def process_science_images(imglist, P_id, chipmask, mask=None, sampling_size=25,
             # take median after scaling to same exposure time as main exposure
             med_img = np.median(np.array(img_list) / tscale.reshape(len(img_list), 1, 1), axis=0)
             del img_list
-            # identify and extract background
-            bg = extract_background(med_img, P_id, slit_height=30, exclude_top_and_bottom=True, timit=timit)
+            # identify and extract background from the median image
+            bg = extract_background(med_img, chipmask['bg'], timit=timit)
+#             bg = extract_background_pid(med_img, P_id, slit_height=30, exclude_top_and_bottom=True, timit=timit)
             del med_img
             # fit background
             bg_coeffs, bg_img = fit_background(bg, clip=10, return_full=True, timit=timit)

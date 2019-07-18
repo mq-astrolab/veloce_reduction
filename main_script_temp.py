@@ -36,19 +36,8 @@ date = '20180917'
 path = '/Users/christoph/data/raw_goodonly/' + date + '/'
 
 
-# some housekeeping...
-# check if files exist:
 
-
-
-# (0) INFO FROM FITS HEADERS ########################################################################################################################
-#####TEMP#####
-# bias_list,dark_list,white_list,thar_list,thxe_list,laser_list,stellar_list = identify_obstypes(path)
-# bias_list = glob.glob(path + 'Bias*.fits')
-# dark_list = glob.glob(path + 'Dark*.fits')
-# white_list = glob.glob(path + 'Light*.fits')
-# stellar_list = glob.glob(path + 'Light*.fits')
-###END TEMP###
+# (0) GET INFO FROM FITS HEADERS ####################################################################################################################
 acq_list, bias_list, dark_list, flat_list, skyflat_list, domeflat_list, arc_list, thxe_list, laser_list, laser_and_thxe_list, stellar_list, unknown_list = get_obstype_lists(path)
 assert len(unknown_list) == 0, "WARNING: unknown files encountered!!!"
 # obsnames = short_filenames(bias_list)
@@ -59,7 +48,7 @@ del dumimg
 
 
 
-# # (1) BAD PIXEL MASK ################################################################################################################################
+# # (1) BAD PIXEL MASK ##############################################################################################################################
 # bpm_list = glob.glob(path + '*bad_pixel_mask*')
 # #read most recent bad pixel mask
 # bpm_dates = [x[-12:-4] for x in bpm_list]
@@ -74,7 +63,7 @@ del dumimg
 # dumstring = str(now)[:10].split('-')
 # datestring = ''.join(dumstring)
 # np.save(path+'bad_pixel_mask_'+datestring+'.npy', bad_pixel_mask)
-# #####################################################################################################################################################
+# ###################################################################################################################################################
 
 
 
