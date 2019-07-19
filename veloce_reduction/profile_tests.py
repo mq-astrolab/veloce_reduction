@@ -111,7 +111,8 @@ def get_multiple_fibre_profiles_single_order(sc, sr, err_sc, ordpol, ordmask=Non
                 fibre_profiles_ord['beta'][i, :] = np.repeat(-1., nfib)
             if offset:
                 fibre_profiles_ord['offset'].append(-1.)
-        elif snr < nfib * 15.:
+#         elif snr < nfib * 15.:
+        elif snr < nfib * 5:
             print('WARNING: SNR too low!!!')
             fibre_profiles_ord['mu'][i, :] = np.repeat(-1., nfib)
             fibre_profiles_ord['sigma'][i, :] = np.repeat(-1., nfib)
@@ -176,7 +177,7 @@ def get_multiple_fibre_profiles_single_order(sc, sr, err_sc, ordpol, ordmask=Non
             #     plt.plot(grid,normdata)
 
             dynrange = np.max(normdata) - np.min(normdata)
-            goodpeaks, mostpeaks, allpeaks = find_suitable_peaks(normdata, thresh=np.min(normdata)+0.5*dynrange, bgthresh=np.min(normdata)+0.25*dynrange,
+            goodpeaks, mostpeaks, allpeaks = find_suitable_peaks(normdata, thresh=np.min(normdata)+0.3*dynrange, bgthresh=np.min(normdata)+0.15*dynrange,
                                                                  clip_edges=False, gauss_filter_sigma=10, slope=1e-8)
 
             if debug_level >=1 :
@@ -220,17 +221,17 @@ def get_multiple_fibre_profiles_single_order(sc, sr, err_sc, ordpol, ordmask=Non
                 if offset:
                     if varbeta:
                         popt, pcov = op.curve_fit(multi_fibmodel_with_amp_and_offset, grid, normdata, p0=np.r_[guess,0],
-                                                  bounds=(np.r_[lower_bounds,0], np.r_[upper_bounds,np.max(normdata)]))
+                                                  bounds=(np.r_[lower_bounds,0], np.r_[upper_bounds,np.max(normdata)]), maxfev=100000)
                     else:
                         popt, pcov = op.curve_fit(CMB_multi_gaussian_with_offset, grid, normdata, p0=np.r_[guess,0],
-                                                  bounds=(np.r_[lower_bounds,0], np.r_[upper_bounds, np.max(normdata)]))
+                                                  bounds=(np.r_[lower_bounds,0], np.r_[upper_bounds, np.max(normdata)]), maxfev=100000)
                 else:
                     if varbeta:
                         popt, pcov = op.curve_fit(multi_fibmodel_with_amp, grid, normdata, p0=guess,
-                                                  bounds=(lower_bounds, upper_bounds))
+                                                  bounds=(lower_bounds, upper_bounds), maxfev=100000)
                     else:
                         popt, pcov = op.curve_fit(CMB_multi_gaussian, grid, normdata, p0=guess,
-                                                  bounds=(lower_bounds, upper_bounds))
+                                                  bounds=(lower_bounds, upper_bounds), maxfev=100000)
 
 
                 if offset:

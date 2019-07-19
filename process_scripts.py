@@ -12,7 +12,7 @@ import os
 from veloce_reduction.veloce_reduction.helper_functions import binary_indices
 from veloce_reduction.veloce_reduction.calibration import correct_for_bias_and_dark_from_filename
 from veloce_reduction.veloce_reduction.cosmic_ray_removal import remove_cosmics, median_remove_cosmics
-from veloce_reduction.veloce_reduction.background import remove_background, extract_background, fit_background
+from veloce_reduction.veloce_reduction.background import extract_background, extract_background_pid, fit_background
 from veloce_reduction.veloce_reduction.order_tracing import extract_stripes
 from veloce_reduction.veloce_reduction.extraction import extract_spectrum, extract_spectrum_from_indices
 from veloce_reduction.veloce_reduction.relative_intensities import get_relints, get_relints_from_indices, append_relints_to_FITS

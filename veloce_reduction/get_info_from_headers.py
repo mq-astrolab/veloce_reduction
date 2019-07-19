@@ -163,7 +163,7 @@ def get_obstype_lists(path, pattern=None, weeding=True):
         thxe = 0
         h = pyfits.getheader(file)
         if 'LCNEXP' in h.keys():   # this indicates the latest version of the FITS headers
-            if 'LCEXP' in h.keys():   # this indicates the LFC actually was actually exposed
+            if ('LCEXP' in h.keys()) or ('LCMNEXP' in h.keys()):   # this indicates the LFC actually was actually exposed (either automatically or manually)
                 lc = 1
         else:   # if not, just go with the OBJECT field
             if file in laser_list + laser_and_thxe_list:

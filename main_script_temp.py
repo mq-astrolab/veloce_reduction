@@ -190,6 +190,8 @@ pix,flux,err = extract_spectrum_from_indices(MW, err_MW, MW_indices, method='opt
 
 # create and save chipmask
 chipmask = make_chipmask(date, savefile=True, timit=True)
+# stellar_traces = make_order_traces_from_chipmask(chipmask, centre_on='stellar')   # just an idea at this stage...
+
 
 ### (4) PROCESS SCIENCE IMAGES
 # figure out the configuration of the calibration lamps for the ARC exposures

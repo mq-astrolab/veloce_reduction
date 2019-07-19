@@ -13,6 +13,7 @@ from scipy import interpolate
 
 
 from veloce_reduction.veloce_reduction.order_tracing import find_stripes, make_P_id, extract_stripes, flatten_single_stripe
+from veloce_reduction.veloce_reduction.chipmasks import get_mean_fibre_separation
 
 
 
@@ -50,7 +51,7 @@ def make_real_fibparms_by_ord(fp_in, degpol=7, savefile=True, date=None, simthxe
         fibparms[ord] = {}
 
         #sanity check the dimensions are right
-        nfib = fp_in['order_01']['mu'].shape[1]
+        nfib = fp_in[ord]['mu'].shape[1]
         if simthxe:
             assert nfib == 1, 'ERROR: input dictionary does NOT contain data for exactly 1 fibre!!!'
         else:
@@ -109,8 +110,8 @@ def make_real_fibparms_by_ord(fp_in, degpol=7, savefile=True, date=None, simthxe
             f_beta = interpolate.interp1d(pix[good], beta[good], fill_value='extrapolate')
             sigma_eqspace = f_sigma(xgrid)
             beta_eqspace = f_beta(xgrid)
-            filtered_sigma = savgol_filter(sigma_eqspace, 2001, 3)   # window size and order were just eye-balled to make it sensible
-            filtered_beta = savgol_filter(beta_eqspace, 2001, 3)     # window size and order were just eye-balled to make it sensible
+            filtered_sigma = savgol_filter(sigma_eqspace, np.minimum(len(xgrid), 2001), 3)   # window size and order were just eye-balled to make it sensible
+            filtered_beta = savgol_filter(beta_eqspace, np.minimum(len(xgrid), 2001), 3)     # window size and order were just eye-balled to make it sensible
             sigma_fit = interpolate.interp1d(xgrid, filtered_sigma, fill_value='extrapolate')
             beta_fit = interpolate.interp1d(xgrid, filtered_beta, fill_value='extrapolate')
 
@@ -301,6 +302,105 @@ def make_fibparms_by_ord(by_fib, savefile=True):
         np.save('/Users/christoph/OneDrive - UNSW/fibre_profiles/sim/fibparms_by_ord.npy', by_orders) 
     
     return by_orders
+    
+    
+
+def get_lfc_offset(date='20190503'):
+    
+    # read in fibparms for stellar & sky fibres
+    stellar_fibparms = np.load('/Users/christoph/OneDrive - UNSW/fibre_profiles/archive/fibre_profile_fits_' + date + '.npy').item()
+    
+    # read in fibparms for simThXe fibre
+    lfc_fibparms = np.load('/Users/christoph/OneDrive - UNSW/fibre_profiles/archive/lfc_fibre_profile_fits_' + date + '.npy').item()
+    
+    # prepare output array
+    offsets = np.zeros((39,24,4112))    
+    
+    for o,ord in enumerate(sorted(stellar_fibparms.keys())):
+        for f,fib in enumerate(sorted(stellar_fibparms[ord].keys())):
+            offsets[o,f,:] = stellar_fibparms[ord][fib]['mu_fit'] - lfc_fibparms[ord]['fibre_01']['mu_fit']
+            # now "normalize" to one step
+            offsets[o,f,:] /= int(fib[-2:]) - 1
+    
+    # take the median values across fibres
+    med_offsets = np.median(offsets, axis=1)
+    
+    return med_offsets
+
+
+    
+def get_simthxe_offset(date='20190503'):
+    
+    # read in fibparms for stellar & sky fibres
+    stellar_fibparms = np.load('/Users/christoph/OneDrive - UNSW/fibre_profiles/archive/fibre_profile_fits_' + date + '.npy').item()
+    
+    # read in fibparms for simThXe fibre
+    simthxe_fibparms = np.load('/Users/christoph/OneDrive - UNSW/fibre_profiles/simthxe/sim_ThXe_fibre_profile_fits_' + date + '_nomask.npy').item()
+    
+    # prepare output array
+    offsets = np.zeros((39,24,4112))    
+    
+    for o,ord in enumerate(sorted(stellar_fibparms.keys())):
+        for f,fib in enumerate(sorted(stellar_fibparms[ord].keys())):
+            offsets[o,f,:] = stellar_fibparms[ord][fib]['mu_fit'] - simthxe_fibparms[ord]['fibre_28']['mu_fit']
+            # now "normalize" to one step
+            offsets[o,f,:] /= 28 - int(fib[-2:])
+    
+    # take the median values across fibres
+    med_offsets = np.median(offsets, axis=1)
+    
+    return med_offsets
+    
+    
+    
+def combine_fibparms(date, savefile=True):
+    
+    archive_path = '/Users/christoph/OneDrive - UNSW/fibre_profiles/archive/'
+    simthxe_path = '/Users/christoph/OneDrive - UNSW/fibre_profiles/simthxe/'
+    
+    # read in fibparms for stellar & sky fibres
+    stellar_fibparms = np.load(archive_path + 'fibre_profile_fits_' + date + '.npy').item()
+    
+    # read in fibparms for simThXe fibre and median offsets from stellar&sky fibres
+    simthxe_fibparms = np.load(simthxe_path + 'sim_ThXe_fibre_profile_fits_20190503_nomask.npy').item()
+    med_simthxe_offsets = get_simthxe_offset()
+    
+#     # read in fibparms for LFC fibre and median offsets from stellar&sky fibres
+#     lfc_fibparms = np.load(simthxe_path + 'sim_ThXe_fibre_profile_fits_' + date + '.npy').item()
+#     med_lfc_offsets = get_lfc_offset()
+    
+    # calculate a new simThXe trace based on the measured positions of the other fibres that night and the median offset as measured on the reference night (20190503)
+    new_simthxe_traces  = np.zeros((39,24,4112))    
+    for o,ord in enumerate(sorted(stellar_fibparms.keys())):
+        for f,fib in enumerate(sorted(stellar_fibparms[ord].keys())):
+            new_simthxe_traces[o,f,:] = stellar_fibparms[ord][fib]['mu_fit'] - (28 - int(fib[-2:])) * med_simthxe_offsets[o,:]
+    med_new_simthxe_trace = np.median(new_simthxe_traces, axis=1)
+    
+    # calculate a new LFC trace based on the measured positions of the other fibres that night and the median offset as measured on the reference night (20190503)
+    new_lfc_traces  = np.zeros((39,24,4112))    
+    for o,ord in enumerate(sorted(stellar_fibparms.keys())):
+        for f,fib in enumerate(sorted(stellar_fibparms[ord].keys())):
+            new_lfc_traces[o,f,:] = stellar_fibparms[ord][fib]['mu_fit'] - (int(fib[-2:]) - 1) * med_lfc_offsets[o,:]
+    med_new_lfc_trace = np.median(new_lfc_traces, axis=1)
+    
+    # create and fill the combined fibparms structure
+    combined_fibparms = {}
+    for o,ord in enumerate(sorted(stellar_fibparms.keys())):
+        combined_fibparms[ord] = {}
+        for fib in stellar_fibparms[ord].keys():
+            combined_fibparms[ord][fib] = stellar_fibparms[ord][fib]
+        for fib in simthxe_fibparms[ord].keys():    
+            combined_fibparms[ord][fib] = simthxe_fibparms[ord][fib]
+            combined_fibparms[ord][fib]['mu_fit'] = med_new_simthxe_trace[o,:]
+#         for fib in lfc_fibparms[ord].keys():    
+#             combined_fibparms[ord][fib] = lfc_fibparms[ord][fib]
+#             combined_fibparms[ord][fib]['mu_fit'] = med_new_lfc_trace[o,:]
+        
+    return combined_fibparms
+    
+    
+    
+    
     
     
     
