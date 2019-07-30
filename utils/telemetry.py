@@ -14,7 +14,7 @@ import astropy.io.fits as pyfits
 import os
 
 from veloce_reduction.veloce_reduction.lfc_peaks import find_affine_transformation_matrix, divide_lfc_peaks_into_orders
-
+from veloce_reduction.veloce_reduction.helper_functions import find_nearest
 
 
 def telemetry():
@@ -36,16 +36,20 @@ def telemetry():
     
     timestamp_cam, det_temp, cryohead_temp, perc_heater = readcol(path + 'arccamera.txt', skipline=1, twod=False)
     timestamp_cam_0, det_temp_0, cryohead_temp_0, perc_heater_0 = readcol(path + 'arccamera.txt.0', skipline=1, twod=False)
-    # timestamp_cam_1, det_temp_1, cryohead_temp_1, perc_heater_1 = readcol(path + 'arccamera.txt.1', skipline=1, twod=False)
+    timestamp_cam_1, det_temp_1, cryohead_temp_1, perc_heater_1 = readcol(path + 'arccamera.txt.1', skipline=1, twod=False)
+    timestamp_cam_2, det_temp_2, cryohead_temp_2, perc_heater_2 = readcol(path + 'arccamera.txt.2', skipline=1, twod=False)
+    
     cam_time = Time(timestamp_cam, format='unix')         # from 17/10/2018 - 27/11/2018
     cam_time_0 = Time(timestamp_cam_0, format='unix')     # from 19/04/2018 - 17/10/2018
-    # cam_time_1 = Time(timestamp_cam_1, format='unix')
+    cam_time_1 = Time(timestamp_cam_1, format='unix')
+    cam_time_2 = Time(timestamp_cam_2, format='unix')
     
     #combine the two subsets
-    t = np.array(list(cam_time_0.jd) + list(cam_time.jd)) - 2.458e6
-    dtemp = np.array(list(det_temp_0) + list(det_temp))
-    cryo = np.array(list(cryohead_temp_0) + list(cryohead_temp))
-    heater_load = np.array(list(perc_heater_0) + list(perc_heater))
+    t = np.array(list(cam_time_2.jd) + list(cam_time_1.jd) + list(cam_time_0.jd) + list(cam_time.jd)) - 2.458e6
+    tobj = Time(t + 2.458e6, format='jd')  
+    dtemp = np.array(list(det_temp_2) + list(det_temp_1) + list(det_temp_0) + list(det_temp))
+    cryo = np.array(list(cryohead_temp_2) + list(cryohead_temp_1) + list(cryohead_temp_0) + list(cryohead_temp))
+    heater_load = np.array(list(perc_heater_2) + list(perc_heater_1) + list(perc_heater_0) + list(perc_heater))
     ix = np.zeros(len(jd))
     # I checked, and the maximum diff in time is less than ~30s :)
     for i in range(len(jd)):
@@ -58,13 +62,40 @@ def telemetry():
         
         
     # make a nice stacked plot
+    # observing run were 20190121 - 20190203
+    tstart_janfeb = 2458504.0
+    tend_janfeb = 2458518.0
+    # 20190408 - 20190415
+    tstart_apr = 2458581.0
+    tend_apr = 2458589.0
+    # 20190503 - 20190512
+    tstart_may01 = 2458606.0
+    tend_may01 = 2458616.0
+    # 20190517 - 20190528
+    tstart_may02 = 2458620.0
+    tend_may02 = 2458632.0
+    # 20190531 - 20190605
+    tstart_jun01 = 2458634.0
+    tend_jun01 = 2458640.0
+    # 20190619 - 20190625
+    tstart_jun02 = 2458653.0
+    tend_jun02 = 2458660.0
+    # 20190722 - 20190724
+    tstart_jul = 2458686.0
+    tend_jul = 2458689.0
+    starts = np.array([tstart_janfeb, tstart_apr, tstart_may01, tstart_may02, tstart_jun01, tstart_jun02, tstart_jul]) - 2.458e6
+    ends = np.array([tend_janfeb, tend_apr, tend_may01, tend_may02, tend_jun01, tend_jun02, tend_jul]) - 2.458e6
+    
+#     t_plot = tobj.datetime   # for plotting nice calendar dates
+    t_plot = t.copy()   #for plotting JD
     fig, axarr = plt.subplots(3, sharex=True)
     # plot 3 subplots
-    axarr[0].plot(t, dtemp)
-    axarr[1].plot(t, cryo)
-    axarr[2].plot(t, heater_load)
+    axarr[0].plot(t_plot, dtemp)
+    axarr[1].plot(t_plot, cryo)
+    axarr[2].plot(t_plot, heater_load)
     # set (global) x-range
-    axarr[0].set_xlim(370,455)
+#     axarr[0].set_xlim(370,455)
+    axarr[0].set_xlim(500,692)  # ~17 Jan - 28 July 2019
     # set y-ranges
     axarr[0].set_ylim(138,150)
     axarr[1].set_ylim(82,88)
@@ -79,6 +110,11 @@ def telemetry():
     axarr[0].set_ylabel('T [K]')
     axarr[1].set_ylabel('T [K]')
     axarr[2].set_ylabel('[%]')
+    # indicate when Veloce was actually observing
+    for x1,x2 in zip(starts,ends):
+        axarr[0].axvspan(x1, x2, alpha=0.3, color='green')
+        axarr[1].axvspan(x1, x2, alpha=0.3, color='green')
+        axarr[2].axvspan(x1, x2, alpha=0.3, color='green')
     # indicate tau Ceti obstimes with dashed vertical lines
     for tobs in jd:
         axarr[0].axvline(tobs-2.458e6, color='gray', linestyle='--')

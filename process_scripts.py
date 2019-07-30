@@ -24,7 +24,7 @@ from veloce_reduction.veloce_reduction.barycentric_correction import get_barycen
 
 def process_whites(white_list, MB=None, ronmask=None, MD=None, gain=None, P_id=None, scalable=False, fancy=False, remove_bg=True, clip=5., savefile=True, saveall=False, diffimg=False, path=None, debug_level=0, timit=False):
     """
-    This routine processes all whites from a given list of file. It corrects the orientation of the image and crops the overscan regions,
+    This routine processes all whites from a given list of files. It corrects the orientation of the image and crops the overscan regions,
     and subtracts both the MASTER BIAS frame [in ADU], and the MASTER DARK frame [in e-] from every image before combining them to create a MASTER WHITE frame.
     NOTE: the input image has units of ADU, but the output image has units of electrons!!!
     
@@ -170,7 +170,9 @@ def process_whites(white_list, MB=None, ronmask=None, MD=None, gain=None, P_id=N
 #         # estimate of the corresponding error array (estimate only!!!)
 #         err_master = err_summed / nw     # I don't know WTF I was thinking here...
         # if roughly Gaussian distribution of values: error of median ~= 1.253*error of mean
-        err_master = 1.253 * np.std(allimg, axis=0) / np.sqrt(nw-1)     # normally it would be sigma/sqrt(n), but np.std is dividing by sqrt(n), not by sqrt(n-1)
+        # err_master = 1.253 * np.std(allimg, axis=0) / np.sqrt(nw-1)     # normally it would be sigma/sqrt(n), but np.std is dividing by sqrt(n), not by sqrt(n-1)
+        # need to rescale by exp time here, too
+        err_master = 1.253 * np.std(np.array(allimg) / tscale.reshape(len(allimg), 1, 1), axis=0) / np.sqrt(nw-1)     # normally it would be sigma/sqrt(n), but np.std is dividing by sqrt(n), not by sqrt(n-1)
         # err_master = np.sqrt( np.sum( (np.array(allimg) - np.mean(np.array(allimg), axis=0))**2 / (nw*(nw-1)) , axis=0) )   # that is equivalent, but slower
     
     

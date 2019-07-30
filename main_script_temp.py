@@ -20,20 +20,20 @@ import os
 
 from veloce_reduction.veloce_reduction.get_info_from_headers import get_obstype_lists
 from veloce_reduction.veloce_reduction.helper_functions import short_filenames
-from veloce_reduction.veloce_reduction.calibration import get_bias_and_readnoise_from_bias_frames, make_ronmask, make_master_bias_from_coeffs, make_master_dark, correct_orientation, crop_overscan_region
+from veloce_reduction.veloce_reduction.calibration import get_bias_and_readnoise_from_bias_frames, make_master_calib, make_ronmask, make_master_bias_from_coeffs, make_master_dark, correct_orientation, crop_overscan_region
 from veloce_reduction.veloce_reduction.order_tracing import find_stripes, make_P_id, make_mask_dict, extract_stripes
 from veloce_reduction.veloce_reduction.spatial_profiles import fit_profiles, fit_profiles_from_indices
 from veloce_reduction.veloce_reduction.chipmasks import make_chipmask
-from veloce_reduction.veloce_reduction.extraction import *
+from veloce_reduction.veloce_reduction.extraction import extract_spectrum_from_indices
 from process_scripts import process_whites, process_science_images
 
 
 date = '20180917'
 
 # desktop:
-# path = '/Volumes/BERGRAID/data/veloce/raw_goodonly/' + date + '/'
+path = '/Volumes/BERGRAID/data/veloce/raw_goodonly/' + date + '/'
 # laptop:
-path = '/Users/christoph/data/raw_goodonly/' + date + '/'
+# path = '/Users/christoph/data/raw_goodonly/' + date + '/'
 
 
 
@@ -50,7 +50,7 @@ del dumimg
 
 # # (1) BAD PIXEL MASK ##############################################################################################################################
 # bpm_list = glob.glob(path + '*bad_pixel_mask*')
-# #read most recent bad pixel mask
+# # read most recent bad pixel mask
 # bpm_dates = [x[-12:-4] for x in bpm_list]
 # most_recent_datestring = sorted(bpm_dates)[-1]
 # bad_pixel_mask = np.load(path + 'bad_pixel_mask_' + most_recent_datestring + '.npy')
@@ -58,7 +58,7 @@ del dumimg
 # # update the pixel mask
 # #blablabla
 # 
-# #save updated bad pixel mask
+# # save updated bad pixel mask
 # now = datetime.datetime.now()
 # dumstring = str(now)[:10].split('-')
 # datestring = ''.join(dumstring)
@@ -126,6 +126,11 @@ else:
     # this is a first iteration without background removal - just so we can do the tracing; then we come back and do it properly later
     MW,err_MW = process_whites(flat_list, MB=medbias, ronmask=ronmask, MD=MDS, gain=gain, scalable=True, fancy=False, P_id=None,
                                clip=5., savefile=False, saveall=False, diffimg=False, remove_bg=False, path=path, debug_level=1, timit=False)
+    
+    
+# (iv) preliminary master LFC frame - no background removal, needed so we can create the fibre profiles / do the tracing
+if len(laser_list) > 0:
+    master_lfc, err_master_lfc = make_master_calib(laser_list, lamptype='simth', MB=medbias, ronmask=ronmask, MD=MDS, gain=gain, chipmask=None, remove_bg=False, savefile=False, path=path)
 #####################################################################################################################################################
 
 
@@ -189,8 +194,15 @@ pix,flux,err = extract_spectrum_from_indices(MW, err_MW, MW_indices, method='opt
 # ###
 
 # create and save chipmask
-chipmask = make_chipmask(date, savefile=True, timit=True)
+chipmask = make_chipmask(date, combined_fibparms=True, savefile=True, timit=True)   # use combined_fibparms=False if you don't trust the simThXe and LFC traces
 # stellar_traces = make_order_traces_from_chipmask(chipmask, centre_on='stellar')   # just an idea at this stage...
+# make master frames for each of the simultaneous calibration sources (ie simTh, simLC, and for both together)
+if len(thxe_list) > 0:
+    master_simth, err_master_simth = make_master_calib(thxe_list, lamptype='simth', MB=medbias, ronmask=ronmask, MD=MDS, gain=gain, chipmask=chipmask, remove_bg=True, savefile=True, path=path)
+if len(laser_list) > 0:
+    master_lfc, err_master_lfc = make_master_calib(laser_list, lamptype='simth', MB=medbias, ronmask=ronmask, MD=MDS, gain=gain, chipmask=chipmask, remove_bg=True, savefile=True, path=path)
+if len(laser_and_thxe_list) > 0:
+    master_lfc_plus_simth, err_master_lfc_plus_simth = make_master_calib(laser_and_thxe_list, lamptype='both', MB=medbias, ronmask=ronmask, MD=MDS, gain=gain, chipmask=chipmask, remove_bg=True, savefile=True, path=path)
 
 
 ### (4) PROCESS SCIENCE IMAGES

@@ -2320,6 +2320,7 @@ def get_dispsol_for_all_fibs_2(obsname, relto='LFC', degpol=7, fibs='stellar', n
     '''using CGT's DAOPHOT results to measure LFC shifts'''
 
     # TODO: instead of reading P_id for the LFC, do a divide into orders and fit new x-y-traces
+    # TODO: use meansep - get_mean_fibre_separation instead of 1.97
 
     lfc_path = '/Users/christoph/OneDrive - UNSW/lfc_peaks/'
 

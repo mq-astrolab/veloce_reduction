@@ -14,7 +14,7 @@ from veloce_reduction.veloce_reduction.order_tracing import flatten_single_strip
 
 
 def get_multiple_fibre_profiles_single_order(sc, sr, err_sc, ordpol, ordmask=None, nfib=24, sampling_size=25, step_size=None,
-                                             varbeta=True, offset=True, return_snr=True, debug_level=0, timit=False):
+                                             varbeta=True, offset=True, return_snr=True, lfc=False, debug_level=0, timit=False):
     """
     INPUT:
     'sc'             : the flux in the extracted, flattened stripe
@@ -31,6 +31,7 @@ def get_multiple_fibre_profiles_single_order(sc, sr, err_sc, ordpol, ordmask=Non
     'varbeta'        : boolean - if set to TRUE, use Gauss-like function for fitting, if set to FALSE use plain Gaussian
     'offset'         : boolean - do you want to fit an offset as well?
     'return_snr'     : boolean - do you want to return SNR of the collapsed super-pixel at each location in 'userange'?
+    'lfc'            : boolean - is this LFC data? (in which case we only want to use the pixels near a peak to determine the fibre profiles)
     'debug_level'    : for debugging...
     'timit'          : boolean - do you want to measure execution run-time?
 
@@ -46,7 +47,6 @@ def get_multiple_fibre_profiles_single_order(sc, sr, err_sc, ordpol, ordmask=Non
     23/09/2018 - CMB create (essentially a mix of "determine_spatial_profiles_single_order" and
                  "fit_profiles_single_order")
 
-    TODO: add offset and/or slope to fit
     """
 
     if timit:
@@ -145,26 +145,33 @@ def get_multiple_fibre_profiles_single_order(sc, sr, err_sc, ordpol, ordmask=Non
             weights = []
             refpos = ordpol(pix)
             for j in np.arange(np.max([0, pix - sampling_size]), np.min([npix - 1, pix + sampling_size]) + 1):
-                grid.append(sr[:, j] - ordpol(j) + refpos)
-                # data.append(sc[:,j])
-                normdata.append(sc[:, j] / np.sum(sc[:, j]))
-                # assign weights for flux (and take care of NaNs and INFs)
-                # normerr = np.sqrt(sc[:,j] + RON**2) / np.sum(sc[:,j])
-                normerr = err_sc[:, j] / np.sum(sc[:, j])
-                pix_w = 1. / (normerr * normerr)
-                pix_w[np.isinf(pix_w)] = 0.
-                weights.append(pix_w)
-                ### initially I thought this was clearly rubbish as it down-weights the central parts
-                ### and that we really want to use the relative errors, ie w_i = 1/(relerr_i)**2
-                ### HOWEVER: this is not true, and the optimal extraction linalg routine requires absolute errors!!!
-                # weights.append(1./((np.sqrt(sc[:,j] + RON**2)) / sc[:,j])**2)
-                if debug_level >= 3:
-                    # plt.plot(sr[:,j] - ordpol(j),sc[:,j],'.')
-                    plt.plot(sr[:, j] - ordpol(j), sc[:, j] / np.sum(sc[:, j]), '.')
-                    # plt.xlim(-5,5)
-                    plt.xlim(-sc.shape[0] / 2, sc.shape[0] / 2)
+                
+                colcounts = np.sum(sc[:, j])           
+                
+                if (colcounts >= 500) or (not lfc):
+                    grid.append(sr[:, j] - ordpol(j) + refpos)
+                    # data.append(sc[:,j])
+                    normdata.append(sc[:, j] / np.sum(sc[:, j]))
+                    # make sure we do not divide by zero by adding 1 plus the min. colcounts across all j's, so that the smallest number we are dividing by is 1
+                    # normdata.append(sc[:, j] / (np.sum(sc[:, j]) - np.min(np.sum(sc[:, np.arange(np.max([0, pix - sampling_size]), np.min([npix - 1, pix + sampling_size]) + 1)], axis=0)) + 1))
+                    # assign weights for flux (and take care of NaNs and INFs)
+                    # normerr = np.sqrt(sc[:,j] + RON**2) / np.sum(sc[:,j])
+                    normerr = err_sc[:, j] / np.sum(sc[:, j])
+                    # normerr = err_sc[:, j] / (np.sum(sc[:, j]) - np.min(np.sum(sc[:, np.arange(np.max([0, pix - sampling_size]), np.min([npix - 1, pix + sampling_size]) + 1)], axis=0)) + 1)
+                    pix_w = 1. / (normerr * normerr)
+                    pix_w[np.isinf(pix_w)] = 0.
+                    weights.append(pix_w)
+                    ### initially I thought this was clearly rubbish as it down-weights the central parts
+                    ### and that we really want to use the relative errors, ie w_i = 1/(relerr_i)**2
+                    ### HOWEVER: this is not true, and the optimal extraction linalg routine requires absolute errors!!!
+                    # weights.append(1./((np.sqrt(sc[:,j] + RON**2)) / sc[:,j])**2)
+                    if debug_level >= 3:
+                        # plt.plot(sr[:,j] - ordpol(j),sc[:,j],'.')
+                        plt.plot(sr[:, j] - ordpol(j), sc[:, j] / np.sum(sc[:, j]), '.')
+                        # plt.xlim(-5,5)
+                        plt.xlim(-sc.shape[0] / 2, sc.shape[0] / 2)
 
-            # data = np.array(data)
+            # data = np.array(data).flatten()
             normdata = np.array(normdata).flatten()
             weights = np.array(weights).flatten()
             grid = np.array(grid).flatten()
@@ -347,8 +354,8 @@ def fit_multiple_profiles(P_id, stripes, err_stripes, mask=None, slit_height=25,
 
 
 
-def fit_multiple_profiles_from_indices(P_id, img, err_img, stripe_indices, mask=None, slit_height=25, nfib=24,
-                                       varbeta=True, offset=True, debug_level=0, timit=False):
+def fit_multiple_profiles_from_indices(P_id, img, err_img, stripe_indices, mask=None, slit_height=25, nfib=24, lfc=False,
+                                       sampling_size=25, step_size=None, varbeta=True, offset=True, debug_level=0, timit=False):
     """
     This routine determines the profiles of the fibres in spatial direction. This is an extremely crucial step, as the
     pre-defined profiles are then used during the optimal extraction, as well as during the determination of the
@@ -363,6 +370,10 @@ def fit_multiple_profiles_from_indices(P_id, img, err_img, stripe_indices, mask=
     'mask'          : dictionary of boolean masks (keys = orders) from "find_stripes" (masking out regions of very low signal)
     'slit_height'   : height of the extraction slit (ie the pixel columns are 2*slit_height pixels long)
     'nfib'          : number of fibres
+    'lfc'           : boolean - is this LFC data? (in which case we only want to use the pixels near a peak to determine the fibre profiles)
+    'sampling_size' : how many pixels (in dispersion direction) either side of current i-th pixel do you want to
+                      consider? (ie stack profiles for a total of 2*sampling_size+1 pixels in dispersion direction...)
+    'step_size'     : only calculate the relative intensities every so and so many pixels (should not change, plus it takes ages...)
     'varbeta'       : boolean - if set to TRUE, use Gauss-like function for fitting, if set to FALSE use plain Gaussian
     'offset'        : boolean - do you want to fit an offset as well?
     'debug_level'   : for debugging...
@@ -403,8 +414,8 @@ def fit_multiple_profiles_from_indices(P_id, img, err_img, stripe_indices, mask=
             cenmask[ord] = np.ones(sc.shape[1], dtype='bool')
 
         # fit profile for single order and save result in "global" parameter dictionary for entire chip
-        fpo = get_multiple_fibre_profiles_single_order(sc, sr, err_sc, ordpol, ordmask=cenmask[ord], nfib=nfib,
-                                                       sampling_size=25, varbeta=varbeta, offset=offset,
+        fpo = get_multiple_fibre_profiles_single_order(sc, sr, err_sc, ordpol, ordmask=cenmask[ord], nfib=nfib, lfc=lfc,
+                                                       sampling_size=sampling_size, step_size=step_size, varbeta=varbeta, offset=offset,
                                                        return_snr=True, debug_level=debug_level, timit=timit)
 
         # if stacking:

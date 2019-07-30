@@ -9,8 +9,10 @@ import numpy as np
 from itertools import combinations
 import time
 import matplotlib.pyplot as plt
+from scipy import ndimage
 
 from veloce_reduction.veloce_reduction.helper_functions import correct_orientation, sigma_clip, polyfit2d, polyval2d
+from veloce_reduction.veloce_reduction.background import extract_background, fit_background
 
 
 
@@ -1296,6 +1298,173 @@ def correct_for_bias_and_dark_from_filename(imgname, MB, MD, gain=None, scalable
 
 #     return dc_bc_img, err_dc_bc_img
     return dc_bc_img
+
+
+
+
+
+def make_master_calib(file_list, lamptype=None, MB=None, ronmask=None, MD=None, gain=None, chipmask=None, scalable=False, remove_bg=True, savefile=True, saveall=False, path=None, debug_level=0, timit=False):
+    """
+    Simplified CLONE OF "process_whites".
+    This routine processes all calibration lamp images from a given list of files. It corrects the orientation of the image and crops the overscan regions,
+    and subtracts both the MASTER BIAS frame [in ADU], and the MASTER DARK frame [in e-] from every image before combining them to create a MASTER frame.
+    NOTE: the input image has units of ADU, but the output image has units of electrons!!!
+    
+    INPUT:
+    'file_list'   : list of filenames of raw white images (incl. directories)
+    'lamptype'    : type of calibration lamp ['simth' / 'lfc' / 'both'] 
+    'MB'          : the master bias frame (bias only, excluding OS levels) [ADU]
+    'ronmask'     : the read-noise mask (or frame) [e-]
+    'MD'          : the master dark frame [e-]
+    'gain'        : the gains for each quadrant [e-/ADU]
+    'P_id'        : order tracing dictionary (only needed if remove_bg is set to TRUE)
+    'scalable'    : boolean - do you want to normalize the dark current to an exposure time of 1s? (ie do you want to make it "scalable"?)
+    'remove_bg'   : boolean - do you want to remove the background from the output master white?
+    'savefile'    : boolean - do you want to save the master white frame as a FITS file?
+    'saveall'     : boolean - do you want to save all individual bias- & dark-corrected images as well?
+    'path'        : path to the output file directory (only needed if savefile is set to TRUE)
+    'debug_level' : for debugging...
+    'timit'       : boolean - do you want to measure execution run time?
+    
+    OUTPUT:
+    'master'      : the master white image [e-] (also has been brought to 'correct' orientation, overscan regions cropped, and (if desired) bg-corrected) 
+    'err_master'  : the corresponding uncertainty array [e-]    
+    
+    """
+    
+    if timit:
+        start_time = time.time()
+
+    while lamptype.lower() not in ['simth', 'lfc', 'both']:
+        lamptype = raw_input("What kind of calibration source is this? ['simth', 'lfc', 'both']: ")
+    typestring = lamptype [:]
+    if lamptype.lower() == 'both':
+        typestring = 'lfc_plus_simth'
+    
+    if debug_level >= 1:
+        print('Creating master ' + typestring.upper() + ' frame from ' + str(len(file_list)) + ' individual exposures...')
+    
+    # if INPUT arrays are not given, read them from default files
+    if path is None:
+        print('WARNING: output file directory not provided!!!')
+        print('Using same directory as input file...')
+        dum = file_list[0].split('/')
+        path = file_list[0][0:-len(dum[-1])]
+    if MB is None:
+        # no need to fix orientation, this is already a processed file [ADU]
+#         MB = pyfits.getdata(path+'master_bias.fits')
+        MB = pyfits.getdata(path + 'median_bias.fits')
+    if ronmask is None:
+        # no need to fix orientation, this is already a processed file [e-]
+        ronmask = pyfits.getdata(path + 'read_noise_mask.fits')
+    if MD is None:
+        if scalable:
+            # no need to fix orientation, this is already a processed file [e-]
+            MD = pyfits.getdata(path + 'master_dark_scalable.fits', 0)
+#             err_MD = pyfits.getdata(path+'master_dark_scalable.fits', 1)
+        else:
+            # no need to fix orientation, this is already a processed file [e-]
+            texp = pyfits.getval(file_list[0])
+            MD = pyfits.getdata(path + 'master_dark_t' + str(int(np.round(texp,0))) + '.fits', 0)
+#             err_MD = pyfits.getdata(path+'master_dark_t'+str(int(np.round(texp,0)))+'.fits', 1)
+
+    # prepare arrays
+    allimg = []
+    allerr = []
+
+    # loop over all files in "file_list"; correct for bias and darks on the fly
+    for n,fn in enumerate(sorted(file_list)):
+        if debug_level >=1:
+            print('Now processing file ' + str(n+1) + '/' + str(len(file_list)) + '   (' + fn + ')')
+
+        # call routine that does all the bias and dark correction stuff and converts from ADU to e-
+        if scalable:
+            # if the darks have a different exposure time than the whites, then we need to re-scale the master dark
+            texp = pyfits.getval(file_list[0], 'ELAPSED')
+            img = correct_for_bias_and_dark_from_filename(fn, MB, MD*texp, gain=gain, scalable=scalable, savefile=saveall,
+                                                          path=path, timit=timit)     #these are now bias- & dark-corrected images; units are e-
+        else:
+            img = correct_for_bias_and_dark_from_filename(fn, MB, MD, gain=gain, scalable=scalable, savefile=saveall,
+                                                          path=path, timit=timit)     # these are now bias- & dark-corrected images; units are e-
+
+        if debug_level >=2:
+            print('min(img) = ' + str(np.min(img)))
+        allimg.append(img)
+#         err_img = np.sqrt(img + ronmask*ronmask)   # [e-]
+        # TEMPFIX: (how should I be doing this properly???)
+        err_img = np.sqrt(np.clip(img,0,None) + ronmask*ronmask)   # [e-]
+        allerr.append(err_img)
+
+    # list of individual exposure times for all whites (should all be the same, but just in case...)
+    texp_list = [pyfits.getval(file, 'ELAPSED') for file in file_list]
+    # scale to the median exposure time
+    tscale = np.array(texp_list) / np.median(texp_list)
+
+
+    #########################################################################
+    ### now we do essentially what "CREATE_MASTER_IMG" does for whites... ###
+    #########################################################################
+    # add individual-image errors in quadrature (need it either way, not only for fancy method)
+#     err_summed = np.sqrt(np.sum((np.array(allerr)**2), axis=0))
+#     # get plain median image
+#     medimg = np.median(np.array(allimg), axis=0)
+    # take median after scaling to median exposure time 
+    medimg = np.median(np.array(allimg) / tscale.reshape(len(allimg), 1, 1), axis=0)
+    
+
+    # now set master image equal to median image
+    master = medimg.copy()
+    nw = len(file_list)     # number of whites 
+#         # estimate of the corresponding error array (estimate only!!!)
+#         err_master = err_summed / nw     # I don't know WTF I was thinking here...
+    # if roughly Gaussian distribution of values: error of median ~= 1.253*error of mean
+    err_master = 1.253 * np.std(allimg, axis=0) / np.sqrt(nw-1)     # normally it would be sigma/sqrt(n), but np.std is dividing by sqrt(n), not by sqrt(n-1)
+    # err_master = np.sqrt( np.sum( (np.array(allimg) - np.mean(np.array(allimg), axis=0))**2 / (nw*(nw-1)) , axis=0) )   # that is equivalent, but slower
+    
+    
+    # now subtract background (errors remain unchanged)
+    if remove_bg:
+        if chipmask is None:
+            date = file_list[0].split('/')[-2]
+            chipmask = np.load('/Users/christoph/OneDrive - UNSW/chipmasks/archive/' + 'chipmask_' + date + '.npy').item()
+        
+        if lamptype == 'simth':
+            lampmask = chipmask['thxe']
+        elif lamptype == 'lfc':
+            lampmask = chipmask['lfc']
+        else:
+            lampmask = np.logical_or(chipmask['thxe'], chipmask['lfc'])
+            
+        # grow this region by 3 pixels either side to avoid contaminating the background
+        growkernel = np.ones((7,7))
+        extended_lampmask = np.cast['bool'](ndimage.convolve(np.cast['float32'](lampmask), growkernel))    
+        # invert mask to identify background regions
+        bgmask = np.invert(extended_lampmask)
+        # identify and extract background
+        bg = extract_background(master, bgmask, timit=timit)
+        # fit background
+        bg_coeffs, bg_img = fit_background(bg, clip=10, return_full=True, timit=timit)
+        # subtract background
+        master = master - bg_img
+
+
+    # now save master frame to file
+    if savefile:
+        outfn = path + 'master_' + typestring + '.fits'
+        pyfits.writeto(outfn, master, clobber=True)
+        pyfits.setval(outfn, 'HISTORY', value='   MASTER ' + typestring.upper() + ' frame - created ' + time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime()) + ' (GMT)')
+        pyfits.setval(outfn, 'MED_TEXP', value=np.median(texp_list), comment='median exposure time [s]')
+        pyfits.setval(outfn, 'UNITS', value='ELECTRONS')
+        pyfits.setval(outfn, 'METHOD', value='median', comment='method to create master ' + typestring + ' and remove outliers')
+        h = pyfits.getheader(outfn)
+        h_err = h.copy()
+        h_err['HISTORY'] = 'estimated uncertainty in MASTER ' + typestring.upper() + ' frame - created ' + time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime()) + ' (GMT)'
+        pyfits.append(outfn, err_master, h_err, clobber=True)
+
+    if timit:
+        print('Total time elapsed: '+str(np.round(time.time() - start_time,1))+' seconds')
+
+    return master, err_master
 
 
 
