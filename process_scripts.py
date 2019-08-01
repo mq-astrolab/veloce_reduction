@@ -8,6 +8,7 @@ import astropy.io.fits as pyfits
 import numpy as np
 import time
 import os
+import glob
 
 from veloce_reduction.veloce_reduction.helper_functions import binary_indices
 from veloce_reduction.veloce_reduction.calibration import correct_for_bias_and_dark_from_filename

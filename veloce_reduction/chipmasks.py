@@ -14,7 +14,7 @@ from scipy.ndimage import label
 
 
 def make_single_chipmask(fibparms, meansep, masktype='stellar', exclude_top_and_bottom=True, nx=4112, ny=4096,
-                         debug_level=0, timit=False):
+                         use_lfc=False, debug_level=0, timit=False):
     if timit:
         start_time = time.time()
 
@@ -52,9 +52,13 @@ def make_single_chipmask(fibparms, meansep, masktype='stellar', exclude_top_and_
         elif masktype.lower() == 'sky3':
             # for the 3 sky fibres near the LFC, we use the "gap" as the lower bound, and as the upper bound either (i) the midpoint between the uppermost sky3 fibre and
             # the LFC fibre, or (ii) the trace of the uppermost sky fibre plus half the average fibre separation for this order and pixel location
-            try:
-                f_upper = 0.5 * (fibparms[order]['fibre_02']['mu_fit'] + fibparms[order]['fibre_01']['mu_fit'])
-            except:
+            if use_lfc:
+                try:
+                    f_upper = 0.5 * (fibparms[order]['fibre_02']['mu_fit'] + fibparms[order]['fibre_01']['mu_fit'])
+                except:
+                    f_upper = 1 * fibparms[order]['fibre_02']['mu_fit']     # the multiplication with one acts like a copy
+                    f_upper += 0.5 * meansep[order]
+            else:
                 f_upper = 1 * fibparms[order]['fibre_02']['mu_fit']     # the multiplication with one acts like a copy
                 f_upper += 0.5 * meansep[order]
             f_lower = 0.5 * (fibparms[order]['fibre_04']['mu_fit'] + fibparms[order]['fibre_06']['mu_fit'])
@@ -63,11 +67,17 @@ def make_single_chipmask(fibparms, meansep, masktype='stellar', exclude_top_and_
             # sky fibre plus half the average fibre separation for this order and pixel location; as the upper bound either (i) the trace of the LFC fibre plus half the average 
             # fibre separation for this order and pixel location, or (ii) the trace of the uppermost sky3 fibre plus one and a half times the average fibre separation for this
             # order and pixel location
-            try:
-                f_upper = 1 * fibparms[order]['fibre_01']['mu_fit']     # the multiplication with one acts like a copy
-                f_upper += 0.5 * meansep[order]
-                f_lower = 0.5 * (fibparms[order]['fibre_01']['mu_fit'] + fibparms[order]['fibre_02']['mu_fit'])
-            except:
+            if use_lfc:
+                try:
+                    f_upper = 1 * fibparms[order]['fibre_01']['mu_fit']     # the multiplication with one acts like a copy
+                    f_upper += 0.5 * meansep[order]
+                    f_lower = 0.5 * (fibparms[order]['fibre_01']['mu_fit'] + fibparms[order]['fibre_02']['mu_fit'])
+                except:
+                    f_upper = 1 * fibparms[order]['fibre_02']['mu_fit']     # the multiplication with one acts like a copy
+                    f_upper += 1.5 * meansep[order]
+                    f_lower = 1 * fibparms[order]['fibre_02']['mu_fit']     # the multiplication with one acts like a copy
+                    f_lower += 0.5 * meansep[order]
+            else:
                 f_upper = 1 * fibparms[order]['fibre_02']['mu_fit']     # the multiplication with one acts like a copy
                 f_upper += 1.5 * meansep[order]
                 f_lower = 1 * fibparms[order]['fibre_02']['mu_fit']     # the multiplication with one acts like a copy
@@ -89,16 +99,26 @@ def make_single_chipmask(fibparms, meansep, masktype='stellar', exclude_top_and_
         elif masktype.lower() in ['background', 'bg']:
             # could either do sth like 1. - np.sum(chipmask_i), but we can also just use the lower bound of ThXe and the upper bound of LFC
             # identify what is NOT background, and later "invert" that
-            try:
-                f_upper = 1 * fibparms[order]['fibre_01']['mu_fit']     # the multiplication with one acts like a copy
-                f_upper += 1. * meansep[order]     # use whole meansep here to avoid contamination from the calib sources a bit more
-                f_lower = 1 * fibparms[order]['fibre_28']['mu_fit']     # the multiplication with one acts like a copy
-                f_lower -= 1. * meansep[order]     # use whole meansep here to avoid contamination from the calib sources a bit more
-            except:
+            if use_lfc:
+                try:
+                    f_upper = 1 * fibparms[order]['fibre_01']['mu_fit']     # the multiplication with one acts like a copy
+                    f_upper += 1. * meansep[order]     # use whole meansep here to avoid contamination from the calib sources a bit more
+                    f_lower = 1 * fibparms[order]['fibre_28']['mu_fit']     # the multiplication with one acts like a copy
+                    f_lower -= 1. * meansep[order]     # use whole meansep here to avoid contamination from the calib sources a bit more
+                except:
+                    f_upper = 1 * fibparms[order]['fibre_02']['mu_fit']     # the multiplication with one acts like a copy
+                    f_upper += 2. * meansep[order]     # use 2 here to avoid contamination from the calib sources a bit more
+                    f_lower = 1 * fibparms[order]['fibre_27']['mu_fit']     # the multiplication with one acts like a copy
+                    f_lower -= 2. * meansep[order]     # use 2 here to avoid contamination from the calib sources a bit more
+            else:
                 f_upper = 1 * fibparms[order]['fibre_02']['mu_fit']     # the multiplication with one acts like a copy
                 f_upper += 2. * meansep[order]     # use 2 here to avoid contamination from the calib sources a bit more
-                f_lower = 1 * fibparms[order]['fibre_27']['mu_fit']     # the multiplication with one acts like a copy
-                f_lower -= 2. * meansep[order]     # use 2 here to avoid contamination from the calib sources a bit more
+                try:
+                    f_lower = 1 * fibparms[order]['fibre_28']['mu_fit']     # the multiplication with one acts like a copy
+                    f_lower -= 1. * meansep[order]  
+                except:
+                    f_lower = 1 * fibparms[order]['fibre_27']['mu_fit']     # the multiplication with one acts like a copy
+                    f_lower -= 2. * meansep[order]     # use 2 here to avoid contamination from the calib sources a bit more
 
         # get indices of the pixels that fall into the respective regions
         order_stripe = (YY < f_upper) & (YY > f_lower)

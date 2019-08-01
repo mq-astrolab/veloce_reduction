@@ -481,7 +481,10 @@ def extract_stripes(img, P_id, slit_height=25, return_indices=True, savefiles=Fa
         overall_start_time = time.time()
     
     #logging.info('Extract stripes...')
-    print('Extracting stripes...')
+    if return_indices:
+        print('Extracting stripes and identifying stripe pixel-offsets...')
+    else:
+        print('Extracting stripes...')
     stripes = {}
     if return_indices:
         stripe_indices = {}

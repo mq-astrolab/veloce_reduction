@@ -547,6 +547,9 @@ def make_norm_profiles_6(x, col, fppo, integrate=False, fibs='stellar', slope=Fa
     elif fibs == 'allsky':
         # nfib = 5
         userange = np.r_[np.arange(1, 3, 1), np.arange(22, 25, 1)]
+    elif fibs == 'calibs':
+        # nfib = 2
+        userange = np.r_[np.arange(0, 1, 2), np.arange(25, 26, 2)]
     else:
         print('ERROR: fibre selection not recognised!!!')
         return

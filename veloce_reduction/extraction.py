@@ -10,7 +10,7 @@ import datetime
 import astropy.io.fits as pyfits
 import os
 
-from veloce_reduction.veloce_reduction.helper_functions import fibmodel_with_amp, make_norm_profiles_5, short_filenames
+from veloce_reduction.veloce_reduction.helper_functions import fibmodel_with_amp, make_norm_profiles_6, short_filenames
 from veloce_reduction.veloce_reduction.spatial_profiles import fit_single_fibre_profile
 from veloce_reduction.veloce_reduction.linalg import linalg_extract_column
 from veloce_reduction.veloce_reduction.order_tracing import flatten_single_stripe, flatten_single_stripe_from_indices, extract_stripes
@@ -309,7 +309,7 @@ def collapse_extract_from_indices(img, err_img, stripe_indices, tramlines, slit_
 
 
 
-def optimal_extraction(stripes, err_stripes=None, ron_stripes=None, slit_height=25, date=None, fibs='all', relints=None,
+def optimal_extraction(stripes, err_stripes=None, ron_stripes=None, slit_height=30, date=None, fibs='all', relints=None,
                        simu=False, phi_onthefly=False, individual_fibres=True, combined_profiles=False, integrate_profiles=False,
                        slope=False, offset=False, collapse=False, debug_level=0, timit=False):
 
@@ -357,7 +357,8 @@ def optimal_extraction(stripes, err_stripes=None, ron_stripes=None, slit_height=
         print('WARNING: errors not provided! Using sqrt(RON**2 + flux) as an estimate...')
 
     if fibs.lower() == 'all':
-        nfib = 24
+#         nfib = 24
+        nfib = 26
     elif fibs.lower() == 'stellar':
         nfib = 19
     elif fibs.lower() == 'sky2':
@@ -366,13 +367,16 @@ def optimal_extraction(stripes, err_stripes=None, ron_stripes=None, slit_height=
         nfib = 3
     elif fibs.lower() == 'allsky':
         nfib = 5
-    elif fibs.lower() == 'thxe':
+    elif fibs.lower() in ['thxe', 'simth']:
         nfib = 1
     elif fibs.lower() in ['lfc', 'laser']:
         nfib = 1
+    elif fibs.lower() == 'calibs':
+        nfib = 2
     else:
-        print('WARNING: input for "fibs" not recognized - using all 24 fibres as a default...')
-        nfib = 24
+        print('WARNING: input for "fibs" not recognized - using all 26 fibres as a default...')
+#         nfib = 24
+        nfib = 26
 
     # read in polynomial coefficients of best-fit individual-fibre-profile parameters
     if simu:
@@ -383,11 +387,13 @@ def optimal_extraction(stripes, err_stripes=None, ron_stripes=None, slit_height=
         # fibparms = np.load('/Users/christoph/OneDrive - UNSW/fibre_profiles/fibre_profile_fits_20180925.npy').item()
         # fibparms = np.load('/Users/christoph/OneDrive - UNSW/fibre_profiles/fibre_profile_fits_20181107.npy').item()
         if date not in ['20181116', '20190127', '20190201']:
-            fibparms = np.load('/Users/christoph/OneDrive - UNSW/fibre_profiles/archive/fibre_profile_fits_' + date + '.npy').item()
+#             fibparms = np.load('/Users/christoph/OneDrive - UNSW/fibre_profiles/archive/fibre_profile_fits_' + date + '.npy').item()
+            fibparms = np.load('/Users/christoph/OneDrive - UNSW/fibre_profiles/archive/combined_fibre_profile_fits_' + date + '.npy').item()
             print('OK, loading fibre profiles for ' + date + '...')
         else:
             # have to laod this crutch, as the first order fits were crap for 20181116 / 20190127 / 20190201, so just for order 01 I replaced them with the parms from the following night
-            fibparms = np.load('/Users/christoph/OneDrive - UNSW/fibre_profiles/archive/fibre_profile_fits_' + date + '_crutch.npy').item()
+#             fibparms = np.load('/Users/christoph/OneDrive - UNSW/fibre_profiles/archive/fibre_profile_fits_' + date + '_crutch.npy').item()
+            fibparms = np.load('/Users/christoph/OneDrive - UNSW/fibre_profiles/archive/combined_fibre_profile_fits_' + date + '_crutch.npy').item()
             print('OK, loading fibre profiles (CRUTCH!!!) for ' + date + '...')
 
     flux = {}
@@ -505,7 +511,7 @@ def optimal_extraction(stripes, err_stripes=None, ron_stripes=None, slit_height=
                     # phi = make_norm_profiles(sr[:,i], ord, i, fibparms)
                     # phi = make_norm_profiles_temp(sr[:,i], ord, i, fibparms)
                     # phi = make_norm_single_profile_temp(sr[:,i], ord, i, fibparms)
-                    phi = make_norm_profiles_5(sr[:, i], i, fppo, integrate=integrate_profiles, slope=slope, offset=offset, fibs=fibs)
+                    phi = make_norm_profiles_6(sr[:, i], i, fppo, integrate=integrate_profiles, slope=slope, offset=offset, fibs=fibs)
 
             # print('WARNING: TEMPORARY offset correction is not commented out!!!')
             # # subtract the median as the offset if BG is not properly corrected for
@@ -613,7 +619,7 @@ def optimal_extraction(stripes, err_stripes=None, ron_stripes=None, slit_height=
 
 
 
-def optimal_extraction_from_indices(img, stripe_indices, err_img=None, ronmask=None, slit_height=25, date=None, fibs='all',
+def optimal_extraction_from_indices(img, stripe_indices, err_img=None, ronmask=None, slit_height=30, date=None, fibs='all',
                                     relints=None, simu=False, phi_onthefly=False, individual_fibres=True,
                                     combined_profiles=False, integrate_profiles=False, slope=False, offset=False,
                                     collapse=False, debug_level=0, timit=False):
@@ -664,8 +670,8 @@ def optimal_extraction_from_indices(img, stripe_indices, err_img=None, ronmask=N
         print('WARNING: errors not provided! Using sqrt(flux + RON**2) as an estimate...')
 
     if fibs.lower() == 'all':
-        nfib = 24
-#         nfib = 26
+#         nfib = 24
+        nfib = 26
     elif fibs.lower() == 'stellar':
         nfib = 19
     elif fibs.lower() == 'sky2':
@@ -674,14 +680,16 @@ def optimal_extraction_from_indices(img, stripe_indices, err_img=None, ronmask=N
         nfib = 3
     elif fibs.lower() == 'allsky':
         nfib = 5
-    elif fibs.lower() == 'thxe':
+    elif fibs.lower() in ['thxe', 'simth']:
         nfib = 1
     elif fibs.lower() in ['lfc', 'laser']:
         nfib = 1
+    elif fibs.lower() == 'calibs':
+        nfib = 2
     else:
-        print('WARNING: input for "fibs" not recognized - using all 24 fibres as a default...')
-        nfib = 24
-#         nfib = 26
+        print('WARNING: input for "fibs" not recognized - using all 26 fibres as a default...')
+#         nfib = 24
+        nfib = 26
 
     # read in polynomial coefficients of best-fit individual-fibre-profile parameters
     if simu:
@@ -692,11 +700,13 @@ def optimal_extraction_from_indices(img, stripe_indices, err_img=None, ronmask=N
         # fibparms = np.load('/Users/christoph/OneDrive - UNSW/fibre_profiles/fibre_profile_fits_20180925.npy').item()
         # fibparms = np.load('/Users/christoph/OneDrive - UNSW/fibre_profiles/fibre_profile_fits_20181107.npy').item()
         if date not in ['20181116', '20190127', '20190201']:
-            fibparms = np.load('/Users/christoph/OneDrive - UNSW/fibre_profiles/archive/fibre_profile_fits_' + date + '.npy').item()
+#             fibparms = np.load('/Users/christoph/OneDrive - UNSW/fibre_profiles/archive/fibre_profile_fits_' + date + '.npy').item()
+            fibparms = np.load('/Users/christoph/OneDrive - UNSW/fibre_profiles/archive/combined_fibre_profile_fits_' + date + '.npy').item()
             print('OK, loading fibre profiles for ' + date + '...')
         else:
             # have to laod this crutch, as the first order fits were crap for 20181116 / 20190127 / 20190201, so just for order 01 I replaced them with the parms from the following night
-            fibparms = np.load('/Users/christoph/OneDrive - UNSW/fibre_profiles/archive/fibre_profile_fits_' + date + '_crutch.npy').item()
+#             fibparms = np.load('/Users/christoph/OneDrive - UNSW/fibre_profiles/archive/fibre_profile_fits_' + date + '_crutch.npy').item()
+            fibparms = np.load('/Users/christoph/OneDrive - UNSW/fibre_profiles/archive/combined_fibre_profile_fits_' + date + '_crutch.npy').item()
             print('OK, loading fibre profiles (CRUTCH!!!) for ' + date + '...')
 
     flux = {}
