@@ -21,8 +21,10 @@ import os
 from veloce_reduction.veloce_reduction.get_info_from_headers import get_obstype_lists
 from veloce_reduction.veloce_reduction.helper_functions import short_filenames
 from veloce_reduction.veloce_reduction.calibration import get_bias_and_readnoise_from_bias_frames, make_master_calib, make_ronmask, make_master_bias_from_coeffs, make_master_dark, correct_orientation, crop_overscan_region
-from veloce_reduction.veloce_reduction.order_tracing import find_stripes, make_P_id, make_mask_dict, extract_stripes
-from veloce_reduction.veloce_reduction.spatial_profiles import fit_profiles, fit_profiles_from_indices
+from veloce_reduction.veloce_reduction.order_tracing import find_stripes, make_P_id, make_mask_dict, extract_stripes, make_order_traces_from_fibparms
+# from veloce_reduction.veloce_reduction.spatial_profiles import fit_profiles, fit_profiles_from_indices
+from veloce_reduction.veloce_reduction.profile_tests import fit_multiple_profiles_from_indices
+from veloce_reduction.veloce_reduction.get_profile_parameters import make_real_fibparms_by_ord, combine_fibparms
 from veloce_reduction.veloce_reduction.chipmasks import make_chipmask
 from veloce_reduction.veloce_reduction.extraction import extract_spectrum_from_indices
 from process_scripts import process_whites, process_science_images
@@ -35,9 +37,12 @@ path = '/Volumes/BERGRAID/data/veloce/raw_goodonly/' + date + '/'
 # laptop:
 # path = '/Users/christoph/data/raw_goodonly/' + date + '/'
 
+# some hard-coded file directories
+chipmask_path = '/Users/christoph/OneDrive - UNSW/chipmasks/archive/'
+fibparms_path = '/Users/christoph/OneDrive - UNSW/fibre_profiles/archive/'
 
 
-# (0) GET INFO FROM FITS HEADERS ####################################################################################################################
+### (0) GET INFO FROM FITS HEADERS ##################################################################################################################
 acq_list, bias_list, dark_list, flat_list, skyflat_list, domeflat_list, arc_list, thxe_list, laser_list, laser_and_thxe_list, stellar_list, unknown_list = get_obstype_lists(path)
 assert len(unknown_list) == 0, "WARNING: unknown files encountered!!!"
 # obsnames = short_filenames(bias_list)
@@ -48,7 +53,7 @@ del dumimg
 
 
 
-# # (1) BAD PIXEL MASK ##############################################################################################################################
+### (1) BAD PIXEL MASK ##############################################################################################################################
 # bpm_list = glob.glob(path + '*bad_pixel_mask*')
 # # read most recent bad pixel mask
 # bpm_dates = [x[-12:-4] for x in bpm_list]
@@ -67,7 +72,7 @@ del dumimg
 
 
 
-# (2) CALIBRATION ###################################################################################################################################
+### (2) CALIBRATIONS ################################################################################################################################
 # gain = [0.88, 0.93, 0.99, 0.93]   # from "VELOCE_DETECTOR_REPORT_V1.PDF"
 # gain = [1., 1., 1., 1.]
 gain = [1., 1.095, 1.125, 1.]   # eye-balled from extracted flat fields
@@ -78,6 +83,7 @@ choice = 'r'
 if os.path.isfile(path + 'median_bias.fits'):
     choice = raw_input("MEDIAN BIAS image for " + date + " already exists! Do you want to skip this step or recreate it? ['s' / 'r']")
 if choice.lower() == 's':
+    print('Loading MASTER BIAS for ' + date + '...')
     medbias = pyfits.getdata(path + 'median_bias.fits')
 else:
     # get offsets and read-out noise from bias frames (units: [offsets] = ADUs; [RON] = e-)
@@ -90,8 +96,9 @@ else:
 # check if read noise mask already exists
 choice = 'r'
 if os.path.isfile(path + 'read_noise_mask.fits'):
-    choice = raw_input("READ NOISE MASK for " + date + " already exists! Do you want to skip this step or recreate it? ['s' / 'r']")
+    choice = raw_input("READ NOISE FRAME for " + date + " already exists! Do you want to skip this step or recreate it? ['s' / 'r']")
 if choice.lower() == 's':
+    print('Loading READ NOISE FRAME for ' + date + '...')
     ronmask = pyfits.getdata(path + 'read_noise_mask.fits')
 else:
     ronmask = make_ronmask(rons, nx, ny, gain=gain, savefile=True, path=path, timit=True)
@@ -120,6 +127,7 @@ choice_mw = 'r'
 if os.path.isfile(path + 'master_white.fits'):
     choice_mw = raw_input("MASTER WHITE image for " + date + " already exists! Do you want to skip this step or recreate it? ['s' / 'r']")
 if choice_mw.lower() == 's':
+    print('Loading MASTER WHITE for ' + date + '...')
     MW = pyfits.getdata(path + 'master_white.fits', 0)
     err_MW = pyfits.getdata(path + 'master_white.fits', 1)
 else:
@@ -135,11 +143,12 @@ if len(laser_list) > 0:
 
 
 
-# (3) ORDER TRACING #################################################################################################################################
+### (3) INITIAL ORDER TRACING #######################################################################################################################
 choice = 'r'
 if os.path.isfile(path + 'P_id.npy') and os.path.isfile(path + 'mask.npy'):
-    choice = raw_input("ORDER TRACING has already been done for " + date + " ! Do you want to skip this step or recreate it? ['s' / 'r']")
+    choice = raw_input("INITIAL ORDER TRACING has already been done for " + date + " ! Do you want to skip this step or recreate it? ['s' / 'r']")
 if choice.lower() == 's':
+    print('Loading initial order traces for ' + date + '...')
     P_id = np.load(path + 'P_id.npy').item()
     mask = np.load(path + 'mask.npy').item()
 else:
@@ -166,47 +175,124 @@ else:
 if choice_mw.lower() == 'r':
     MW,err_MW = process_whites(flat_list, MB=medbias, ronmask=ronmask, MD=MDS, gain=gain, scalable=True, fancy=False, P_id=P_id,
                                clip=5., savefile=True, saveall=False, diffimg=False, remove_bg=True, path=path, debug_level=1, timit=False)
-# extract stripes of user-defined width from the science image, centred on the polynomial fits defined in step (1)
-MW_stripes,MW_indices = extract_stripes(MW, P_id, return_indices=True, slit_height=30)
-pix,flux,err = extract_spectrum_from_indices(MW, err_MW, MW_indices, method='quick', slit_height=30, ronmask=ronmask,
-                                             savefile=True, filetype='fits', obsname='master_white', path=path, timit=True)
-pix,flux,err = extract_spectrum_from_indices(MW, err_MW, MW_indices, method='optimal', slope=True, offset=True, fibs='all', slit_height=30,
-                                             ronmask=ronmask, savefile=True, filetype='fits', obsname='master_white', date=date, path=path, timit=True)
 #####################################################################################################################################################
 
 
-###
-#if we want to determine spatial profiles, then we should remove cosmics and background from MW like so:
+### (4) CREATE FIBRE PROFILES #######################################################################################################################
+slit_height = 30
+MW_stripes,MW_indices = extract_stripes(MW, P_id, return_indices=True, slit_height=slit_height)
+del MW_stripes     # save memory
+# err_MW_stripes = extract_stripes(err_MW, P_id, return_indices=False, slit_height=slit_height)
 
-# cosmic_cleaned_MW = remove_cosmics(MW, ronmask, obsname, path, Flim=3.0, siglim=5.0, maxiter=1, savemask=False, savefile=False, save_err=False, verbose=True, timit=True)
-# bg_corrected_MW = remove_background(cosmic_cleaned_MW, P_id, obsname, path, degpol=5, slit_height=5, save_bg=False, savefile=False, save_err=False, exclude_top_and_bottom=True, verbose=True, timit=True)
-#before doing the following:
-# MW_stripes,MW_stripe_indices = extract_stripes(MW, P_id, return_indices=True, slit_height=30)
-# err_MW_stripes = extract_stripes(err_MW, P_id, return_indices=False, slit_height=30)
-# pix_MW_q,flux_MW_q,err_MW_q = extract_spectrum_from_indices(MW, err_MW, MW_stripe_indices, method='quick', slit_height=30, RON=ronmask, savefile=True,
-#                                                          filetype='fits', obsname='master_white', path=path, timit=True)
-# pix_MW,flux_MW,err_MW = extract_spectrum_from_indices(MW, err_MW, MW_stripe_indices, method='optimal', individual_fibres=True, slit_height=30, RON=ronmask, savefile=True,
-#                                                          filetype='fits', obsname='master_white', path=path, timit=True)
+choice_fp = 'r'
+if os.path.isfile(fibparms_path + 'combined_fibre_profile_fits_' + date + '.npy'):
+    choice_fp = raw_input("FIBRE PROFILES for " + date + " already exists! Do you want to skip this step or recreate it? ['s' / 'r']")
+if choice_fp.lower() == 's':
+    print('Loading fibre profiles for ' + date + '...')
+    fibparms = np.load(fibparms_path + 'combined_fibre_profile_fits_' + date + '.npy').item()
+else:
+    sure = 'x'
+    while sure.lower() not in ['y','n']:
+        sure = raw_input("Are you sure you want to create fibre profiles for " + date + "??? This may take several hours!!! ['y' / 'n']")
+    if sure == 'y':
+        fp_in = fit_multiple_profiles_from_indices(P_id, MW, err_MW, MW_indices, slit_height=slit_height, timit=True, debug_level=1)
+        np.save(archive_path + 'individual_fibre_profiles_' + date + '.npy', fp_in)
+        stellar_fibparms = make_real_fibparms_by_ord(fp_in, date=date)
+        fibparms = combine_fibparms(date)
+#####################################################################################################################################################
 
-# fp = fit_profiles(P_id, MW_stripes, err_MW_stripes, mask=mask, stacking=True, slit_height=5, model='gausslike', return_stats=True, timit=True)
-# #OR
-# fp2 = fit_profiles_from_indices(P_id, MW, err_MW, MW_stripe_indices, mask=mask, stacking=True, slit_height=5, model='gausslike', return_stats=True, timit=True)
-# ###
 
-# create and save chipmask
-chipmask = make_chipmask(date, combined_fibparms=True, savefile=True, timit=True)   # use combined_fibparms=False if you don't trust the simThXe and LFC traces
-# stellar_traces = make_order_traces_from_chipmask(chipmask, centre_on='stellar')   # just an idea at this stage...
-# make master frames for each of the simultaneous calibration sources (ie simTh, simLC, and for both together)
+### (5) CREATE CHIPMASKS, FINAL ORDER TRACES, AND DETERMINE SLIT HEIGHTS FOR OPTIMAL EXTRACTION #####################################################
+choice = 'r'
+if os.path.isfile(chipmask_path + 'chipmask_' + date + '.npy'):
+    choice = raw_input("CHIPMASK for " + date + " already exists! Do you want to skip this step or recreate it? ['s' / 'r']")
+if choice.lower() == 's':
+    print('Loading chipmask for ' + date + '...')
+    chipmask = np.load(chipmask_path + 'chipmask_' + date + '.npy').item()
+else:
+    chipmask = make_chipmask(date, combined_fibparms=True, savefile=True, timit=True)   # use combined_fibparms=False if you don't trust the simThXe and LFC traces
+
+# make proper order traces from fibre profiles (this can now be used instead of "P_id", as it is exactly the same format, ie no need to change any subsequent routines!!!)
+choice = 'r'
+if os.path.isfile(path + 'traces.npy'):
+    choice = raw_input("FINAL ORDER TRACING has already been done for " + date + " ! Do you want to skip this step or recreate it? ['s' / 'r']")
+if choice.lower() == 's':
+    print('Loading final order traces for ' + date + '...')
+    traces = np.load(path + 'traces.npy').item()
+else:
+    traces = make_order_traces_from_fibparms(fibparms)   
+
+# determine slit_heights from fibre profiles
+slit_heights = []
+for ord in sorted(traces.keys()):
+    # calculate median slit height between outermost sky fibres and add 5 pixels to make sure we're at least ~3-4 pixels above/beloce calib fibres
+    slit_heights.append(np.ceil(np.median(np.abs(0.5 * (fibparms[ord]['fibre_02']['mu_fit'] - fibparms[ord]['fibre_27']['mu_fit'])))) + 5)
+slit_height = np.max(slit_heights[1:]).astype(int)  # exclude order_01, as can be quite dodgy
+#####################################################################################################################################################
+
+
+### (6) PROCESS SIM. CALIBRATION LAMP MASTER FRAMES #################################################################################################
+# (6a) extract Master Whites
+stripes,indices = extract_stripes(MW, traces, return_indices=True, slit_height=slit_height)     # NOTE: these indices are now common for ALL subsequent extractions, so no need to run extract_stripes again
+pix_q,flux_q,err_q = extract_spectrum_from_indices(MW, err_MW, indices, method='quick', slit_height=slit_height, ronmask=ronmask, savefile=True,
+                                                   filetype='fits', obsname='master_white', path=path, timit=True)
+pix,flux,err = extract_spectrum_from_indices(MW, err_MW, indices, method='optimal', slit_height=slit_height, slope=True, offset=True,
+                                             individual_fibres=True, ronmask=ronmask, savefile=True, filetype='fits', obsname='master_white', path=path, timit=True)
+
+# (6b) MAKE MASTER FRAMES FOR EACH OF THE SIMULTAENOUS CALIBRATION SOURCES AND EXTRACT THEM 
 if len(thxe_list) > 0:
-    master_simth, err_master_simth = make_master_calib(thxe_list, lamptype='simth', MB=medbias, ronmask=ronmask, MD=MDS, gain=gain, chipmask=chipmask, remove_bg=True, savefile=True, path=path)
+    choice = 'r'
+    if os.path.isfile(path + 'master_simthxe.fits'):
+        choice = raw_input("Master SimThXe frame for " + date + " already exists! Do you want to skip this step or recreate it? ['s' / 'r']")
+    if choice.lower() == 's':
+        print('Loading MASTER SimThXe frame for ' + date + '...')
+        master_simth = pyfits.getdata(path + 'master_simthxe.fits', 0)
+        err_master_simth = pyfits.getdata(path + 'master_simthxe.fits', 1)
+    else:
+        master_simth, err_master_simth = make_master_calib(thxe_list, lamptype='simth', MB=medbias, ronmask=ronmask, MD=MDS, gain=gain, chipmask=chipmask, remove_bg=True, savefile=True, path=path)
+    # now do the extraction    
+    pix_q,flux_q,err_q = extract_spectrum_from_indices(master_simth, err_master_simth, indices, method='quick', slit_height=slit_height, ronmask=ronmask, savefile=True,
+                                                       filetype='fits', obsname='master_simthxe', path=path, timit=True)
+    pix,flux,err = extract_spectrum_from_indices(master_simth, err_master_simth, indices, method='optimal', slit_height=slit_height, slope=True, offset=True,
+                                                 individual_fibres=True, ronmask=ronmask, savefile=True, filetype='fits', obsname='master_simthxe', path=path, timit=True)
+    
 if len(laser_list) > 0:
-    master_lfc, err_master_lfc = make_master_calib(laser_list, lamptype='simth', MB=medbias, ronmask=ronmask, MD=MDS, gain=gain, chipmask=chipmask, remove_bg=True, savefile=True, path=path)
+    choice = 'r'
+    if os.path.isfile(path + 'master_lfc.fits'):
+        choice = raw_input("Master LFC frame for " + date + " already exists! Do you want to skip this step or recreate it? ['s' / 'r']")
+    if choice.lower() == 's':
+        print('Loading MASTER LFC frame for ' + date + '...')
+        master_lfc = pyfits.getdata(path + 'master_lfc.fits', 0)
+        err_master_lfc = pyfits.getdata(path + 'master_lfc.fits', 1)
+    else:
+        master_lfc, err_master_lfc = make_master_calib(laser_list, lamptype='lfc', MB=medbias, ronmask=ronmask, MD=MDS, gain=gain, chipmask=chipmask, remove_bg=True, savefile=True, path=path)
+    # now do the extraction
+    pix_q,flux_q,err_q = extract_spectrum_from_indices(master_lfc, err_master_lfc, indices, method='quick', slit_height=slit_height, ronmask=ronmask, savefile=True,
+                                                       filetype='fits', obsname='master_lfc', path=path, timit=True)
+    pix,flux,err = extract_spectrum_from_indices(master_lfc, err_master_lfc, indices, method='optimal', slit_height=slit_height, slope=True, offset=True,
+                                                 individual_fibres=True, ronmask=ronmask, savefile=True, filetype='fits', obsname='master_lfc', path=path, timit=True)
+    
+    
 if len(laser_and_thxe_list) > 0:
-    master_lfc_plus_simth, err_master_lfc_plus_simth = make_master_calib(laser_and_thxe_list, lamptype='both', MB=medbias, ronmask=ronmask, MD=MDS, gain=gain, chipmask=chipmask, remove_bg=True, savefile=True, path=path)
+    choice = 'r'
+    if os.path.isfile(path + 'master_lfc_plus_simth.fits'):
+        choice = raw_input("Master LFC_PLUS_SIMTH frame for " + date + " already exists! Do you want to skip this step or recreate it? ['s' / 'r']")
+    if choice.lower() == 's':
+        print('Loading MASTER LFC + SimThXe frame for ' + date + '...')
+        master_both = pyfits.getdata(path + 'master_lfc_plus_simth.fits', 0)
+        err_master_both = pyfits.getdata(path + 'master_lfc_plus_simth.fits', 1)
+    else:
+        master_both, err_master_both = make_master_calib(laser_and_thxe_list, lamptype='both', MB=medbias, ronmask=ronmask, MD=MDS, gain=gain, chipmask=chipmask, remove_bg=True, savefile=True, path=path)
+    # now do the extraction
+    pix_q,flux_q,err_q = extract_spectrum_from_indices(master_both, err_master_both, indices, method='quick', slit_height=slit_height, ronmask=ronmask, savefile=True,
+                                                       filetype='fits', obsname='master_laser_and_thxe_list', path=path, timit=True)
+    pix,flux,err = extract_spectrum_from_indices(master_both, err_master_both, indices, method='optimal', slit_height=slit_height, slope=True, offset=True,
+                                                 individual_fibres=True, ronmask=ronmask, savefile=True, filetype='fits', obsname='master_laser_and_thxe_list', path=path, timit=True)
+#####################################################################################################################################################    
 
 
-### (4) PROCESS SCIENCE IMAGES
-# figure out the configuration of the calibration lamps for the ARC exposures
+### (7) PROCESS and EXTRACT ARC IMAGES #######################################################################################################3######
+# first, figure out the configuration of the calibration lamps for the ARC exposures
 arc_sublists = {'lfc':[], 'thxe':[], 'both':[], 'neither':[]}
 for file in arc_list:
     lc = 0
@@ -227,23 +313,39 @@ for file in arc_list:
     elif lc+thxe == 2:
         arc_sublists['both'].append(file)
         
-# (4a) PROCESS ARC IMAGES
 for subl in arc_sublists.keys():
-    dum = process_science_images(arc_sublists[subl], P_id, chipmask, mask=mask, sampling_size=25, slit_height=30, gain=gain, MB=medbias, ronmask=ronmask, MD=MDS, scalable=True,
-                                 saveall=False, path=path, ext_method='optimal', offset='True', slope='True', fibs='all', date=date, from_indices=True, timit=True)
-# (4b) PROCESS STELLAR IMAGES
-dum = process_science_images(stellar_list, P_id, chipmask, mask=mask, sampling_size=25, slit_height=24, gain=gain, MB=medbias, ronmask=ronmask, MD=MDS, scalable=True, 
-                             saveall=False, path=path, ext_method='optimal', offset='True', slope='True', fibs='stellar', date=date, from_indices=True, timit=True)
+    if len(subl) > 0:
+        dum = process_science_images(arc_sublists[subl], traces, chipmask, mask=mask, stripe_indices=indices, sampling_size=25, slit_height=slit_height, gain=gain, MB=medbias, 
+                                     ronmask=ronmask, MD=MDS, scalable=True, saveall=False, path=path, ext_method='optimal', offset='True', slope='True', fibs='all', date=date, 
+                                     from_indices=True, timit=True)
+#####################################################################################################################################################
 
 
+### (8) PROCESS SIM. CALIBRATION FRAMES #############################################################################################################
+# TODO: use different traces and smaller slit_height for LFC only and lfc only
+# TODO: add fibs='lfc', 'simth' 'both'
+if len(thxe_list) > 0:
+    dum = process_science_images(thxe_list, traces, chipmask, mask=mask, stripe_indices=indices, sampling_size=25, slit_height=slit_height, gain=gain, MB=medbias, ronmask=ronmask,
+                                 MD=MDS, scalable=True, saveall=False, path=path, ext_method='optimal', offset='True', slope='True', fibs='stellar', date=date, from_indices=True, timit=True)
+if len(laser_list) > 0:
+    dum = process_science_images(laser_list, traces, chipmask, mask=mask, stripe_indices=indices, sampling_size=25, slit_height=slit_height, gain=gain, MB=medbias, ronmask=ronmask,
+                                 MD=MDS, scalable=True, saveall=False, path=path, ext_method='optimal', offset='True', slope='True', fibs='stellar', date=date, from_indices=True, timit=True)
+if len(laser_and_thxe_list) > 0:
+    dum = process_science_images(laser_and_thxe_list, traces, chipmask, mask=mask, stripe_indices=indices, sampling_size=25, slit_height=slit_height, gain=gain, MB=medbias, ronmask=ronmask,
+                                 MD=MDS, scalable=True, saveall=False, path=path, ext_method='optimal', offset='True', slope='True', fibs='stellar', date=date, from_indices=True, timit=True)
+#####################################################################################################################################################
 
-# (5) calculate barycentric correction and append to FITS header
+
+### (9) PROCESS STELLAR IMAGES ######################################################################################################################
+if len(stellar_list) > 0:
+    dum = process_science_images(stellar_list, traces, chipmask, mask=mask, stripe_indices=indices, sampling_size=25, slit_height=slit_height, gain=gain, MB=medbias, ronmask=ronmask,
+                                 MD=MDS, scalable=True, saveall=False, path=path, ext_method='optimal', offset='True', slope='True', fibs='stellar', date=date, from_indices=True, timit=True)
+#####################################################################################################################################################
 
 
-
-# (6) calculate RV
-
-
+### (10) CALCULATE RADIAL VELOCITIES ################################################################################################################
+# RV = ?
+#####################################################################################################################################################
 
 
 

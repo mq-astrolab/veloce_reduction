@@ -932,7 +932,7 @@ def optimal_extraction_from_indices(img, stripe_indices, err_img=None, ronmask=N
 
 
 def extract_spectrum(stripes, err_stripes, ron_stripes, method='optimal', individual_fibres=True, combined_profiles=False, integrate_profiles=False, slope=False,
-                     offset=False, fibs='all', slit_height=25, savefile=False, filetype='fits', obsname=None, date=None, path=None, simu=False, verbose=False, timit=False, debug_level=0):
+                     offset=False, fibs='all', slit_height=30, savefile=False, filetype='fits', obsname=None, date=None, path=None, simu=False, verbose=False, timit=False, debug_level=0):
     """
     This routine is simply a wrapper code for the different extraction methods. There are a total FIVE (1,2,3a,3b,3c) different extraction methods implemented, 
     which can be selected by a combination of the 'method', individual_fibres', and 'combined_profile' keyword arguments.
@@ -970,7 +970,7 @@ def extract_spectrum(stripes, err_stripes, ron_stripes, method='optimal', indivi
                            the function at the discrete values corresponding to the pixel centres (which is only a good approximation if the function varies slowly)
     'slope'              : boolean - do you want to include a slope (along the slit) as an extra 'fibre' in the optimal extraction?
     'offset'             : boolean - do you want to include an offset as an extra 'fibre' in the optimal extraction?
-    'fibs'               : which fibres do you want to include in the profile creation for the optimal extraction? ['all', 'stellar', 'sky2', 'sky3', 'allsky']
+    'fibs'               : which fibres do you want to include in the profile creation for the optimal extraction? ['all', 'stellar', 'sky2', 'sky3', 'allsky', 'lfc', 'simth', 'calibs']
     'slit_height'        : height of the extraction slit is 2*slit_height pixels
     'gain'               : gain
     'savefile'           : boolean - do you want to save the extracted spectrum to a file? 
@@ -1097,7 +1097,7 @@ def extract_spectrum(stripes, err_stripes, ron_stripes, method='optimal', indivi
 
 
 def extract_spectrum_from_indices(img, err_img, stripe_indices, ronmask=None, method='optimal', individual_fibres=True, combined_profiles=False, integrate_profiles=False, slope=False,
-                                  offset=False, fibs='all', slit_height=25, savefile=False, filetype='fits', obsname=None, date=None, path=None, simu=False, verbose=False, timit=False, debug_level=0):
+                                  offset=False, fibs='all', slit_height=30, savefile=False, filetype='fits', obsname=None, date=None, path=None, simu=False, verbose=False, timit=False, debug_level=0):
     """
     CLONE OF 'extract_spectrum'!
     This routine is simply a wrapper code for the different extraction methods. There are a total FIVE (1,2,3a,3b,3c) different extraction methods implemented, 
@@ -1137,7 +1137,7 @@ def extract_spectrum_from_indices(img, err_img, stripe_indices, ronmask=None, me
                            the function at the discrete values corresponding to the pixel centres (which is only a good approximation if the function varies slowly)
     'slope'              : boolean - do you want to include a slope (along the slit) as an extra 'fibre' in the optimal extraction?
     'offset'             : boolean - do you want to include an offset as an extra 'fibre' in the optimal extraction?
-    'fibs'               : which fibres do you want to include in the profile creation for the optimal extraction? ['all', 'stellar', 'sky2', 'sky3', 'allsky']
+    'fibs'               : which fibres do you want to include in the profile creation for the optimal extraction? ['all', 'stellar', 'sky2', 'sky3', 'allsky', 'lfc', 'simth', 'calibs']
     'slit_height'        : height of the extraction slit is 2*slit_height pixels
     'gain'               : gain
     'savefile'           : boolean - do you want to save the extracted spectrum to a file? 
