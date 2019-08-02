@@ -135,11 +135,7 @@ else:
     MW,err_MW = process_whites(flat_list, MB=medbias, ronmask=ronmask, MD=MDS, gain=gain, scalable=True, fancy=False, P_id=None,
                                clip=5., savefile=False, saveall=False, diffimg=False, remove_bg=False, path=path, debug_level=1, timit=False)
     
-    
-# (iv) preliminary master LFC frame - no background removal, needed so we can create the fibre profiles / do the tracing
-if len(laser_list) > 0:
-    master_lfc, err_master_lfc = make_master_calib(laser_list, lamptype='simth', MB=medbias, ronmask=ronmask, MD=MDS, gain=gain, chipmask=None, remove_bg=False, savefile=False, path=path)
-#####################################################################################################################################################
+    #####################################################################################################################################################
 
 
 
@@ -235,8 +231,8 @@ slit_height = np.max(slit_heights[1:]).astype(int)  # exclude order_01, as can b
 # (6a) extract Master Whites
 stripes,indices = extract_stripes(MW, traces, return_indices=True, slit_height=slit_height)     # NOTE: these indices are now common for ALL subsequent extractions, so no need to run extract_stripes again
 pix_q,flux_q,err_q = extract_spectrum_from_indices(MW, err_MW, indices, method='quick', slit_height=slit_height, ronmask=ronmask, savefile=True,
-                                                   filetype='fits', obsname='master_white', path=path, timit=True)
-pix,flux,err = extract_spectrum_from_indices(MW, err_MW, indices, method='optimal', slit_height=slit_height, fibs='all', slope=True, offset=True,
+                                                   date=date, filetype='fits', obsname='master_white', path=path, timit=True)
+pix,flux,err = extract_spectrum_from_indices(MW, err_MW, indices, method='optimal', slit_height=slit_height, fibs='all', slope=True, offset=True, date=date,
                                              individual_fibres=True, ronmask=ronmask, savefile=True, filetype='fits', obsname='master_white', path=path, timit=True)
 
 # (6b) MAKE MASTER FRAMES FOR EACH OF THE SIMULTAENOUS CALIBRATION SOURCES AND EXTRACT THEM 
@@ -252,8 +248,8 @@ if len(thxe_list) > 0:
         master_simth, err_master_simth = make_master_calib(thxe_list, lamptype='simth', MB=medbias, ronmask=ronmask, MD=MDS, gain=gain, chipmask=chipmask, remove_bg=True, savefile=True, path=path)
     # now do the extraction    
     pix_q,flux_q,err_q = extract_spectrum_from_indices(master_simth, err_master_simth, indices, method='quick', slit_height=slit_height, ronmask=ronmask, savefile=True,
-                                                       filetype='fits', obsname='master_simthxe', path=path, timit=True)
-    pix,flux,err = extract_spectrum_from_indices(master_simth, err_master_simth, indices, method='optimal', slit_height=slit_height, fibs='simth', slope=True, offset=True,
+                                                       date=date, filetype='fits', obsname='master_simthxe', path=path, timit=True)
+    pix,flux,err = extract_spectrum_from_indices(master_simth, err_master_simth, indices, method='optimal', slit_height=slit_height, fibs='simth', slope=True, offset=True, date=date,
                                                  individual_fibres=True, ronmask=ronmask, savefile=True, filetype='fits', obsname='master_simthxe', path=path, timit=True)
     
 if len(laser_list) > 0:
@@ -268,10 +264,9 @@ if len(laser_list) > 0:
         master_lfc, err_master_lfc = make_master_calib(laser_list, lamptype='lfc', MB=medbias, ronmask=ronmask, MD=MDS, gain=gain, chipmask=chipmask, remove_bg=True, savefile=True, path=path)
     # now do the extraction
     pix_q,flux_q,err_q = extract_spectrum_from_indices(master_lfc, err_master_lfc, indices, method='quick', slit_height=slit_height, ronmask=ronmask, savefile=True,
-                                                       filetype='fits', obsname='master_lfc', path=path, timit=True)
-    pix,flux,err = extract_spectrum_from_indices(master_lfc, err_master_lfc, indices, method='optimal', slit_height=slit_height, fibs='lfc', slope=True, offset=True,
+                                                       date=date, filetype='fits', obsname='master_lfc', path=path, timit=True)
+    pix,flux,err = extract_spectrum_from_indices(master_lfc, err_master_lfc, indices, method='optimal', slit_height=slit_height, fibs='lfc', slope=True, offset=True, date=date,
                                                  individual_fibres=True, ronmask=ronmask, savefile=True, filetype='fits', obsname='master_lfc', path=path, timit=True)
-    
     
 if len(laser_and_thxe_list) > 0:
     choice = 'r'
@@ -285,8 +280,8 @@ if len(laser_and_thxe_list) > 0:
         master_both, err_master_both = make_master_calib(laser_and_thxe_list, lamptype='both', MB=medbias, ronmask=ronmask, MD=MDS, gain=gain, chipmask=chipmask, remove_bg=True, savefile=True, path=path)
     # now do the extraction
     pix_q,flux_q,err_q = extract_spectrum_from_indices(master_both, err_master_both, indices, method='quick', slit_height=slit_height, ronmask=ronmask, savefile=True,
-                                                       filetype='fits', obsname='master_laser_and_thxe_list', path=path, timit=True)
-    pix,flux,err = extract_spectrum_from_indices(master_both, err_master_both, indices, method='optimal', slit_height=slit_height, fibs='calibs', slope=True, offset=True,
+                                                       date=date, filetype='fits', obsname='master_laser_and_thxe_list', path=path, timit=True)
+    pix,flux,err = extract_spectrum_from_indices(master_both, err_master_both, indices, method='optimal', slit_height=slit_height, fibs='calibs', slope=True, offset=True, date=date,
                                                  individual_fibres=True, ronmask=ronmask, savefile=True, filetype='fits', obsname='master_laser_and_thxe_list', path=path, timit=True)
 #####################################################################################################################################################    
 
@@ -322,8 +317,7 @@ for subl in arc_sublists.keys():
 
 
 ### (8) PROCESS SIM. CALIBRATION FRAMES #############################################################################################################
-# TODO: use different traces and smaller slit_height for LFC only and lfc only
-# TODO: add fibs='lfc', 'simth' 'both'
+# TODO: use different traces and smaller slit_height for LFC only and lfc only???
 if len(thxe_list) > 0:
     dum = process_science_images(thxe_list, traces, chipmask, mask=mask, stripe_indices=indices, sampling_size=25, slit_height=slit_height, gain=gain, MB=medbias, ronmask=ronmask,
                                  MD=MDS, scalable=True, saveall=False, path=path, ext_method='optimal', offset='True', slope='True', fibs='simth', date=date, from_indices=True, timit=True)

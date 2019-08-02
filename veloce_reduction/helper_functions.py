@@ -527,27 +527,27 @@ def make_norm_profiles_6(x, col, fppo, integrate=False, fibs='stellar', slope=Fa
     nfib = 26
     
     # same number of fibres for every order, of course
-    if fibs == 'all':
+    if fibs.lower() == 'all':
         userange = np.arange(nfib)
-    elif fibs == 'stellar':
+    elif fibs.lower() in ['stellar', 'object']:
         # nfib = 19
         userange = np.arange(3, 22, 1)
-    elif fibs == 'laser':
+    elif fibs.lower() in ['lfc', 'laser']:
         # nfib = 1
         userange = np.arange(25, 26, 2)
-    elif fibs == 'thxe':
+    elif fibs.lower() in ['simth', 'thxe']:
         # nfib = 1
         userange = np.arange(0, 1, 2)
-    elif fibs == 'sky3':
+    elif fibs.lower() == 'sky3':
         # nfib = 3
         userange = np.arange(22, 25, 1)
-    elif fibs == 'sky2':
+    elif fibs.lower() == 'sky2':
         # nfib = 2
         userange = np.arange(1, 3, 1)
-    elif fibs == 'allsky':
+    elif fibs.lower() == 'allsky':
         # nfib = 5
         userange = np.r_[np.arange(1, 3, 1), np.arange(22, 25, 1)]
-    elif fibs == 'calibs':
+    elif fibs.lower() == 'calibs':
         # nfib = 2
         userange = np.r_[np.arange(0, 1, 2), np.arange(25, 26, 2)]
     else:

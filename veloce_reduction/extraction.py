@@ -20,7 +20,7 @@ from veloce_reduction.veloce_reduction.relative_intensities import get_relints
 
 
 
-def quick_extract(stripes, err_stripes, slit_height=25, verbose=False, timit=False):
+def quick_extract(stripes, err_stripes, slit_height=30, skip_first_order=False, debug_level=0, timit=False):
     """
     This routine performs a quick-look reduction of an echelle spectrum, by simply adding up the flux in a pixel column
     perpendicular to the dispersion direction. Similar to the tramline extraction in "collapse_extract", but even sloppier
@@ -30,6 +30,7 @@ def quick_extract(stripes, err_stripes, slit_height=25, verbose=False, timit=Fal
     'stripes'     : dictionary (keys = orders) containing the 2-dim stripes (ie the to-be-extracted regions centred on the orders) of the spectrum
     'err_stripes' : dictionary (keys = orders) containing the errors in the 2-dim stripes (ie the to-be-extracted regions centred on the orders) of the spectrum    
     'slit_height' : height of the extraction slit (ie the pixel columns are 2*slit_height pixels long)
+    'skip_first_order'   : boolean - do you want to skip order 01 (causes problems as not fully on chip, and especially b/c LFC trace is rubbish)
     'verbose'     : boolean - for debugging...
     'timit'       : boolean - do you want to measure execution run time?
     
@@ -39,7 +40,7 @@ def quick_extract(stripes, err_stripes, slit_height=25, verbose=False, timit=Fal
     'err'     : dictionary (keys = orders) containing the uncertainty in the summed up (ie collapsed) flux (including photon noise and read-out noise)
     """
     
-    if verbose:
+    if debug_level > 1:
         print('Performing quick-look extraction of orders...')
     
     if timit:    
@@ -48,10 +49,14 @@ def quick_extract(stripes, err_stripes, slit_height=25, verbose=False, timit=Fal
     flux = {}
     err = {}
     pixnum = {}
-    
+
+    useful_orders = sorted(stripes.keys())
+    if skip_first_order:
+        del useful_orders[0]
+
     # loop over all orders
-    for ord in sorted(stripes.keys()):
-        if verbose:
+    for ord in useful_orders:
+        if debug_level > 1:
             print('OK, now processing order '+str(ord)+'...')
         if timit:
             order_start_time = time.time()
@@ -69,14 +74,14 @@ def quick_extract(stripes, err_stripes, slit_height=25, verbose=False, timit=Fal
         err[ord] = np.sqrt(np.sum(err_sc*err_sc, axis=0))
         pixnum[ord] = np.arange(nx) + 1
     
-        if timit:
+        if debug_level > 0:
             print('Time taken for quick-look extraction of '+ord+': '+str(time.time() - order_start_time)+' seconds')
     
     
     if timit:
         print('Time taken for quick-look extraction of spectrum: '+str(time.time() - start_time)+' seconds')
     
-    if verbose:
+    if debug_level > 1:
         print('Extraction complete! Coffee time...')
     
     return pixnum,flux,err
@@ -85,7 +90,7 @@ def quick_extract(stripes, err_stripes, slit_height=25, verbose=False, timit=Fal
 
 
 
-def quick_extract_from_indices(img, err_img, stripe_indices, slit_height=25, verbose=False, timit=False):
+def quick_extract_from_indices(img, err_img, stripe_indices, slit_height=30, skip_first_order=False, debug_level=0, timit=False):
     """
     This routine performs a quick-look reduction of an echelle spectrum, by simply adding up the flux in a pixel column
     perpendicular to the dispersion direction. Similar to the tramline extraction in "collapse_extract", but even sloppier
@@ -96,7 +101,8 @@ def quick_extract_from_indices(img, err_img, stripe_indices, slit_height=25, ver
     'err_img'        : 2-dim array of the corresponding errors
     'stripe_indices' : dictionary (keys = orders) containing the indices of the pixels that are identified as the "stripes" (ie the to-be-extracted regions centred on the orders)
     'slit_height'    : height of the extraction slit (ie the pixel columns are 2*slit_height pixels long)
-    'verbose'        : boolean - for debugging...
+    'skip_first_order'   : boolean - do you want to skip order 01 (causes problems as not fully on chip, and especially b/c LFC trace is rubbish)
+    'debug_level'    : boolean - for debugging...
     'timit'          : boolean - do you want to measure execution run time?
     
     OUTPUT:
@@ -105,9 +111,10 @@ def quick_extract_from_indices(img, err_img, stripe_indices, slit_height=25, ver
     'err'     : dictionary (keys = orders) containing the uncertainty in the summed up (ie collapsed) flux (including photon noise and read-out noise)
     """
     
-    print('ATTENTION: This routine works fine, but consider using "quick_extract", as it is a factor of ~2 faster...')
+    if debug_level > 0:
+        print('ATTENTION: This routine works fine, but consider using "quick_extract", as it is a factor of ~2 faster...')
     
-    if verbose:
+    if debug_level > 1:
         print('Performing quick-look extraction of orders...')
     
     if timit:    
@@ -116,9 +123,14 @@ def quick_extract_from_indices(img, err_img, stripe_indices, slit_height=25, ver
     flux = {}
     err = {}
     pixnum = {}
-    
-    for ord in sorted(stripe_indices.keys()):
-        if verbose:
+
+    useful_orders = sorted(stripe_indices.keys())
+    if skip_first_order:
+        del useful_orders[0]
+
+    # loop over all orders
+    for ord in useful_orders:
+        if debug_level > 1:
             print('OK, now processing order '+str(ord)+'...')
         if timit:
             order_start_time = time.time()
@@ -135,14 +147,14 @@ def quick_extract_from_indices(img, err_img, stripe_indices, slit_height=25, ver
         err[ord] = np.sqrt(np.sum(err_sc*err_sc,axis=0))
         pixnum[ord] = np.arange(nx) + 1
     
-        if timit:
+        if debug_level > 0:
             print('Time taken for quick-look extraction of '+ord+': '+str(time.time() - order_start_time)+' seconds')
     
     
     if timit:
         print('Time taken for quick-look extraction of spectrum: '+str(time.time() - start_time)+' seconds')
     
-    if verbose:
+    if debug_level > 1:
         print('Extraction complete! Coffee time...')
     
     return pixnum,flux,err
@@ -309,7 +321,7 @@ def collapse_extract_from_indices(img, err_img, stripe_indices, tramlines, slit_
 
 
 
-def optimal_extraction(stripes, err_stripes=None, ron_stripes=None, slit_height=30, date=None, fibs='all', relints=None,
+def optimal_extraction(stripes, err_stripes=None, ron_stripes=None, slit_height=30, date=None, fibs='all', relints=None, skip_first_order=False,
                        simu=False, phi_onthefly=False, individual_fibres=True, combined_profiles=False, integrate_profiles=False,
                        slope=False, offset=False, collapse=False, debug_level=0, timit=False):
 
@@ -326,6 +338,7 @@ def optimal_extraction(stripes, err_stripes=None, ron_stripes=None, slit_height=
     'date'               : the date ('YYYYMMDD') the obervations were taken (so that the sorresponding (pre-determined) fibre profiles can be loaded)
     'fibs'               : which fibres are you using? ['all', 'stellar', 'sky2', 'sky3', 'allsky']
     'relints'            : an array of the relative intensities in the stellar fibres (only needed if 'individual_fibres' == FALSE and 'combined_profiles' == TRUE)
+    'skip_first_order'   : boolean - do you want to skip order 01 (causes problems as not fully on chip, and especially b/c LFC trace is rubbish)
     'simu'               : boolean - are you using simulated spectra?
     'phi_onthefly'       : boolean - CODING RELIC - TO BE REMOVED; creates fibre profiles on the fly
     'individual_fibres'  : boolean - do you want to extract spectra for each fibre individually?
@@ -389,19 +402,26 @@ def optimal_extraction(stripes, err_stripes=None, ron_stripes=None, slit_height=
         if date not in ['20181116', '20190127', '20190201']:
 #             fibparms = np.load('/Users/christoph/OneDrive - UNSW/fibre_profiles/archive/fibre_profile_fits_' + date + '.npy').item()
             fibparms = np.load('/Users/christoph/OneDrive - UNSW/fibre_profiles/archive/combined_fibre_profile_fits_' + date + '.npy').item()
-            print('OK, loading fibre profiles for ' + date + '...')
+            if debug_level > 0:
+                print('OK, loading fibre profiles for ' + date + '...')
         else:
             # have to laod this crutch, as the first order fits were crap for 20181116 / 20190127 / 20190201, so just for order 01 I replaced them with the parms from the following night
 #             fibparms = np.load('/Users/christoph/OneDrive - UNSW/fibre_profiles/archive/fibre_profile_fits_' + date + '_crutch.npy').item()
             fibparms = np.load('/Users/christoph/OneDrive - UNSW/fibre_profiles/archive/combined_fibre_profile_fits_' + date + '_crutch.npy').item()
-            print('OK, loading fibre profiles (CRUTCH!!!) for ' + date + '...')
+            if debug_level > 0:
+                print('OK, loading fibre profiles (CRUTCH!!!) for ' + date + '...')
 
     flux = {}
     err = {}
     pix = {}
 
+
+    useful_orders = sorted(stripes.keys())
+    if skip_first_order:
+        del useful_orders[0]
+
     # loop over all orders
-    for ord in sorted(stripes.iterkeys()):
+    for ord in useful_orders:
         if debug_level > 0:
             print('OK, now processing order: ' + ordnum)
         if timit:
@@ -496,14 +516,13 @@ def optimal_extraction(stripes, err_stripes=None, ron_stripes=None, slit_height=
             else:
                 # get normalized profiles for all fibres for this cutout
                 if combined_profiles:
-                    print('WARNING: we currently do not have a profile estimate for the calibration fibres!!!')
-                    phi_laser = np.sum(make_norm_profiles_5(sr[:, i], i, fppo, integrate=integrate_profiles, fibs='laser'), axis=1)
-                    phi_thxe = np.sum(make_norm_profiles_5(sr[:, i], i, fppo, integrate=integrate_profiles, fibs='thxe'), axis=1)
-                    phis_sky3 = make_norm_profiles_5(sr[:, i], i, fppo, integrate=integrate_profiles, fibs='sky3')
+                    phi_laser = np.sum(make_norm_profiles_6(sr[:, i], i, fppo, integrate=integrate_profiles, fibs='laser'), axis=1)
+                    phi_thxe = np.sum(make_norm_profiles_6(sr[:, i], i, fppo, integrate=integrate_profiles, fibs='thxe'), axis=1)
+                    phis_sky3 = make_norm_profiles_6(sr[:, i], i, fppo, integrate=integrate_profiles, fibs='sky3')
                     phi_sky3 = np.sum(phis_sky3, axis=1) / 3.
-                    phis_stellar = make_norm_profiles_5(sr[:, i], i, fppo, integrate=integrate_profiles, fibs='stellar')
+                    phis_stellar = make_norm_profiles_6(sr[:, i], i, fppo, integrate=integrate_profiles, fibs='stellar')
                     phi_stellar = np.sum(phis_stellar * relints, axis=1)
-                    phis_sky2 = make_norm_profiles_5(sr[:, i], i, fppo, integrate=integrate_profiles, fibs='sky2')
+                    phis_sky2 = make_norm_profiles_6(sr[:, i], i, fppo, integrate=integrate_profiles, fibs='sky2')
                     phi_sky2 = np.sum(phis_sky2, axis=1) / 2.
                     phi_sky = (phi_sky3 + phi_sky2) / 2.
                     phi = np.vstack((phi_laser, phi_sky, phi_stellar, phi_thxe)).T
@@ -620,7 +639,7 @@ def optimal_extraction(stripes, err_stripes=None, ron_stripes=None, slit_height=
 
 
 def optimal_extraction_from_indices(img, stripe_indices, err_img=None, ronmask=None, slit_height=30, date=None, fibs='all',
-                                    relints=None, simu=False, phi_onthefly=False, individual_fibres=True,
+                                    relints=None, skip_first_order=False, simu=False, phi_onthefly=False, individual_fibres=True,
                                     combined_profiles=False, integrate_profiles=False, slope=False, offset=False,
                                     collapse=False, debug_level=0, timit=False):
     """
@@ -638,6 +657,7 @@ def optimal_extraction_from_indices(img, stripe_indices, err_img=None, ronmask=N
     'fibs'               : which fibres are you using? ['all', 'stellar', 'sky2', 'sky3', 'allsky']
     'relints'            : an array of the relative intensities in the stellar fibres (only needed if 'individual_fibres' == FALSE and 'combined_profiles' == TRUE)
     'simu'               : boolean - are you using simulated spectra?
+    'skip_first_order'   : boolean - do you want to skip order 01 (causes problems as not fully on chip, and especially b/c LFC trace is rubbish)
     'phi_onthefly'       : boolean - CODING RELIC - TO BE REMOVED; creates fibre profiles on the fly
     'individual_fibres'  : boolean - do you want to extract spectra for each fibre individually?
     'combined_profiles'  : boolean - do you want to use a combined profile for each 'object' (stellar / sky / laser / thxe)? ignored if 'individual_fibres' is set to TRUE
@@ -702,20 +722,25 @@ def optimal_extraction_from_indices(img, stripe_indices, err_img=None, ronmask=N
         if date not in ['20181116', '20190127', '20190201']:
 #             fibparms = np.load('/Users/christoph/OneDrive - UNSW/fibre_profiles/archive/fibre_profile_fits_' + date + '.npy').item()
             fibparms = np.load('/Users/christoph/OneDrive - UNSW/fibre_profiles/archive/combined_fibre_profile_fits_' + date + '.npy').item()
-            print('OK, loading fibre profiles for ' + date + '...')
+            if debug_level > 0:
+                print('OK, loading fibre profiles for ' + date + '...')
         else:
             # have to laod this crutch, as the first order fits were crap for 20181116 / 20190127 / 20190201, so just for order 01 I replaced them with the parms from the following night
 #             fibparms = np.load('/Users/christoph/OneDrive - UNSW/fibre_profiles/archive/fibre_profile_fits_' + date + '_crutch.npy').item()
             fibparms = np.load('/Users/christoph/OneDrive - UNSW/fibre_profiles/archive/combined_fibre_profile_fits_' + date + '_crutch.npy').item()
-            print('OK, loading fibre profiles (CRUTCH!!!) for ' + date + '...')
+            if debug_level > 0:
+                print('OK, loading fibre profiles (CRUTCH!!!) for ' + date + '...')
 
     flux = {}
     err = {}
     pix = {}
 
-    # loop over all orders
-    for ord in sorted(stripe_indices.iterkeys()):
+    useful_orders = sorted(stripe_indices.keys())
+    if skip_first_order:
+        del useful_orders[0]
 
+    # loop over all orders
+    for ord in useful_orders:
         if timit:
             order_start_time = time.time()
 
@@ -818,14 +843,13 @@ def optimal_extraction_from_indices(img, stripe_indices, err_img=None, ronmask=N
             else:
                 # get normalized profiles for all fibres for this cutout
                 if combined_profiles:
-                    print('WARNING: we currently do not have a profile estimate for the calibration fibres!!!')
-                    phi_laser = np.sum(make_norm_profiles_4(sr[:, i], i, fppo, integrate=integrate_profiles, fibs='laser'), axis=1)
-                    phi_thxe = np.sum(make_norm_profiles_4(sr[:, i], i, fppo, integrate=integrate_profiles, fibs='thxe'), axis=1)
-                    phis_sky3 = make_norm_profiles_4(sr[:, i], i, fppo, integrate=integrate_profiles, fibs='sky3')
+                    phi_laser = np.sum(make_norm_profiles_6(sr[:, i], i, fppo, integrate=integrate_profiles, fibs='laser'), axis=1)
+                    phi_thxe = np.sum(make_norm_profiles_6(sr[:, i], i, fppo, integrate=integrate_profiles, fibs='thxe'), axis=1)
+                    phis_sky3 = make_norm_profiles_6(sr[:, i], i, fppo, integrate=integrate_profiles, fibs='sky3')
                     phi_sky3 = np.sum(phis_sky3, axis=1) / 3.
-                    phis_stellar = make_norm_profiles_4(sr[:, i], i, fppo, integrate=integrate_profiles, fibs='stellar')
+                    phis_stellar = make_norm_profiles_6(sr[:, i], i, fppo, integrate=integrate_profiles, fibs='stellar')
                     phi_stellar = np.sum(phis_stellar * relints, axis=1)
-                    phis_sky2 = make_norm_profiles_4(sr[:, i], i, fppo, integrate=integrate_profiles, fibs='sky2')
+                    phis_sky2 = make_norm_profiles_6(sr[:, i], i, fppo, integrate=integrate_profiles, fibs='sky2')
                     phi_sky2 = np.sum(phis_sky2, axis=1) / 2.
                     phi_sky = (phi_sky3 + phi_sky2) / 2.
                     phi = np.vstack((phi_laser, phi_sky, phi_stellar, phi_thxe)).T
@@ -942,7 +966,7 @@ def optimal_extraction_from_indices(img, stripe_indices, err_img=None, ronmask=N
 
 
 def extract_spectrum(stripes, err_stripes, ron_stripes, method='optimal', individual_fibres=True, combined_profiles=False, integrate_profiles=False, slope=False,
-                     offset=False, fibs='all', slit_height=30, savefile=False, filetype='fits', obsname=None, date=None, path=None, simu=False, verbose=False, timit=False, debug_level=0):
+                     offset=False, fibs='all', slit_height=30, savefile=False, filetype='fits', obsname=None, date=None, path=None, skip_first_order=False, simu=False, verbose=False, timit=False, debug_level=0):
     """
     This routine is simply a wrapper code for the different extraction methods. There are a total FIVE (1,2,3a,3b,3c) different extraction methods implemented, 
     which can be selected by a combination of the 'method', individual_fibres', and 'combined_profile' keyword arguments.
@@ -988,6 +1012,7 @@ def extract_spectrum(stripes, err_stripes, ron_stripes, method='optimal', indivi
     'obsname'            : (short) name of observation file
     'date'               : the date of the observations to be extracted in format 'YYYYMMDD' (needed for the optimal extraction routine to select the right fibre profiles/traces)
     'path'               : directory to the destination of the output file
+    'skip_first_order'   : boolean - do you want to skip order 01 (causes problems as not fully on chip, and especially b/c LFC trace is rubbish)
     'simu'               : boolean - are you using ES-simulated spectra???
     'verbose'            : boolean - for debugging...
     'timit'              : boolean - do you want to measure execution run time?
@@ -1010,7 +1035,7 @@ def extract_spectrum(stripes, err_stripes, ron_stripes, method='optimal', indivi
         method = raw_input('Which method do you want to use (valid options are ["quick" / "tramline" / "optimal"] )?')
         
     if method.lower() == 'quick':
-        pix, flux, err = quick_extract(stripes, err_stripes, slit_height=slit_height, verbose=verbose, timit=timit)
+        pix, flux, err = quick_extract(stripes, err_stripes, slit_height=slit_height, skip_first_order=skip_first_order, verbose=verbose, timit=timit)
     elif method.lower() == 'tramline':
         print('WARNING: need to update tramline finding routine first for new IFU layout - use method="quick" in the meantime')
         return
@@ -1018,7 +1043,7 @@ def extract_spectrum(stripes, err_stripes, ron_stripes, method='optimal', indivi
         #pix,flux,err = collapse_extract(stripes, err_stripes, tramlines, slit_height=slit_height, verbose=verbose, timit=timit, debug_level=debug_level)
     elif method.lower() == 'optimal':
         pix,flux,err = optimal_extraction(stripes, err_stripes=err_stripes, ron_stripes=ron_stripes, slit_height=slit_height, individual_fibres=individual_fibres,
-                                          combined_profiles=combined_profiles, integrate_profiles=integrate_profiles, slope=slope, offset=offset, fibs=fibs, date=date, simu=simu, timit=timit, debug_level=debug_level)
+                                          skip_first_order=skip_first_order, combined_profiles=combined_profiles, integrate_profiles=integrate_profiles, slope=slope, offset=offset, fibs=fibs, date=date, simu=simu, timit=timit, debug_level=debug_level)
     else:
         print('ERROR: Nightmare! That should never happen  --  must be an error in the Matrix...')
         return    
@@ -1054,8 +1079,8 @@ def extract_spectrum(stripes, err_stripes, ron_stripes, method='optimal', indivi
                 print('ERROR: file type for output file not recognized!')
                 filetype = raw_input('Which file type do you want to use (valid options are ["fits" / "dict" / "both"] )?') 
             if filetype in ['fits', 'both']:
-                fluxarr = np.zeros((len(pix), len(pix['order_01'])))
-                errarr = np.zeros((len(pix), len(pix['order_01'])))
+                fluxarr = np.zeros((len(pix), len(flux[flux.keys()[0]]), len(pix[pix.keys()[0]])))
+                errarr = np.zeros((len(pix), len(flux[flux.keys()[0]]), len(pix[pix.keys()[0]])))
                 for i,o in enumerate(sorted(pix.keys())):
                     fluxarr[i,:] = flux[o]
                     errarr[i,:] = err[o]
@@ -1107,7 +1132,7 @@ def extract_spectrum(stripes, err_stripes, ron_stripes, method='optimal', indivi
 
 
 def extract_spectrum_from_indices(img, err_img, stripe_indices, ronmask=None, method='optimal', individual_fibres=True, combined_profiles=False, integrate_profiles=False, slope=False,
-                                  offset=False, fibs='all', slit_height=30, savefile=False, filetype='fits', obsname=None, date=None, path=None, simu=False, verbose=False, timit=False, debug_level=0):
+                                  offset=False, fibs='all', slit_height=30, savefile=False, filetype='fits', obsname=None, date=None, path=None, skip_first_order=False, simu=False, verbose=False, timit=False, debug_level=0):
     """
     CLONE OF 'extract_spectrum'!
     This routine is simply a wrapper code for the different extraction methods. There are a total FIVE (1,2,3a,3b,3c) different extraction methods implemented, 
@@ -1149,12 +1174,12 @@ def extract_spectrum_from_indices(img, err_img, stripe_indices, ronmask=None, me
     'offset'             : boolean - do you want to include an offset as an extra 'fibre' in the optimal extraction?
     'fibs'               : which fibres do you want to include in the profile creation for the optimal extraction? ['all', 'stellar', 'sky2', 'sky3', 'allsky', 'lfc', 'simth', 'calibs']
     'slit_height'        : height of the extraction slit is 2*slit_height pixels
-    'gain'               : gain
     'savefile'           : boolean - do you want to save the extracted spectrum to a file? 
     'filetype'           : if 'savefile' is set to TRUE: do you want to save it as a 'fits' file, or as a 'dict' (python disctionary)
     'obsname'            : (short) name of observation file
     'date'               : the date of the observations to be extracted in format 'YYYYMMDD' (needed for the optimal extraction routine to select the right fibre profiles/traces)
     'path'               : directory to the destination of the output file
+    'skip_first_order'   : boolean - do you want to skip order 01 (causes problems as not fully on chip, and especially b/c LFC trace is rubbish)
     'simu'               : boolean - are you using ES-simulated spectra???
     'verbose'            : boolean - for debugging...
     'timit'              : boolean - do you want to measure execution run time?
@@ -1176,7 +1201,7 @@ def extract_spectrum_from_indices(img, err_img, stripe_indices, ronmask=None, me
         method = raw_input('Which method do you want to use (valid options are ["quick" / "tramline" / "optimal"] )?')
         
     if method.lower() == 'quick':
-        pix, flux, err = quick_extract_from_indices(img, err_img, stripe_indices, slit_height=slit_height, verbose=verbose, timit=timit)
+        pix, flux, err = quick_extract_from_indices(img, err_img, stripe_indices, slit_height=slit_height, skip_first_order=skip_first_order, verbose=verbose, timit=timit)
     elif method.lower() == 'tramline':
         print('WARNING: need to update tramline finding routine first for new IFU layout - use method="quick" in the meantime')
         return
@@ -1185,7 +1210,7 @@ def extract_spectrum_from_indices(img, err_img, stripe_indices, ronmask=None, me
     elif method.lower() == 'optimal':
         pix,flux,err = optimal_extraction_from_indices(img, stripe_indices, err_img=err_img, ronmask=ronmask, slit_height=slit_height, individual_fibres=individual_fibres,
                                                        combined_profiles=combined_profiles, integrate_profiles=integrate_profiles, slope=slope, offset=offset, fibs=fibs, 
-                                                       date=date, simu=simu, timit=timit, debug_level=debug_level)
+                                                       skip_first_order=skip_first_order, date=date, simu=simu, timit=timit, debug_level=debug_level)
     else:
         print('ERROR: Nightmare! That should never happen  --  must be an error in the Matrix...')
         return    
@@ -1222,8 +1247,8 @@ def extract_spectrum_from_indices(img, err_img, stripe_indices, ronmask=None, me
                 filetype = raw_input('Which file type do you want to use (valid options are ["fits" / "dict" / "both"] )?') 
             if filetype in ['fits', 'both']:
                 if method.lower() == 'optimal' and submethod == '3a':      # ie for individual-fibre extraction
-                    fluxarr = np.zeros((len(pix), len(flux['order_01']), len(pix['order_01'])))
-                    errarr = np.zeros((len(pix), len(flux['order_01']), len(pix['order_01'])))
+                    fluxarr = np.zeros((len(pix), len(flux[flux.keys()[0]]), len(pix[pix.keys()[0]])))
+                    errarr = np.zeros((len(pix), len(flux[flux.keys()[0]]), len(pix[pix.keys()[0]])))
                     for i,o in enumerate(sorted(pix.keys())):
                         for j,fib in enumerate(sorted(flux[o].keys())):
                             fluxarr[i,j,:] = flux[o][fib]
