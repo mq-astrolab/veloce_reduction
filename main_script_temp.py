@@ -288,6 +288,7 @@ if len(laser_and_thxe_list) > 0:
 
 ### (7) PROCESS and EXTRACT ARC IMAGES #######################################################################################################3######
 # first, figure out the configuration of the calibration lamps for the ARC exposures
+print('Processing ARC (fibre Thorium) images...')
 arc_sublists = {'lfc':[], 'thxe':[], 'both':[], 'neither':[]}
 for file in arc_list:
     lc = 0
@@ -309,22 +310,25 @@ for file in arc_list:
         arc_sublists['both'].append(file)
         
 for subl in arc_sublists.keys():
-    if len(subl) > 0:
+    if len(arc_sublists[subl]) > 0:
         dum = process_science_images(arc_sublists[subl], traces, chipmask, mask=mask, stripe_indices=indices, sampling_size=25, slit_height=slit_height, gain=gain, MB=medbias, 
                                      ronmask=ronmask, MD=MDS, scalable=True, saveall=False, path=path, ext_method='optimal', fibs='all', offset=True, slope=True, date=date, 
                                      from_indices=True, timit=True)
 #####################################################################################################################################################
 
 
-### (8) PROCESS SIM. CALIBRATION FRAMES #############################################################################################################
+### (8) PROCESS INDIVIDUAL SIM. CALIBRATION FRAMES ##################################################################################################
 # TODO: use different traces and smaller slit_height for LFC only and lfc only???
 if len(thxe_list) > 0:
+    print('Processing sim-ThXe images...')
     dum = process_science_images(thxe_list, traces, chipmask, mask=mask, stripe_indices=indices, sampling_size=25, slit_height=slit_height, gain=gain, MB=medbias, ronmask=ronmask,
                                  MD=MDS, scalable=True, saveall=False, path=path, ext_method='optimal', offset='True', slope='True', fibs='simth', date=date, from_indices=True, timit=True)
 if len(laser_list) > 0:
+    print('Processing LFC images...')
     dum = process_science_images(laser_list, traces, chipmask, mask=mask, stripe_indices=indices, sampling_size=25, slit_height=slit_height, gain=gain, MB=medbias, ronmask=ronmask,
                                  MD=MDS, scalable=True, saveall=False, path=path, ext_method='optimal', offset='True', slope='True', fibs='lfc', date=date, from_indices=True, timit=True)
 if len(laser_and_thxe_list) > 0:
+    print('Processing LFC+sim-ThXe images...')
     dum = process_science_images(laser_and_thxe_list, traces, chipmask, mask=mask, stripe_indices=indices, sampling_size=25, slit_height=slit_height, gain=gain, MB=medbias, ronmask=ronmask,
                                  MD=MDS, scalable=True, saveall=False, path=path, ext_method='optimal', offset='True', slope='True', fibs='calibs', date=date, from_indices=True, timit=True)
 #####################################################################################################################################################
@@ -332,6 +336,7 @@ if len(laser_and_thxe_list) > 0:
 
 ### (9) PROCESS STELLAR IMAGES ######################################################################################################################
 if len(stellar_list) > 0:
+    print('Processing stellar images...')
     dum = process_science_images(stellar_list, traces, chipmask, mask=mask, stripe_indices=indices, sampling_size=25, slit_height=slit_height, gain=gain, MB=medbias, ronmask=ronmask,
                                  MD=MDS, scalable=True, saveall=False, path=path, ext_method='optimal', offset='True', slope='True', fibs='all', date=date, from_indices=True, timit=True)
 #####################################################################################################################################################

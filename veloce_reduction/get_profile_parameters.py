@@ -13,7 +13,7 @@ from scipy import interpolate
 
 
 from veloce_reduction.veloce_reduction.order_tracing import find_stripes, make_P_id, extract_stripes, flatten_single_stripe
-# from veloce_reduction.veloce_reduction.chipmasks import get_mean_fibre_separation
+from veloce_reduction.veloce_reduction.chipmasks import get_mean_fibre_separation
 
 
 
@@ -362,7 +362,7 @@ def get_simthxe_offset(date='20190503', return_median=False, norm=True):
     
     
     
-def combine_fibparms(date, savefile=True):
+def combine_fibparms(date, use_lfc=True, savefile=True):
     
     archive_path = '/Users/christoph/OneDrive - UNSW/fibre_profiles/archive/'
     simthxe_path = '/Users/christoph/OneDrive - UNSW/fibre_profiles/simthxe/'
@@ -389,13 +389,17 @@ def combine_fibparms(date, savefile=True):
             new_simthxe_traces[o,f,:] = stellar_fibparms[ord][fib]['mu_fit'] - (28 - int(fib[-2:])) * simthxe_offsets[o,f,:]
     med_new_simthxe_trace = np.median(new_simthxe_traces, axis=1)
     
-    # calculate a new LFC trace based on the measured positions of the other fibres that night and the median offset as measured on the reference night (20190503)
-    new_lfc_traces  = np.zeros((39,24,4112))    
-    for o,ord in enumerate(sorted(stellar_fibparms.keys())):
-        for f,fib in enumerate(sorted(stellar_fibparms[ord].keys())):
-            # new_lfc_traces[o,f,:] = stellar_fibparms[ord][fib]['mu_fit'] - (int(fib[-2:]) - 1) * med_lfc_offsets[o,:]
-            new_lfc_traces[o,f,:] = stellar_fibparms[ord][fib]['mu_fit'] - (int(fib[-2:]) - 1) * lfc_offsets[o,f,:]
-    med_new_lfc_trace = np.median(new_lfc_traces, axis=1)
+    if use_lfc:
+        # calculate a new LFC trace based on the measured positions of the other fibres that night and the median offset as measured on the reference night (20190503)
+        new_lfc_traces  = np.zeros((39,24,4112))    
+        for o,ord in enumerate(sorted(stellar_fibparms.keys())):
+            for f,fib in enumerate(sorted(stellar_fibparms[ord].keys())):
+                # new_lfc_traces[o,f,:] = stellar_fibparms[ord][fib]['mu_fit'] - (int(fib[-2:]) - 1) * med_lfc_offsets[o,:]
+                new_lfc_traces[o,f,:] = stellar_fibparms[ord][fib]['mu_fit'] - (int(fib[-2:]) - 1) * lfc_offsets[o,f,:]
+        med_new_lfc_trace = np.median(new_lfc_traces, axis=1)
+    else:
+        meansep = get_mean_fibre_separation(stellar_fibparms)
+        
     
     # create and fill the combined fibparms structure
     combined_fibparms = {}
@@ -403,15 +407,24 @@ def combine_fibparms(date, savefile=True):
         combined_fibparms[ord] = {}
         for fib in stellar_fibparms[ord].keys():
             combined_fibparms[ord][fib] = stellar_fibparms[ord][fib]
-        for fib in simthxe_fibparms[ord].keys():    
+        for fib in simthxe_fibparms[ord].keys():    # that's just 'fibre_28'
             combined_fibparms[ord][fib] = simthxe_fibparms[ord][fib]
             combined_fibparms[ord][fib]['mu_fit'] = med_new_simthxe_trace[o,:]
-        for fib in lfc_fibparms[ord].keys():    
-            combined_fibparms[ord][fib] = lfc_fibparms[ord][fib]
-            combined_fibparms[ord][fib]['mu_fit'] = med_new_lfc_trace[o,:]
-    
+        if use_lfc:
+            for fib in lfc_fibparms[ord].keys():    # that's just 'fibre_01'
+                combined_fibparms[ord][fib] = lfc_fibparms[ord][fib]
+                combined_fibparms[ord][fib]['mu_fit'] = med_new_lfc_trace[o,:]
+        else:
+            for fib in lfc_fibparms[ord].keys():    # that's just 'fibre_01'
+                combined_fibparms[ord][fib] = lfc_fibparms[ord][fib]
+                combined_fibparms[ord][fib]['mu_fit'] = stellar_fibparms[ord]['fibre_02']['mu_fit'] + meansep[ord]
+            
+            
     if savefile:
-        np.save(archive_path + 'combined_fibre_profile_fits_' + date + '.npy', combined_fibparms)
+        if use_lfc:
+            np.save(archive_path + 'combined_fibre_profile_fits_' + date + '.npy', combined_fibparms)
+        else:
+            np.save(archive_path + 'combined_fibre_profile_fits_not_using_lfc_' + date + '.npy', combined_fibparms)
         
     return combined_fibparms
     

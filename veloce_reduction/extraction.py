@@ -422,13 +422,19 @@ def optimal_extraction(stripes, err_stripes=None, ron_stripes=None, slit_height=
 
     # loop over all orders
     for ord in useful_orders:
-        if debug_level > 0:
-            print('OK, now processing order: ' + ordnum)
-        if timit:
+
+        if timit and (debug_level > 0):
             order_start_time = time.time()
 
         # order number
         ordnum = ord[-2:]
+
+        if ord == useful_orders[0]:
+            print('OK, now processing order: ' + ordnum),
+        elif ord == useful_orders[-1]:
+            print(' ' + ordnum)
+        else:
+            print(' ' + ordnum),
 
         # fibre profile parameters for that order
         fppo = fibparms[ord]
@@ -741,14 +747,18 @@ def optimal_extraction_from_indices(img, stripe_indices, err_img=None, ronmask=N
 
     # loop over all orders
     for ord in useful_orders:
-        if timit:
+        if timit and (debug_level > 0):
             order_start_time = time.time()
 
         # order number
         ordnum = ord[-2:]
 
-        if debug_level > 0:
-            print('OK, now processing order: ' + ordnum)
+        if ord == useful_orders[0]:
+            print('OK, now processing order: ' + ordnum),
+        elif ord == useful_orders[-1]:
+            print(' ' + ordnum)
+        else:
+            print(' ' + ordnum),
 
         # fibre profile parameters for that order
         fppo = fibparms[ord]
@@ -952,7 +962,7 @@ def optimal_extraction_from_indices(img, stripe_indices, err_img=None, ronmask=N
                 flux['order_01'][fib] = np.r_[np.repeat(0., 900), flux['order_01'][fib]]
                 err['order_01'][fib] = np.r_[np.repeat(0., 900), err['order_01'][fib]]
 
-        if timit:
+        if timit and (debug_level > 0):
             print('Time taken for extraction of ' + ord + ': ' + str(time.time() - order_start_time) + ' seconds')
 
     if timit:
@@ -1035,7 +1045,7 @@ def extract_spectrum(stripes, err_stripes, ron_stripes, method='optimal', indivi
         method = raw_input('Which method do you want to use (valid options are ["quick" / "tramline" / "optimal"] )?')
         
     if method.lower() == 'quick':
-        pix, flux, err = quick_extract(stripes, err_stripes, slit_height=slit_height, skip_first_order=skip_first_order, verbose=verbose, timit=timit)
+        pix, flux, err = quick_extract(stripes, err_stripes, slit_height=slit_height, skip_first_order=skip_first_order, debug_level=debug_level, timit=timit)
     elif method.lower() == 'tramline':
         print('WARNING: need to update tramline finding routine first for new IFU layout - use method="quick" in the meantime')
         return
@@ -1134,7 +1144,7 @@ def extract_spectrum(stripes, err_stripes, ron_stripes, method='optimal', indivi
 def extract_spectrum_from_indices(img, err_img, stripe_indices, ronmask=None, method='optimal', individual_fibres=True, combined_profiles=False, integrate_profiles=False, slope=False,
                                   offset=False, fibs='all', slit_height=30, savefile=False, filetype='fits', obsname=None, date=None, path=None, skip_first_order=False, simu=False, verbose=False, timit=False, debug_level=0):
     """
-    CLONE OF 'extract_spectrum'!
+    CLONE OF 'extract_spectrum'! 
     This routine is simply a wrapper code for the different extraction methods. There are a total FIVE (1,2,3a,3b,3c) different extraction methods implemented, 
     which can be selected by a combination of the 'method', individual_fibres', and 'combined_profile' keyword arguments.
     
@@ -1201,7 +1211,7 @@ def extract_spectrum_from_indices(img, err_img, stripe_indices, ronmask=None, me
         method = raw_input('Which method do you want to use (valid options are ["quick" / "tramline" / "optimal"] )?')
         
     if method.lower() == 'quick':
-        pix, flux, err = quick_extract_from_indices(img, err_img, stripe_indices, slit_height=slit_height, skip_first_order=skip_first_order, verbose=verbose, timit=timit)
+        pix, flux, err = quick_extract_from_indices(img, err_img, stripe_indices, slit_height=slit_height, skip_first_order=skip_first_order, debug_level=debug_level, timit=timit)
     elif method.lower() == 'tramline':
         print('WARNING: need to update tramline finding routine first for new IFU layout - use method="quick" in the meantime')
         return

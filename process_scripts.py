@@ -293,8 +293,6 @@ def process_science_images(imglist, P_id, chipmask, mask=None, stripe_indices=No
 
     # loop over all files
     for i,filename in enumerate(imglist):
-        
-        print('Extracting ' + obstype + ' spectrum ' + str(i+1) + '/' + str(len(imglist)))
 
         # (0) do some housekeeping with filenames, and check if there are multiple exposures for a given epoch of a star
         dum = filename.split('/')
@@ -304,6 +302,8 @@ def process_science_images(imglist, P_id, chipmask, mask=None, stripe_indices=No
         object = pyfits.getval(filename, 'OBJECT').split('+')[0]
         object_indices = np.where(object == np.array(object_list))[0]
         texp = pyfits.getval(filename, 'ELAPSED')
+
+        print('Extracting ' + obstype + ' spectrum ' + str(i + 1) + '/' + str(len(imglist)) + ': ' + obsname)
         
         if obstype == 'stellar':
             # list of all the observations belonging to this epoch
@@ -364,7 +364,7 @@ def process_science_images(imglist, P_id, chipmask, mask=None, stripe_indices=No
         if len(epoch_sublists[lamp_config]) == 1:
             # do it the hard way using LACosmic
             # identify and extract background
-            bg_raw = extract_background(img, P_id, slit_height=slit_height, exclude_top_and_bottom=True, timit=timit)
+            bg_raw = extract_background(img, chipmask['bg'], timit=timit)
             # remove cosmics, but only from background
             cosmic_cleaned_img = remove_cosmics(bg_raw.todense(), ronmask, obsname, path, Flim=3.0, siglim=5.0, maxiter=1, savemask=False, savefile=False, save_err=False, verbose=True, timit=True)   # [e-]
             # identify and extract background from cosmic-cleaned image
