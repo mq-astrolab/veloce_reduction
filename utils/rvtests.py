@@ -72,8 +72,12 @@ for i,filename in enumerate(files):
     bc = get_barycentric_correction(filename, rvabs=-16.68)
     pyfits.setval(filename, 'BARYCORR', value=bc[0], comment='barycentric velocity correction [m/s]')
     all_bc.append(bc[0])
-    jd = pyfits.getval(filename, 'UTMJD') + 2.4e6 + 0.5
-    all_jd.append(jd)
+    # get UT obs start time
+    utmjd = pyfits.getval(filename, 'UTMJD') + 2.4e6 + 0.5  # the fits header has 2,400,000.5 subtracted!!!!!
+    # add half the exposure time in days
+    texp = pyfits.getval(filename, 'ELAPSED')
+    utmjd = utmjd + (texp / 2.) / 86400.
+    all_jd.append(utmjd)
     outfile_names.write(shortname + ' \n')
     outfile_jd.write('%14.6f \n' % (jd))
     outfile_bc.write('%14.6f \n' % (bc))

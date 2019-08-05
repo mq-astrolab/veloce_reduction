@@ -1107,7 +1107,7 @@ def extract_spectrum(stripes, err_stripes, ron_stripes, method='optimal', indivi
                     h = pyfits.getheader(path+obsname+'.fits')   
                 #update the header and write to file
                 h['HISTORY'] = '   EXTRACTED SPECTRUM - created ' + time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime()) + ' (GMT)'
-                h['METHOD'] = (method, 'extraction method used')
+                h['EXMETH'] = (method, 'extraction method used')
                 topord = sorted(pix.keys())[0]
                 topordnum = int(topord[-2:])
                 botord = sorted(pix.keys())[-1]
@@ -1115,11 +1115,14 @@ def extract_spectrum(stripes, err_stripes, ron_stripes, method='optimal', indivi
                 h['FIRSTORD'] = (topordnum, 'order number of first (top) order')
                 h['LASTORD'] = (botordnum, 'order number of last (bottom) order')
                 if method.lower() == 'optimal':
-                    h['METHOD2'] = (submethod, 'exact optimal extraction method used')
+                    h['EXMETH2'] = (submethod, 'exact optimal extraction method used')
                     h['SLOPE'] = (slope,)
                     h['OFFSET'] = (offset,)
-                #write to FITS file    
-                outfn = path + starname + '_' + obsname + '_' + method.lower() + submethod + '_extracted.fits'
+                #write to FITS file
+                if starname == '':
+                    outfn = path + starname + obsname + '_' + method.lower() + submethod + '_extracted.fits'
+                else:
+                    outfn = path + starname + '_' + obsname + '_' + method.lower() + submethod + '_extracted.fits'
                 pyfits.writeto(outfn, fluxarr, h, clobber=True)    
                 #now append the corresponding error array
                 h_err = h.copy()
@@ -1282,7 +1285,7 @@ def extract_spectrum_from_indices(img, err_img, stripe_indices, ronmask=None, me
                     h = pyfits.getheader(path+obsname+'.fits')   
                 # update the header and write to file
                 h['HISTORY'] = '   EXTRACTED SPECTRUM - created ' + time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime()) + ' (GMT)'
-                h['METHOD'] = (method, 'extraction method used')
+                h['EXMETH'] = (method, 'extraction method used')
                 topord = sorted(pix.keys())[0]
                 topordnum = int(topord[-2:])
                 botord = sorted(pix.keys())[-1]
@@ -1290,7 +1293,7 @@ def extract_spectrum_from_indices(img, err_img, stripe_indices, ronmask=None, me
                 h['FIRSTORD'] = (topordnum, 'order number of first (top) order')
                 h['LASTORD'] = (botordnum, 'order number of last (bottom) order')
                 if method.lower() == 'optimal':
-                    h['METHOD2'] = (submethod, 'exact optimal extraction method used')
+                    h['EXMETH2'] = (submethod, 'exact optimal extraction method used')
                     h['SLOPE'] = (slope,)
                     h['OFFSET'] = (offset,)
                 # write to FITS file    

@@ -114,7 +114,7 @@ def get_barycentric_correction(fn, rvabs=None, obs_path='/Users/christoph/OneDri
             rvabs = 0.
 
     bc = barycorrpy.get_BC_vel(JDUTC=utmjd, ra=gaia_data['ra'], dec=gaia_data['dec'], pmra=gaia_data['pmra'], pmdec=gaia_data['pmdec'],
-                               px=gaia_data['parallax'], rv=rvabs, epoch=epoch, obsname='AAO', ephemeris='de430')
+                               px=gaia_data['parallax'], rv=rvabs*1e3, epoch=epoch, obsname='AAO', ephemeris='de430')
     # bc = barycorrpy.get_BC_vel(JDUTC=utmjd, ra=ra, dec=dec, pmra=gaia_data['pmra'], pmdec=gaia_data['pmdec'],
     #                            px=gaia_data['parallax'], rv=gaia_data['radial_velocity']*1e3, obsname='AAO', ephemeris='de430')
     # bc = barycorrpy.get_BC_vel(JDUTC=utmjd, ra=ra, dec=dec, pmra=pmra, pmdec=pmdec,

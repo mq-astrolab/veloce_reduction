@@ -468,9 +468,7 @@ def process_science_images(imglist, P_id, chipmask, mask=None, stripe_indices=No
             for outfn in outfn_list:
                 pyfits.setval(outfn, 'BARYCORR', value=bc, comment='barycentric velocity correction [m/s]')
 
-# HMMM...using hip_id=xxx and actual coordinates from header makes a huge difference (~11m/s for the tau Ceti example I tried)!!!
-#         bc1 = barycorrpy.get_BC_vel(JDUTC=utmjd, hip_id=8102, obsname='AAO', ephemeris='de430')
-#         bc2 = barycorrpy.get_BC_vel(JDUTC=utmjd, ra=ra, dec=dec, obsname='AAO', ephemeris='de430')
+
 
 #         #now append relints, wl-solution, and barycorr to extracted FITS file header
 #         outfn = path + obsname + '_extracted.fits'

@@ -216,7 +216,8 @@ if choice.lower() == 's':
     print('Loading final order traces for ' + date + '...')
     traces = np.load(path + 'traces.npy').item()
 else:
-    traces = make_order_traces_from_fibparms(fibparms)   
+    traces = make_order_traces_from_fibparms(fibparms)
+    np.save(path + 'traces.npy', traces)
 
 # determine slit_heights from fibre profiles
 slit_heights = []
@@ -322,15 +323,15 @@ for subl in arc_sublists.keys():
 if len(thxe_list) > 0:
     print('Processing sim-ThXe images...')
     dum = process_science_images(thxe_list, traces, chipmask, mask=mask, stripe_indices=indices, sampling_size=25, slit_height=slit_height, gain=gain, MB=medbias, ronmask=ronmask,
-                                 MD=MDS, scalable=True, saveall=False, path=path, ext_method='optimal', offset='True', slope='True', fibs='simth', date=date, from_indices=True, timit=True)
+                                 MD=MDS, scalable=True, saveall=False, path=path, ext_method='optimal', offset=True, slope=True, fibs='simth', date=date, from_indices=True, timit=True)
 if len(laser_list) > 0:
     print('Processing LFC images...')
     dum = process_science_images(laser_list, traces, chipmask, mask=mask, stripe_indices=indices, sampling_size=25, slit_height=slit_height, gain=gain, MB=medbias, ronmask=ronmask,
-                                 MD=MDS, scalable=True, saveall=False, path=path, ext_method='optimal', offset='True', slope='True', fibs='lfc', date=date, from_indices=True, timit=True)
+                                 MD=MDS, scalable=True, saveall=False, path=path, ext_method='optimal', offset=True, slope=True, fibs='lfc', date=date, from_indices=True, timit=True)
 if len(laser_and_thxe_list) > 0:
     print('Processing LFC+sim-ThXe images...')
     dum = process_science_images(laser_and_thxe_list, traces, chipmask, mask=mask, stripe_indices=indices, sampling_size=25, slit_height=slit_height, gain=gain, MB=medbias, ronmask=ronmask,
-                                 MD=MDS, scalable=True, saveall=False, path=path, ext_method='optimal', offset='True', slope='True', fibs='calibs', date=date, from_indices=True, timit=True)
+                                 MD=MDS, scalable=True, saveall=False, path=path, ext_method='optimal', offset=True, slope=True, fibs='calibs', date=date, from_indices=True, timit=True)
 #####################################################################################################################################################
 
 
@@ -338,7 +339,7 @@ if len(laser_and_thxe_list) > 0:
 if len(stellar_list) > 0:
     print('Processing stellar images...')
     dum = process_science_images(stellar_list, traces, chipmask, mask=mask, stripe_indices=indices, sampling_size=25, slit_height=slit_height, gain=gain, MB=medbias, ronmask=ronmask,
-                                 MD=MDS, scalable=True, saveall=False, path=path, ext_method='optimal', offset='True', slope='True', fibs='all', date=date, from_indices=True, timit=True)
+                                 MD=MDS, scalable=True, saveall=False, path=path, ext_method='optimal', offset=True, slope=True, fibs='all', date=date, from_indices=True, timit=True)
 #####################################################################################################################################################
 
 
