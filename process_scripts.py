@@ -218,7 +218,7 @@ def process_whites(white_list, MB=None, ronmask=None, MD=None, gain=None, P_id=N
 
 
 
-def process_science_images(imglist, P_id, chipmask, mask=None, stripe_indices=None, sampling_size=25, slit_height=30, gain=[1.,1.,1.,1.], MB=None, ronmask=None, MD=None, scalable=False, saveall=False, path=None, ext_method='optimal', 
+def process_science_images(imglist, P_id, chipmask, mask=None, stripe_indices=None, quick_indices=None, sampling_size=25, slit_height=32, qsh=23, gain=[1.,1.,1.,1.], MB=None, ronmask=None, MD=None, scalable=False, saveall=False, path=None, ext_method='optimal',
                            from_indices=True, slope=True, offset=True, fibs='all', date=None, timit=False):
     """
     Process all science / calibration lamp images. This includes:
@@ -234,7 +234,11 @@ def process_science_images(imglist, P_id, chipmask, mask=None, stripe_indices=No
     (8) wavelength solution
     (9) barycentric correction (for stellar observations only)
     """
-    
+
+    print('WARNING: I commented out BARCYRORR')
+    cont = raw_input('Do you still want to continue?')
+    assert cont.lower() == 'y', 'You chose to quit!'
+
     if timit:
         start_time = time.time()
 
@@ -254,8 +258,8 @@ def process_science_images(imglist, P_id, chipmask, mask=None, stripe_indices=No
         # list of indices for individual epochs - there's gotta be a smarter way to do this...
         all_epoch_list = []
         all_epoch_list.append(np.arange(0,changes[0]))
-        for i in range(len(changes) - 1):
-            all_epoch_list.append(np.arange(changes[i],changes[i+1]))
+        for j in range(len(changes) - 1):
+            all_epoch_list.append(np.arange(changes[j], changes[j+1]))
         all_epoch_list.append(np.arange(changes[-1], len(object_list)))
 
 
@@ -315,7 +319,7 @@ def process_science_images(imglist, P_id, chipmask, mask=None, stripe_indices=No
                 lc = 0
                 thxe = 0
                 h = pyfits.getheader(file)
-                if 'LCEXP' in h.keys():
+                if ('LCEXP' in h.keys()) or ('LCMNEXP' in h.keys()):
                     lc = 1
                 if h['SIMCALTT'] > 0:
                     thxe = 1
@@ -437,12 +441,12 @@ def process_science_images(imglist, P_id, chipmask, mask=None, stripe_indices=No
 
         # (6) perform extraction of 1-dim spectrum
         if from_indices:
-            pix,flux,err = extract_spectrum_from_indices(final_img, err_img, stripe_indices, method='quick', slit_height=slit_height, ronmask=ronmask, savefile=True,
+            pix,flux,err = extract_spectrum_from_indices(final_img, err_img, quick_indices, method='quick', slit_height=qsh, ronmask=ronmask, savefile=True,
                                                          filetype='fits', obsname=obsname, date=date, path=path, timit=True)
             pix,flux,err = extract_spectrum_from_indices(final_img, err_img, stripe_indices, method=ext_method, slope=slope, offset=offset, fibs=fibs, slit_height=slit_height, 
                                                          ronmask=ronmask, savefile=True, filetype='fits', obsname=obsname, date=date, path=path, timit=True)
         else:
-            pix,flux,err = extract_spectrum(stripes, err_stripes=err_stripes, ron_stripes=ron_stripes, method='quick', slit_height=slit_height, ronmask=ronmask, savefile=True,
+            pix,flux,err = extract_spectrum(stripes, err_stripes=err_stripes, ron_stripes=ron_stripes, method='quick', slit_height=qsh, ronmask=ronmask, savefile=True,
                                             filetype='fits', obsname=obsname, date=date, path=path, timit=True)
             pix,flux,err = extract_spectrum(stripes, err_stripes=err_stripes, ron_stripes=ron_stripes, method=ext_method, slope=slope, offset=offset, fibs=fibs, 
                                             slit_height=slit_height, ronmask=ronmask, savefile=True, filetype='fits', obsname=obsname, date=date, path=path, timit=True)
@@ -458,15 +462,16 @@ def process_science_images(imglist, P_id, chipmask, mask=None, stripe_indices=No
 #         #XXXXX
 
 
-        # (9) get barycentric correction
-        if obstype == 'stellar':
-            bc = get_barycentric_correction(filename)
-            bc = np.round(bc,2)
-            obj = pyfits.getval(filename, 'OBJECT')
-            # write the barycentric correction into the FITS header of both the quick-extracted and the optimal-extracted reduced spectrum files
-            outfn_list = glob.glob(path + '*' + obsname + '*extracted*')
-            for outfn in outfn_list:
-                pyfits.setval(outfn, 'BARYCORR', value=bc, comment='barycentric velocity correction [m/s]')
+        # # (9) get barycentric correction
+        # if obstype == 'stellar':
+        #     bc = get_barycentric_correction(filename)
+        #     bc = np.round(bc,2)
+        #     if np.isnan(bc):
+        #         bc = ''
+        #     # write the barycentric correction into the FITS header of both the quick-extracted and the optimal-extracted reduced spectrum files
+        #     outfn_list = glob.glob(path + '*' + obsname + '*extracted*')
+        #     for outfn in outfn_list:
+        #         pyfits.setval(outfn, 'BARYCORR', value=bc, comment='barycentric velocity correction [m/s]')
 
 
 

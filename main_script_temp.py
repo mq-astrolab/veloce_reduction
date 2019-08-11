@@ -220,35 +220,46 @@ else:
     np.save(path + 'traces.npy', traces)
 
 # determine slit_heights from fibre profiles
-slit_heights = []
-for ord in sorted(traces.keys()):
-    # calculate median slit height between outermost sky fibres and add 5 pixels to make sure we're at least ~3-4 pixels above/beloce calib fibres
-    slit_heights.append(np.ceil(np.median(np.abs(0.5 * (fibparms[ord]['fibre_02']['mu_fit'] - fibparms[ord]['fibre_27']['mu_fit'])))) + 5)
-slit_height = np.max(slit_heights[1:]).astype(int)  # exclude order_01, as can be quite dodgy
+    slit_heights = []
+    for ord in sorted(traces['allfib'].keys()):
+        # calculate median slit height between outermost sky fibres and add 5 pixels to make sure we're at least ~3-4 pixels above/beloce calib fibres
+        slit_heights.append(np.ceil(np.median(np.abs(0.5 * (fibparms[ord]['fibre_02']['mu_fit'] - fibparms[ord]['fibre_27']['mu_fit'])))) + 5)
+    slit_height = np.max(slit_heights[1:]).astype(int)  # exclude order_01, as can be quite dodgy
 #####################################################################################################################################################
 
 
 ### (6) PROCESS SIM. CALIBRATION LAMP MASTER FRAMES #################################################################################################
-# (6a) extract Master Whites
-stripes,indices = extract_stripes(MW, traces, return_indices=True, slit_height=slit_height)     # NOTE: these indices are now common for ALL subsequent extractions, so no need to run extract_stripes again
+# (6a) define different stripes / strip_indices / slit_heights
+# NOTE: these indices are now used for ALL subsequent extractions, so no need to run extract_stripes again
+# stellar slit_height (want to exclude sim calibs)
+stsh = 23
+# sim calib slit_height (want just one fibre)
+calsh = 4
+stripes, indices = extract_stripes(MW, traces['allfib'], return_indices=True, slit_height=slit_height)
+st_stripes, st_indices = extract_stripes(MW, traces['stellar'], return_indices=True, slit_height=stsh)
+lfc_stripes, lfc_indices = extract_stripes(MW, traces['lfc'], return_indices=True, slit_height=calsh)
+simth_stripes, simth_indices = extract_stripes(MW, traces['simth'], return_indices=True, slit_height=calsh)
+
+# (6b) extract Master Whites
 pix_q,flux_q,err_q = extract_spectrum_from_indices(MW, err_MW, indices, method='quick', slit_height=slit_height, ronmask=ronmask, savefile=True,
                                                    date=date, filetype='fits', obsname='master_white', path=path, timit=True)
 pix,flux,err = extract_spectrum_from_indices(MW, err_MW, indices, method='optimal', slit_height=slit_height, fibs='all', slope=True, offset=True, date=date,
                                              individual_fibres=True, ronmask=ronmask, savefile=True, filetype='fits', obsname='master_white', path=path, timit=True)
 
-# (6b) MAKE MASTER FRAMES FOR EACH OF THE SIMULTAENOUS CALIBRATION SOURCES AND EXTRACT THEM 
+# (6c) MAKE MASTER FRAMES FOR EACH OF THE SIMULTAENOUS CALIBRATION SOURCES AND EXTRACT THEM
+# TODO: use different traces and smaller slit_height for LFC only and lfc only???
 if len(thxe_list) > 0:
     choice = 'r'
-    if os.path.isfile(path + 'master_simthxe.fits'):
+    if os.path.isfile(path + 'master_simth.fits'):
         choice = raw_input("Master SimThXe frame for " + date + " already exists! Do you want to skip this step or recreate it? ['s' / 'r']")
     if choice.lower() == 's':
         print('Loading MASTER SimThXe frame for ' + date + '...')
-        master_simth = pyfits.getdata(path + 'master_simthxe.fits', 0)
-        err_master_simth = pyfits.getdata(path + 'master_simthxe.fits', 1)
+        master_simth = pyfits.getdata(path + 'master_simth.fits', 0)
+        err_master_simth = pyfits.getdata(path + 'master_simth.fits', 1)
     else:
         master_simth, err_master_simth = make_master_calib(thxe_list, lamptype='simth', MB=medbias, ronmask=ronmask, MD=MDS, gain=gain, chipmask=chipmask, remove_bg=True, savefile=True, path=path)
     # now do the extraction    
-    pix_q,flux_q,err_q = extract_spectrum_from_indices(master_simth, err_master_simth, indices, method='quick', slit_height=slit_height, ronmask=ronmask, savefile=True,
+    pix_q,flux_q,err_q = extract_spectrum_from_indices(master_simth, err_master_simth, simth_indices, method='quick', slit_height=calsh, ronmask=ronmask, savefile=True,
                                                        date=date, filetype='fits', obsname='master_simthxe', path=path, timit=True)
     pix,flux,err = extract_spectrum_from_indices(master_simth, err_master_simth, indices, method='optimal', slit_height=slit_height, fibs='simth', slope=True, offset=True, date=date,
                                                  individual_fibres=True, ronmask=ronmask, savefile=True, filetype='fits', obsname='master_simthxe', path=path, timit=True)
@@ -264,7 +275,7 @@ if len(laser_list) > 0:
     else:
         master_lfc, err_master_lfc = make_master_calib(laser_list, lamptype='lfc', MB=medbias, ronmask=ronmask, MD=MDS, gain=gain, chipmask=chipmask, remove_bg=True, savefile=True, path=path)
     # now do the extraction
-    pix_q,flux_q,err_q = extract_spectrum_from_indices(master_lfc, err_master_lfc, indices, method='quick', slit_height=slit_height, ronmask=ronmask, savefile=True,
+    pix_q,flux_q,err_q = extract_spectrum_from_indices(master_lfc, err_master_lfc, lfc_indices, method='quick', slit_height=calsh, ronmask=ronmask, savefile=True,
                                                        date=date, filetype='fits', obsname='master_lfc', path=path, timit=True)
     pix,flux,err = extract_spectrum_from_indices(master_lfc, err_master_lfc, indices, method='optimal', slit_height=slit_height, fibs='lfc', slope=True, offset=True, date=date,
                                                  individual_fibres=True, ronmask=ronmask, savefile=True, filetype='fits', obsname='master_lfc', path=path, timit=True)
@@ -280,8 +291,8 @@ if len(laser_and_thxe_list) > 0:
     else:
         master_both, err_master_both = make_master_calib(laser_and_thxe_list, lamptype='both', MB=medbias, ronmask=ronmask, MD=MDS, gain=gain, chipmask=chipmask, remove_bg=True, savefile=True, path=path)
     # now do the extraction
-    pix_q,flux_q,err_q = extract_spectrum_from_indices(master_both, err_master_both, indices, method='quick', slit_height=slit_height, ronmask=ronmask, savefile=True,
-                                                       date=date, filetype='fits', obsname='master_laser_and_thxe_list', path=path, timit=True)
+    # pix_q,flux_q,err_q = extract_spectrum_from_indices(master_both, err_master_both, q_indices, method='quick', slit_height=qsh, ronmask=ronmask, savefile=True,
+    #                                                    date=date, filetype='fits', obsname='master_laser_and_thxe_list', path=path, timit=True)
     pix,flux,err = extract_spectrum_from_indices(master_both, err_master_both, indices, method='optimal', slit_height=slit_height, fibs='calibs', slope=True, offset=True, date=date,
                                                  individual_fibres=True, ronmask=ronmask, savefile=True, filetype='fits', obsname='master_laser_and_thxe_list', path=path, timit=True)
 #####################################################################################################################################################    
@@ -309,12 +320,12 @@ for file in arc_list:
             arc_sublists['thxe'].append(file)
     elif lc+thxe == 2:
         arc_sublists['both'].append(file)
-        
+
 for subl in arc_sublists.keys():
     if len(arc_sublists[subl]) > 0:
-        dum = process_science_images(arc_sublists[subl], traces, chipmask, mask=mask, stripe_indices=indices, sampling_size=25, slit_height=slit_height, gain=gain, MB=medbias, 
-                                     ronmask=ronmask, MD=MDS, scalable=True, saveall=False, path=path, ext_method='optimal', fibs='all', offset=True, slope=True, date=date, 
-                                     from_indices=True, timit=True)
+        dum = process_science_images(arc_sublists[subl], traces, chipmask, mask=mask, stripe_indices=indices, quick_indices=indices, sampling_size=25,
+                                     slit_height=slit_height, qsh=slit_height, gain=gain, MB=medbias, ronmask=ronmask, MD=MDS, scalable=True, saveall=False,
+                                     path=path, ext_method='optimal', fibs='all', offset=True, slope=True, date=date, from_indices=True, timit=True)
 #####################################################################################################################################################
 
 
@@ -322,24 +333,32 @@ for subl in arc_sublists.keys():
 # TODO: use different traces and smaller slit_height for LFC only and lfc only???
 if len(thxe_list) > 0:
     print('Processing sim-ThXe images...')
-    dum = process_science_images(thxe_list, traces, chipmask, mask=mask, stripe_indices=indices, sampling_size=25, slit_height=slit_height, gain=gain, MB=medbias, ronmask=ronmask,
-                                 MD=MDS, scalable=True, saveall=False, path=path, ext_method='optimal', offset=True, slope=True, fibs='simth', date=date, from_indices=True, timit=True)
+    dum = process_science_images(thxe_list, traces, chipmask, mask=mask, stripe_indices=indices, quick_indices=simth_indices,
+                                 sampling_size=25, slit_height=slit_height, qsh=calsh, gain=gain, MB=medbias,
+                                 ronmask=ronmask, MD=MDS, scalable=True, saveall=False, path=path, ext_method='optimal',
+                                 offset=True, slope=True, fibs='simth', date=date, from_indices=True, timit=True)
 if len(laser_list) > 0:
     print('Processing LFC images...')
-    dum = process_science_images(laser_list, traces, chipmask, mask=mask, stripe_indices=indices, sampling_size=25, slit_height=slit_height, gain=gain, MB=medbias, ronmask=ronmask,
-                                 MD=MDS, scalable=True, saveall=False, path=path, ext_method='optimal', offset=True, slope=True, fibs='lfc', date=date, from_indices=True, timit=True)
+    dum = process_science_images(laser_list, traces, chipmask, mask=mask, stripe_indices=indices, quick_indices=lfc_indices,
+                                 sampling_size=25, slit_height=slit_height, qsh=calsh, gain=gain, MB=medbias,
+                                 ronmask=ronmask, MD=MDS, scalable=True, saveall=False, path=path, ext_method='optimal',
+                                 offset=True, slope=True, fibs='lfc', date=date, from_indices=True, timit=True)
 if len(laser_and_thxe_list) > 0:
     print('Processing LFC+sim-ThXe images...')
-    dum = process_science_images(laser_and_thxe_list, traces, chipmask, mask=mask, stripe_indices=indices, sampling_size=25, slit_height=slit_height, gain=gain, MB=medbias, ronmask=ronmask,
-                                 MD=MDS, scalable=True, saveall=False, path=path, ext_method='optimal', offset=True, slope=True, fibs='calibs', date=date, from_indices=True, timit=True)
+    dum = process_science_images(laser_and_thxe_list, traces, chipmask, mask=mask, stripe_indices=indices, quick_indices=indices,
+                                 sampling_size=25, slit_height=slit_height, qsh=slit_height, gain=gain, MB=medbias,
+                                 ronmask=ronmask, MD=MDS, scalable=True, saveall=False, path=path, ext_method='optimal',
+                                 offset=True, slope=True, fibs='calibs', date=date, from_indices=True, timit=True)
 #####################################################################################################################################################
 
 
 ### (9) PROCESS STELLAR IMAGES ######################################################################################################################
 if len(stellar_list) > 0:
     print('Processing stellar images...')
-    dum = process_science_images(stellar_list, traces, chipmask, mask=mask, stripe_indices=indices, sampling_size=25, slit_height=slit_height, gain=gain, MB=medbias, ronmask=ronmask,
-                                 MD=MDS, scalable=True, saveall=False, path=path, ext_method='optimal', offset=True, slope=True, fibs='all', date=date, from_indices=True, timit=True)
+    dum = process_science_images(stellar_list, traces, chipmask, mask=mask, stripe_indices=indices, quick_indices=st_indices,
+                                 sampling_size=25, slit_height=slit_height, qsh=stsh, gain=gain, MB=medbias,
+                                 ronmask=ronmask, MD=MDS, scalable=True, saveall=False, path=path, ext_method='optimal',
+                                 offset=True, slope=True, fibs='all', date=date, from_indices=True, timit=True)
 #####################################################################################################################################################
 
 

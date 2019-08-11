@@ -377,24 +377,38 @@ def make_mask_dict(tempmask):
 
 
 
-def make_order_traces_from_fibparms(fibparms, stellar_only=False, from_simcalibs=False, degpol=7):
+def make_order_traces_from_fibparms(fibparms, from_simcalibs=False, degpol=7):
     
     traces = {}
+    traces['lfc'] = {}
+    traces['simth'] = {}
+    traces['stellar'] = {}
+    traces['allfib'] = {}
     
     nx = len(fibparms['order_02']['fibre_02']['mu_fit'])
     xx = np.arange(nx)
     
     for ord in fibparms.keys():
-        if stellar_only:
-            cen_trace = 0.5 * (fibparms[ord]['fibre_06']['mu_fit'] + fibparms[ord]['fibre_24']['mu_fit'])
-        elif from_simcalibs:
-            cen_trace = 0.5 * (fibparms[ord]['fibre_01']['mu_fit'] + fibparms[ord]['fibre_28']['mu_fit'])
+        if from_simcalibs:
+            allfib_trace = 0.5 * (fibparms[ord]['fibre_01']['mu_fit'] + fibparms[ord]['fibre_28']['mu_fit'])
         else:
             # I think the best way is to use the outermost sky fibres, as the LFC trace is often a bit dodgy, so that's the default
-            cen_trace = 0.5 * (fibparms[ord]['fibre_02']['mu_fit'] + fibparms[ord]['fibre_27']['mu_fit'])
-        
-        trace_fit = np.poly1d(np.polyfit(xx, cen_trace, degpol))
-        traces[ord] = trace_fit
+            allfib_trace = 0.5 * (fibparms[ord]['fibre_02']['mu_fit'] + fibparms[ord]['fibre_27']['mu_fit'])
+
+        lfc_trace = fibparms[ord]['fibre_01']['mu_fit']
+        simth_trace = fibparms[ord]['fibre_28']['mu_fit']
+        stellar_trace = 0.5 * (fibparms[ord]['fibre_06']['mu_fit'] + fibparms[ord]['fibre_24']['mu_fit'])
+
+
+        lfc_trace_fit = np.poly1d(np.polyfit(xx, lfc_trace, degpol))
+        simth_trace_fit = np.poly1d(np.polyfit(xx, simth_trace, degpol))
+        stellar_trace_fit = np.poly1d(np.polyfit(xx, stellar_trace, degpol))
+        allfib_trace_fit = np.poly1d(np.polyfit(xx, allfib_trace, degpol))
+
+        traces['lfc'][ord] = lfc_trace_fit
+        traces['simth'][ord] = simth_trace_fit
+        traces['stellar'][ord] = stellar_trace_fit
+        traces['allfib'][ord] = allfib_trace_fit
     
     return traces
         

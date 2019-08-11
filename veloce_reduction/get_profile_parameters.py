@@ -362,7 +362,7 @@ def get_simthxe_offset(date='20190503', return_median=False, norm=True):
     
     
     
-def combine_fibparms(date, use_lfc=True, savefile=True):
+def combine_fibparms(date, use_lfc=False, savefile=True):
     
     archive_path = '/Users/christoph/OneDrive - UNSW/fibre_profiles/archive/'
     simthxe_path = '/Users/christoph/OneDrive - UNSW/fibre_profiles/simthxe/'
@@ -418,13 +418,13 @@ def combine_fibparms(date, use_lfc=True, savefile=True):
             for fib in lfc_fibparms[ord].keys():    # that's just 'fibre_01'
                 combined_fibparms[ord][fib] = lfc_fibparms[ord][fib]
                 combined_fibparms[ord][fib]['mu_fit'] = stellar_fibparms[ord]['fibre_02']['mu_fit'] + meansep[ord]
-            
-            
+
+
     if savefile:
         if use_lfc:
-            np.save(archive_path + 'combined_fibre_profile_fits_' + date + '.npy', combined_fibparms)
+            np.save(archive_path + 'combined_fibre_profile_fits_using_lfc_' + date + '.npy', combined_fibparms)
         else:
-            np.save(archive_path + 'combined_fibre_profile_fits_not_using_lfc_' + date + '.npy', combined_fibparms)
+            np.save(archive_path + 'combined_fibre_profile_fits_' + date + '.npy', combined_fibparms)
         
     return combined_fibparms
     

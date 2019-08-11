@@ -96,15 +96,18 @@ def get_barycentric_correction(fn, rvabs=None, obs_path='/Users/christoph/OneDri
             else:
                 gaia_dr2_id = gaia_dict['HD'+targ]['gaia_dr2_id']
     except:
-        print('ERROR: could not find Gaia DR2 ID for target: ', targ)
-        return -1
-        
+        print('WARNING: could not find Gaia DR2 ID for target: ', targ)
+        gaia_dr2_id = None
+        return np.nan
+
+
 #     coord = SkyCoord(ra=ra, dec=dec, unit=(u.degree, u.degree), frame='icrs')
 #     width = u.Quantity(w, u.deg)
 #     height = u.Quantity(h, u.deg)
 
 #     gaia_data = Gaia.query_object_async(coordinate=coord, width=width, height=height)
-    q = Gaia.launch_job_async('SELECT * FROM gaiadr2.gaia_source WHERE source_id = ' + str(gaia_dr2_id))
+#     q = Gaia.launch_job_async('SELECT * FROM gaiadr2.gaia_source WHERE source_id = ' + str(gaia_dr2_id))
+    q = Gaia.launch_job('SELECT * FROM gaiadr2.gaia_source WHERE source_id = ' + str(gaia_dr2_id))
     gaia_data = q.results
 
     # some targets don't have a RV from Gaia

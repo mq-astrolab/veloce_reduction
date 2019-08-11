@@ -464,10 +464,10 @@ def get_bias_and_readnoise_from_overscan(img, ramps=[35, 35, 35, 35], gain=None,
     ron2 = np.nanstd(sigma_clip(good_os2[:, :-1].flatten(), clip))
     ron3 = np.nanstd(sigma_clip(good_os3[:, :-1].flatten(), clip))
     ron4 = np.nanstd(sigma_clip(good_os4[:, 1:].flatten(), clip))
-    rons = np.array([ron1, ron2, ron3, ron4])
+    rons_adu = np.array([ron1, ron2, ron3, ron4])
     # convert read-out noise (but NOT the bias image!!!) to units of electrons rather than ADUs by multiplying with the gain (which has units of e-/ADU)
     assert gain is not None, 'ERROR: gain is not defined!'
-    rons = rons * gain
+    rons = rons_adu * gain
   
     # create "master bias" (4k x 4k) frame (incl. OS levels) from that (note the order is important, following the definition of the quadrants)
     bias = np.vstack([np.hstack([model_os1, model_os2]), np.hstack([model_os4, model_os3])]) + add
@@ -482,7 +482,7 @@ def get_bias_and_readnoise_from_overscan(img, ramps=[35, 35, 35, 35], gain=None,
     bias_only = bias - offmask
     
     if timit:
-        print('Time elapsed: '+str(np.round(time.time() - start_time,1))+' seconds')
+        print('Time elapsed: '+str(np.round(time.time() - start_time, 1))+' seconds')
     
     return bias, bias_only, offsets, rons
 
@@ -548,21 +548,28 @@ def get_bias_and_readnoise_from_bias_frames(bias_list, degpol=5, clip=5, gain=No
         img = pyfits.getdata(name)
         
         # get the overscan levels so we can subtract them later
-        os_levels = get_bias_and_readnoise_from_overscan(img, gain=gain, return_oslevels_only=True)
+        ### OLD WAY:
+        #  offsets = get_bias_and_readnoise_from_overscan(img, gain=gain, return_oslevels_only=True)
+        overscan_img, bias_only, offsets, readnoise = get_bias_and_readnoise_from_overscan(img, gain=gain, return_oslevels_only=False)
         
         # bring to "correct" orientation
         img = correct_orientation(img)
         # remove the overscan region
         img = crop_overscan_region(img)
         
-        # make (4k x 4k) frame of the offsets
-        offmask = np.ones((ny,nx))
-        for q,osl in zip([q1,q2,q3,q4], os_levels):
-            offmask[q] = offmask[q] * osl
-            
-        # subtract overscan levels
-        img = img - offmask
-        
+        ### THE OLD WAY (I THINK THAT'S WRONG) ###
+        # #  make (4k x 4k) frame of the offsets
+        # offmask = np.ones((ny,nx))
+        # for q,osl in zip([q1,q2,q3,q4], offsets):
+        #     offmask[q] = offmask[q] * osl
+        #
+        # # subtract overscan levels
+        # img = img - offmask
+        #####
+
+        # subtract overscan
+        img = img - overscan_img
+
         # append quadrant-medians to lists
         medians_q1.append(np.nanmedian(img[q1]))
         medians_q2.append(np.nanmedian(img[q2]))
@@ -584,7 +591,7 @@ def get_bias_and_readnoise_from_bias_frames(bias_list, degpol=5, clip=5, gain=No
         img2 = correct_orientation(img2)
         img2 = crop_overscan_region(img2)
 
-        #take difference and do sigma-clipping
+        # take difference and do sigma-clipping
         diff = img1.astype(long) - img2.astype(long)
         sigs_q1.append(np.nanstd(sigma_clip(diff[q1], 5))/np.sqrt(2))
         sigs_q2.append(np.nanstd(sigma_clip(diff[q2], 5))/np.sqrt(2))
@@ -1229,9 +1236,11 @@ def correct_for_bias_and_dark_from_filename(imgname, MB, MD, gain=None, scalable
 
     ### (0) read in raw image [ADU] 
     img = pyfits.getdata(imgname)
-    
+
     # get the overscan levels so we can subtract them later
-    os_levels = get_bias_and_readnoise_from_overscan(img, gain=None, return_oslevels_only=True)
+    ### OLD WAY:
+    #  offsets = get_bias_and_readnoise_from_overscan(img, gain=gain, return_oslevels_only=True)
+    overscan_img, bias_only, offsets, readnoise = get_bias_and_readnoise_from_overscan(img, gain=gain, return_oslevels_only=False)
     
     if not simu:
         # bring to "correct" orientation
@@ -1239,18 +1248,23 @@ def correct_for_bias_and_dark_from_filename(imgname, MB, MD, gain=None, scalable
         # remove the overscan region
         img = crop_overscan_region(img)
 
-    # make (4k x 4k) frame of the offsets
+
+    ### OLD WAY:
+    # # make (4k x 4k) frame of the offsets
     ny,nx = img.shape
-    offmask = np.ones((ny,nx))
+    # offmask = np.ones((ny,nx))
     # define four quadrants via masks
     q1,q2,q3,q4 = make_quadrant_masks(nx,ny)
-    for q,osl in zip([q1,q2,q3,q4], os_levels):
-        offmask[q] = offmask[q] * osl
-
+    # for q,osl in zip([q1,q2,q3,q4], offsets):
+    #     offmask[q] = offmask[q] * osl
+    #
+    # # subtract overscan levels
+    # img = img - offmask - MB
+    #####
 
     ### (1) BIAS AND OVERSCAN SUBTRACTION [ADU]
-    # bias-corrected_image
-    bc_img = img - offmask - MB
+    # subtract overscan
+    bc_img = img - overscan_img - MB
 
 
     ### (2) conversion to ELECTRONS and DARK SUBTRACTION [e-]

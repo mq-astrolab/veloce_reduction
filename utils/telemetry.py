@@ -20,10 +20,10 @@ from veloce_reduction.veloce_reduction.helper_functions import find_nearest
 def telemetry():
     path = '/Users/christoph/OneDrive - UNSW/telemetry/'
     
-    # tau Ceti observation times
-    jd_sep = readcol('/Volumes/BERGRAID/data/veloce/reduced/tauceti/tauceti_with_LFC/sep2018/' + 'tauceti_all_jds.dat')
-    jd_nov = readcol('/Volumes/BERGRAID/data/veloce/reduced/tauceti/tauceti_with_LFC/nov2018/' + 'tauceti_all_jds.dat')
-    jd = list(jd_sep) + list(jd_nov)
+    # # tau Ceti observation times
+    # jd_sep = readcol('/Volumes/BERGRAID/data/veloce/reduced/tauceti/tauceti_with_LFC/sep2018/' + 'tauceti_all_jds.dat')
+    # jd_nov = readcol('/Volumes/BERGRAID/data/veloce/reduced/tauceti/tauceti_with_LFC/nov2018/' + 'tauceti_all_jds.dat')
+    # jd = list(jd_sep) + list(jd_nov)
     
     # # read detector temperature file(s)
     # with open(path + 'arccamera.txt') as det_temp_file:
@@ -44,25 +44,34 @@ def telemetry():
     cam_time_1 = Time(timestamp_cam_1, format='unix')
     cam_time_2 = Time(timestamp_cam_2, format='unix')
     
-    #combine the two subsets
+    # combine all the subsets
     t = np.array(list(cam_time_2.jd) + list(cam_time_1.jd) + list(cam_time_0.jd) + list(cam_time.jd)) - 2.458e6
     tobj = Time(t + 2.458e6, format='jd')  
     dtemp = np.array(list(det_temp_2) + list(det_temp_1) + list(det_temp_0) + list(det_temp))
     cryo = np.array(list(cryohead_temp_2) + list(cryohead_temp_1) + list(cryohead_temp_0) + list(cryohead_temp))
     heater_load = np.array(list(perc_heater_2) + list(perc_heater_1) + list(perc_heater_0) + list(perc_heater))
-    ix = np.zeros(len(jd))
-    # I checked, and the maximum diff in time is less than ~30s :)
-    for i in range(len(jd)):
-        ix[i] = find_nearest(t, jd[i] - 2.458e6, return_index=True)
-    # now len(ix) = 138, whereas len(x_shift = 133, b/c the LFC peaks were not successfully measured for the first 5 tau ceti observations;
-    # hence cut away first 5 entries
-    ix = ix[5:]
-    ix = ix.astype(int)
+
+    # # for showing tau ceti obstimes
+    # ix = np.zeros(len(jd))
+    # # I checked, and the maximum diff in time is less than ~30s :)
+    # for i in range(len(jd)):
+    #     ix[i] = find_nearest(t, jd[i] - 2.458e6, return_index=True)
+    # # now len(ix) = 138, whereas len(x_shift = 133, b/c the LFC peaks were not successfully measured for the first 5 tau ceti observations;
+    # # hence cut away first 5 entries
+    # ix = ix[5:]
+    # ix = ix.astype(int)
     
         
         
-    # make a nice stacked plot
-    # observing run were 20190121 - 20190203
+
+    # observing runs were:
+    # 20180917 - 20180926
+    tstart_sep = 2458378.0
+    tend_sep = 2458388.0
+    # 20181115 - 20181127
+    tstart_nov = 2458437.0
+    tend_nov = 2458450.0
+    # 20190121 - 20190203
     tstart_janfeb = 2458504.0
     tend_janfeb = 2458518.0
     # 20190408 - 20190415
@@ -83,19 +92,48 @@ def telemetry():
     # 20190722 - 20190724
     tstart_jul = 2458686.0
     tend_jul = 2458689.0
-    starts = np.array([tstart_janfeb, tstart_apr, tstart_may01, tstart_may02, tstart_jun01, tstart_jun02, tstart_jul]) - 2.458e6
-    ends = np.array([tend_janfeb, tend_apr, tend_may01, tend_may02, tend_jun01, tend_jun02, tend_jul]) - 2.458e6
-    
+    starts = np.array([tstart_sep, tstart_nov, tstart_janfeb, tstart_apr, tstart_may01, tstart_may02, tstart_jun01, tstart_jun02, tstart_jul]) - 2.458e6
+    ends = np.array([tend_sep, tend_nov, tend_janfeb, tend_apr, tend_may01, tend_may02, tend_jun01, tend_jun02, tend_jul]) - 2.458e6
+
+    ##### make a nice stacked plot #####
+
+    run = 'sep'
+
+    # runs = np.array(['all', 'sep', 'nov', 'jan', 'apr', 'may', 'jun', 'jul'])
+    # runix = np.argwhere(runs == run)[0]
+    # tlow, thigh = (starts[runix] - 3, ends[runix] + 3)
+
+    if run == 'all':
+        tlow, thigh = (np.min(starts) - 3, np.max(ends) + 3 )
+    elif run == 'sep':
+        tlow, thigh = (tstart_sep - 2.458e6 - 3, tend_sep - 2.458e6 + 3)
+    elif run == 'nov':
+        tlow, thigh = (tstart_nov - 2.458e6 - 3, tend_nov - 2.458e6 + 3)
+    elif run == 'jan':
+        tlow, thigh = (tstart_janfeb - 2.458e6 - 3, tend_janfeb - 2.458e6 + 3)
+    elif run == 'apr':
+        tlow, thigh = (tstart_apr - 2.458e6 - 3, tend_apr - 2.458e6 + 3)
+    elif run == 'may':
+        tlow, thigh = (tstart_may01 - 2.458e6 - 3, tend_may01 - 2.458e6 + 3)
+    elif run == 'jun':
+        tlow, thigh = (tstart_may02 - 2.458e6 - 3, tend_jun02 - 2.458e6 + 3)
+    elif run == 'jul':
+        tlow, thigh = (tstart_jul - 2.458e6 - 3, tend_jul - 2.458e6 + 3)
+
+
+
 #     t_plot = tobj.datetime   # for plotting nice calendar dates
     t_plot = t.copy()   #for plotting JD
-    fig, axarr = plt.subplots(3, sharex=True)
+    fig, axarr = plt.subplots(3, sharex=True, figsize=(12,6.75))
     # plot 3 subplots
-    axarr[0].plot(t_plot, dtemp)
-    axarr[1].plot(t_plot, cryo)
-    axarr[2].plot(t_plot, heater_load)
+    axarr[0].plot(t_plot, dtemp, 'b')
+    axarr[1].plot(t_plot, cryo, 'b')
+    axarr[2].plot(t_plot, heater_load, 'b')
     # set (global) x-range
 #     axarr[0].set_xlim(370,455)
-    axarr[0].set_xlim(500,692)  # ~17 Jan - 28 July 2019
+#     axarr[0].set_xlim(500,692)  # ~17 Jan - 28 July 2019
+#     axarr[0].set_xlim(375, 692)  # ~14 Sep 2018 - 28 July 2019
+    axarr[0].set_xlim(tlow, thigh)
     # set y-ranges
     axarr[0].set_ylim(138,150)
     axarr[1].set_ylim(82,88)
@@ -115,11 +153,11 @@ def telemetry():
         axarr[0].axvspan(x1, x2, alpha=0.3, color='green')
         axarr[1].axvspan(x1, x2, alpha=0.3, color='green')
         axarr[2].axvspan(x1, x2, alpha=0.3, color='green')
-    # indicate tau Ceti obstimes with dashed vertical lines
-    for tobs in jd:
-        axarr[0].axvline(tobs-2.458e6, color='gray', linestyle='--')
-        axarr[1].axvline(tobs-2.458e6, color='gray', linestyle='--')
-        axarr[2].axvline(tobs-2.458e6, color='gray', linestyle='--')
+    # # indicate tau Ceti obstimes with dashed vertical lines
+    # for tobs in jd:
+    #     axarr[0].axvline(tobs-2.458e6, color='gray', linestyle='--')
+    #     axarr[1].axvline(tobs-2.458e6, color='gray', linestyle='--')
+    #     axarr[2].axvline(tobs-2.458e6, color='gray', linestyle='--')
     # save to file
     # plt.savefig(...)
     
