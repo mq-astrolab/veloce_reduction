@@ -7,8 +7,10 @@ Created on 7 May 2018
 
 import glob
 import astropy.io.fits as pyfits
+import numpy as np
 
-
+from veloce_reduction.veloce_reduction.helper_functions import laser_on, thxe_on
+from veloce_reduction.veloce_reduction.calibration import correct_for_bias_and_dark_from_filename
 
 #path = '/Users/christoph/UNSW/veloce_spectra/test1/'
 
@@ -85,6 +87,8 @@ def identify_obstypes(path):
 
 def get_obstype_lists(path, pattern=None, weeding=True):
 
+    date = path[-9:-1]
+
     if pattern is None:
         file_list = glob.glob(path + "*.fits")
     else:
@@ -159,27 +163,50 @@ def get_obstype_lists(path, pattern=None, weeding=True):
     laser_and_simth_list = []
     calib_list = laser_list + thxe_list + laser_and_thxe_list
     calib_list.sort()
-    for file in calib_list:
-        lc = 0
-        thxe = 0
-        h = pyfits.getheader(file)
-        if 'LCNEXP' in h.keys():   # this indicates the latest version of the FITS headers
-            if ('LCEXP' in h.keys()) or ('LCMNEXP' in h.keys()):   # this indicates the LFC actually was actually exposed (either automatically or manually)
-                lc = 1
-        else:   # if not, just go with the OBJECT field
-            if file in laser_list + laser_and_thxe_list:
-                lc = 1
-        if h['SIMCALTT'] > 0:
-            thxe = 1
-        if lc+thxe == 1:
-            if lc == 1:
-                laser_only_list.append(file)
+    
+    if int(date) < 20190503:
+        chipmask_path = '/Users/christoph/OneDrive - UNSW/chipmasks/archive/'
+        try:
+            chipmask = np.load(chipmask_path + 'chipmask_' + date + '.npy').item()
+        except:
+            chipmask = np.load(chipmask_path + 'chipmask_' + '20180921' + '.npy').item()
+        # look at the actual 2D image (using chipmasks for LFC and simThXe) to determine which calibration lamps fired
+        for file in calib_list:
+            img = correct_for_bias_and_dark_from_filename(file, np.zeros((4096,4112)), np.zeros((4096,4112)), gain=[1., 1.095, 1.125, 1.], scalable=False, savefile=False, path=path)
+            lc = laser_on(img, chipmask)
+            thxe = thxe_on(img, chipmask)
+            if (not lc) and (not thxe):
+                unknown_list.append(file)
+            elif (lc) and (thxe):
+                laser_and_simth_list.append(file)
             else:
-                simth_only_list.append(file)
-        elif lc+thxe == 2:
-            laser_and_simth_list.append(file)
-        else:
-            unknown_list.append(file)
+                if lc:
+                    laser_only_list.append(file)
+                elif thxe:
+                    simth_only_list.append(file)
+    else:
+        # since May 2019 the header keywords are correct, so check for LFC / ThXe in header, as that is MUCH faster    
+        for file in calib_list:
+            lc = 0
+            thxe = 0
+            h = pyfits.getheader(file)
+            if 'LCNEXP' in h.keys():   # this indicates the latest version of the FITS headers (from May 2019 onwards)
+                if ('LCEXP' in h.keys()) or ('LCMNEXP' in h.keys()):   # this indicates the LFC actually was actually exposed (either automatically or manually)
+                    lc = 1
+            else:   # if not, just go with the OBJECT field
+                if file in laser_list + laser_and_thxe_list:
+                    lc = 1
+            if h['SIMCALTT'] > 0:
+                thxe = 1
+            if lc+thxe == 1:
+                if lc == 1:
+                    laser_only_list.append(file)
+                else:
+                    simth_only_list.append(file)
+            elif lc+thxe == 2:
+                laser_and_simth_list.append(file)
+            else:
+                unknown_list.append(file)
         
 
     return acq_list, bias_list, dark_list, flat_list, skyflat_list, domeflat_list, arc_list, simth_only_list, laser_only_list, laser_and_simth_list, stellar_list, unknown_list

@@ -1273,3 +1273,21 @@ def jdnow():
     """get current JD"""
     return time.time() / 86400. + 2440587.5
 
+
+
+def laser_on(img, chipmask, thresh=1000, count=3000):
+    """check if the LFC was on for a given exposure"""
+    n_high = np.sum(img[chipmask['lfc']] > thresh)
+    ison = n_high >= count
+    return ison
+
+
+
+def thxe_on(img, chipmask, thresh=1000, count=1500):
+    """check if the sim ThXe lamp was on for a given exposure"""
+    n_high = np.sum(img[chipmask['thxe']] > thresh)
+    ison = n_high >= count
+    return ison
+
+
+

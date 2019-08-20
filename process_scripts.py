@@ -10,7 +10,7 @@ import time
 import os
 import glob
 
-from veloce_reduction.veloce_reduction.helper_functions import binary_indices
+from veloce_reduction.veloce_reduction.helper_functions import binary_indices, laser_on, thxe_on
 from veloce_reduction.veloce_reduction.calibration import correct_for_bias_and_dark_from_filename
 from veloce_reduction.veloce_reduction.cosmic_ray_removal import remove_cosmics, median_remove_cosmics
 from veloce_reduction.veloce_reduction.background import extract_background, extract_background_pid, fit_background
@@ -236,7 +236,8 @@ def process_science_images(imglist, P_id, chipmask, mask=None, stripe_indices=No
     """
 
     print('WARNING: I commented out BARCYRORR')
-    cont = raw_input('Do you still want to continue?')
+    # cont = raw_input('Do you still want to continue?')
+    cont='y'
     assert cont.lower() == 'y', 'You chose to quit!'
 
     if timit:
@@ -315,41 +316,45 @@ def process_science_images(imglist, P_id, chipmask, mask=None, stripe_indices=No
             epoch_list = list(np.array(imglist)[epoch_ix])
             # make sublists according to the four possible calibration lamp configurations
             epoch_sublists = {'lfc':[], 'thxe':[], 'both':[], 'neither':[]}
-            for file in epoch_list:
-                lc = 0
-                thxe = 0
-                h = pyfits.getheader(file)
-                if ('LCEXP' in h.keys()) or ('LCMNEXP' in h.keys()):
-                    lc = 1
-                if h['SIMCALTT'] > 0:
-                    thxe = 1
-                assert lc+thxe in [0,1,2], 'ERROR: could not establish status of LFC and simultaneous ThXe for ' + obsname + '.fits !!!'    
-                if lc+thxe == 0:
-                    epoch_sublists['neither'].append(file)
-                elif lc+thxe == 1:
-                    if lc == 1:
-                        epoch_sublists['lfc'].append(file)
+            if int(date) < 20190503:
+                # look at the actual 2D image (using chipmasks for LFC and simThXe) to determine which calibration lamps fired
+                for file in epoch_list:
+                    img = correct_for_bias_and_dark_from_filename(file, MB, MD, gain=gain, scalable=scalable, savefile=saveall, path=path)
+                    lc = laser_on(img, chipmask)
+                    thxe = thxe_on(img, chipmask)
+                    if (not lc) and (not thxe):
+                        epoch_sublists['neither'].append(file)
+                    elif (lc) and (thxe):
+                        epoch_sublists['both'].append(file)
                     else:
-                        epoch_sublists['thxe'].append(file)
-                elif lc+thxe == 2:
-                    epoch_sublists['both'].append(file)
-            # now check the status for the main observation in question
-            lc = 0
-            thxe = 0
-            h = pyfits.getheader(filename)
-            if 'LCEXP' in h.keys():
-                lc = 1
-            if h['SIMCALTT'] > 0:
-                thxe = 1
-            if lc+thxe == 0:
-                lamp_config = 'neither'
-            elif lc+thxe == 1:
-                if lc == 1:
-                    lamp_config = 'lfc'
-                else:
-                    lamp_config = 'thxe'
-            elif lc+thxe == 2:
-                lamp_config = 'both'
+                        if lc:
+                            epoch_sublists['lfc'].append(file)
+                        elif thxe:
+                            epoch_sublists['thxe'].append(file)
+            else:
+                # since May 2019 the header keywords are correct, so check for LFC / ThXe in header, as that is MUCH faster
+                for file in epoch_list:
+                    lc = 0
+                    thxe = 0
+                    h = pyfits.getheader(file)
+                    if 'LCNEXP' in h.keys():  # this indicates the latest version of the FITS headers (from May 2019 onwards)
+                        if ('LCEXP' in h.keys()) or ('LCMNEXP' in h.keys()):  # this indicates the LFC actually was actually exposed (either automatically or manually)
+                            lc = 1
+                    else:  # if not, just go with the OBJECT field
+                        if ('LC' in pyfits.getval(filename, 'OBJECT').split('+')) or ('LFC' in pyfits.getval(filename, 'OBJECT').split('+')):
+                            lc = 1
+                    if h['SIMCALTT'] > 0:
+                        thxe = 1
+                    assert lc+thxe in [0,1,2], 'ERROR: could not establish status of LFC and simultaneous ThXe for ' + obsname + '.fits !!!'    
+                    if lc+thxe == 0:
+                        epoch_sublists['neither'].append(file)
+                    elif lc+thxe == 1:
+                        if lc == 1:
+                            epoch_sublists['lfc'].append(file)
+                        else:
+                            epoch_sublists['thxe'].append(file)
+                    elif lc+thxe == 2:
+                        epoch_sublists['both'].append(file)
         else:
             # for calibration images we don't need to check for the calibration lamp configuration!
             # just create a dummy copy of the image list so that it is in the same format that ix expected for stellar observations
@@ -362,6 +367,41 @@ def process_science_images(imglist, P_id, chipmask, mask=None, stripe_indices=No
         #err = np.sqrt(img + ronmask*ronmask)   # [e-]
         #TEMPFIX: (how should I be doing this properly???)
         err_img = np.sqrt(np.clip(img,0,None) + ronmask*ronmask)   # [e-]
+        
+        # now check the calibration lamp configuration for the main observation in question
+        if int(date) < 20190503:
+            lc = 0
+            thxe = 0
+            h = pyfits.getheader(filename)
+            if 'LCNEXP' in h.keys():  # this indicates the latest version of the FITS headers (from May 2019 onwards)
+                if ('LCEXP' in h.keys()) or ('LCMNEXP' in h.keys()):  # this indicates the LFC actually was actually exposed (either automatically or manually)
+                    lc = 1
+            else:  # if not, just go with the OBJECT field
+                if ('LC' in pyfits.getval(filename, 'OBJECT').split('+')) or ('LFC' in pyfits.getval(filename, 'OBJECT').split('+')):
+                    lc = 1
+            if h['SIMCALTT'] > 0:
+                thxe = 1
+            if lc+thxe == 0:
+                lamp_config = 'neither'
+            elif lc+thxe == 1:
+                if lc == 1:
+                    lamp_config = 'lfc'
+                else:
+                    lamp_config = 'thxe'
+            elif lc+thxe == 2:
+                lamp_config = 'both'
+        else:
+            lc = laser_on(img, chipmask)
+            thxe = thxe_on(img, chipmask)
+            if (not lc) and (not thxe):
+                lamp_config = 'neither'
+            elif (lc) and (thxe):
+                lamp_config = 'both'
+            else:
+                if lc:
+                    lamp_config = 'lfc'
+                elif thxe:
+                    lamp_config = 'thxe'
         
         ## (2) remove cosmic rays (ERRORS MUST REMAIN UNCHANGED)
         ## check if there are multiple exposures for this epoch (if yes, we can do the much simpler "median_remove_cosmics")

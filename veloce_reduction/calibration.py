@@ -1317,7 +1317,8 @@ def correct_for_bias_and_dark_from_filename(imgname, MB, MD, gain=None, scalable
 
 
 
-def make_master_calib(file_list, lamptype=None, MB=None, ronmask=None, MD=None, gain=None, chipmask=None, scalable=False, remove_bg=True, savefile=True, saveall=False, path=None, debug_level=0, timit=False):
+def make_master_calib(file_list, lamptype=None, MB=None, ronmask=None, MD=None, gain=None, chipmask=None, scalable=False, remove_bg=True,
+                      savefile=True, saveall=False, path=None, debug_level=0, timit=False):
     """
     Simplified CLONE OF "process_whites".
     This routine processes all calibration lamp images from a given list of files. It corrects the orientation of the image and crops the overscan regions,

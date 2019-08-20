@@ -358,7 +358,7 @@ def old_get_relints_single_order(sc, sr, ordpol, fppo, ordmask=None, nfib=19, sl
 
 
 
-def get_relints(P_id, stripes, err_stripes, mask=None, sampling_size=25, slit_height=25, return_full=False, simu=False, debug_level=0, timit=False):
+def get_relints(P_id, stripes, err_stripes, mask=None, sampling_size=25, slit_height=32, return_full=False, simu=False, debug_level=0, timit=False):
     """
     This routine computes the relative intensities in the individual fibres of a Veloce spectrum.
     
@@ -476,7 +476,7 @@ def get_relints(P_id, stripes, err_stripes, mask=None, sampling_size=25, slit_he
 
 
 
-def get_relints_from_indices(P_id, img, err_img, stripe_indices, mask=None, sampling_size=25, slit_height=25, return_full=False, simu=False, debug_level=0, timit=False):
+def get_relints_from_indices(P_id, img, err_img, stripe_indices, mask=None, sampling_size=25, slit_height=32, return_full=False, simu=False, debug_level=0, timit=False):
     """
     This routine computes the relative intensities in the individual fibres of a Veloce spectrum.
     
@@ -636,7 +636,7 @@ def get_relints_single_order_gaussian(sc, sr, err_sc, ordpol, ordmask=None, nfib
     if timit:
         start_time = time.time()
     if debug_level >= 1:
-        print('Fitting fibre profiles for one order...')
+        print('Fitting fibre profiles (pure Gaussians) for one order...')
 
     npix = sc.shape[1]
 
@@ -646,7 +646,7 @@ def get_relints_single_order_gaussian(sc, sr, err_sc, ordpol, ordmask=None, nfib
     if step_size is None:
         step_size = 2 * sampling_size
     userange = np.arange(np.arange(npix)[ordmask][0] + sampling_size, np.arange(npix)[ordmask][-1], step_size)
-    #don't use pixel columns 200 pixels from either end of the chip
+    # don't use pixel columns 200 pixels from either end of the chip
     userange = userange[np.logical_and(userange > 200, userange < npix - 200)]
 
     # prepare output arrays
@@ -842,7 +842,7 @@ def get_relints_single_order_gaussian(sc, sr, err_sc, ordpol, ordmask=None, nfib
 
 
 
-def get_relints_from_indices_gaussian(P_id, img, err_img, stripe_indices, mask=None, nfib=24, sampling_size=25, slit_height=25,
+def get_relints_from_indices_gaussian(P_id, img, err_img, stripe_indices, mask=None, nfib=24, sampling_size=25, slit_height=32,
                                       debug_level=0, timit=False):
     """
     This routine computes the relative intensities in the individual fibres of a Veloce spectrum.
@@ -920,7 +920,7 @@ def get_relints_from_indices_gaussian(P_id, img, err_img, stripe_indices, mask=N
 
         if debug_level >= 2:
             # try to find cause for NaNs
-            print('n_elements should be:   len(relints_ord)*19 = ' + str(len(relints_ord) * 19))
+            print('n_elements should be:   len(relints_ord)*nfib = ' + str(len(relints_ord) * 19))
             print('relints_ord   : ' + str(np.sum(relints_ord == relints_ord)))
             print('relints_ord_norm   : ' + str(np.sum(relints_ord_norm == relints_ord_norm)))
             print('n_elements(SNR) should be:   ' + str(len(snr_ord)) + '   ;   ' + str(
@@ -958,23 +958,37 @@ def get_relints_from_indices_gaussian(P_id, img, err_img, stripe_indices, mask=N
 
 
 
-def append_relints_to_FITS(relints, fn, nfib=19):
+
+def append_relints_to_FITS(relints, fn):
     
-    #prepare information on fibres
-    fibinfo = ['inner ring', 'outer ring (2)', 'outer ring (1)', 'inner ring', 'outer ring (2)', 'outer ring (1)', 'inner ring', 'outer ring (2)', 'outer ring (1)',
-               'central', 'outer ring (2)', 'outer ring (1)', 'inner ring', 'outer ring (2)', 'outer ring (1)', 'inner ring', 'outer ring (2)', 'outer ring (1)', 'inner ring']
-    #numbering of fibres as per Jon Lawrence's diagram (email from 22/02/2018
-    #ie correspoding to the following layout:
-    # L S1 S3 S4 X I O2 O1 I O2 O1 I O2 O1 C O2 O1 I O2 O1 I O2 O1 I X S2 S5 ThXe
-    # L S1 S3 S4 X 2 19  8 3  9 10 4 11 12 1 13 14 5 15 16 6 17 18 7 X S2 S5 ThXe
-    #here O1 is the outer ring that is slightly further away from the centre!!!
-    fibnums = [2, 19, 8, 3, 9, 10, 4, 11, 12, 1, 13, 14, 5, 15, 16, 6, 17, 18, 7]
-    #the pseudoslit is reversed w.r.t. my simulations - we therefore turn the fibnums array around
-    fibnums = fibnums[::-1]
+    nfib = len(relints)
+    
+    assert nfib in [19,24], 'ERROR: relative intensities provided are not for exactly 19 or exactly 24 fibres!!!'
+    
+    # numbering of fibres as per Ion Lawrence's diagram (email from 22/02/2018
+    # ie correspoding to the following layout:
+    # LC S1 S3 S4 X I O2 O1 I O2 O1 I O2 O1 C O2 O1 I O2 O1 I O2 O1 I X S2 S5 ThXe
+    # LC S1 S3 S4 X 2 19  8 3  9 10 4 11 12 1 13 14 5 15 16 6 17 18 7 X S2 S5 ThXe
+    # here 'O1' is the outer ring that is slightly further away from the centre!!!
+    
+    if nfib == 19:    
+        # prepare information on fibres
+        fibinfo = ['inner ring', 'outer ring (2)', 'outer ring (1)', 'inner ring', 'outer ring (2)', 'outer ring (1)', 'inner ring', 'outer ring (2)', 'outer ring (1)',
+                   'central', 'outer ring (2)', 'outer ring (1)', 'inner ring', 'outer ring (2)', 'outer ring (1)', 'inner ring', 'outer ring (2)', 'outer ring (1)', 'inner ring']
+        fibnums = ['02', '19', '08', '03', '09', '10', '04', '11', '12', '01', '13', '14', '05', '15', '16', '06', '17', '18', '07']
+        # the pseudo-slit is reversed w.r.t. my simulations - we therefore turn the fibnums array around
+        fibnums = fibnums[::-1]   # so this goes from simThXe to LFC now
+    elif nfib == 24:
+        # prepare information on fibres
+        fibinfo = ['sky', 'sky', 'sky', 'inner ring', 'outer ring (2)', 'outer ring (1)', 'inner ring', 'outer ring (2)', 'outer ring (1)', 'inner ring', 'outer ring (2)', 'outer ring (1)',
+                   'central', 'outer ring (2)', 'outer ring (1)', 'inner ring', 'outer ring (2)', 'outer ring (1)', 'inner ring', 'outer ring (2)', 'outer ring (1)', 'inner ring', 'sky', 'sky']
+        fibnums = ['S1', 'S3', 'S4', '02', '19', '08', '03', '09', '10', '04', '11', '12', '01', '13', '14', '05', '15', '16', '06', '17', '18', '07', 'S2', 'S5']
+        # the pseudo-slit is reversed w.r.t. my simulations - we therefore turn the fibnums array around
+        fibnums = fibnums[::-1]   # so this goes from simThXe to LFC now
     
     #loop over all fibres
     for i in np.arange(nfib):
-        pyfits.setval(fn, 'RELINT'+str(i+1).zfill(2), value=relints[i], comment='fibre #'+str(fibnums[i])+' - '+fibinfo[i]+' fibre')
+        pyfits.setval(fn, 'RELINT'+str(i+1).zfill(2), value=relints[i], comment='fibre '+str(fibnums[i])+'   ('+fibinfo[i]+' fibre)')
         
     return
 

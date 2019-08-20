@@ -19,8 +19,9 @@ import copy
 import os
 
 from veloce_reduction.veloce_reduction.get_info_from_headers import get_obstype_lists
-from veloce_reduction.veloce_reduction.helper_functions import short_filenames
-from veloce_reduction.veloce_reduction.calibration import get_bias_and_readnoise_from_bias_frames, make_master_calib, make_ronmask, make_master_bias_from_coeffs, make_master_dark, correct_orientation, crop_overscan_region
+from veloce_reduction.veloce_reduction.helper_functions import short_filenames, laser_on, thxe_on
+from veloce_reduction.veloce_reduction.calibration import correct_for_bias_and_dark_from_filename, get_bias_and_readnoise_from_bias_frames, make_master_calib, \
+make_ronmask, make_master_bias_from_coeffs, make_master_dark, correct_orientation, crop_overscan_region
 from veloce_reduction.veloce_reduction.order_tracing import find_stripes, make_P_id, make_mask_dict, extract_stripes, make_order_traces_from_fibparms
 # from veloce_reduction.veloce_reduction.spatial_profiles import fit_profiles, fit_profiles_from_indices
 from veloce_reduction.veloce_reduction.profile_tests import fit_multiple_profiles_from_indices
@@ -160,7 +161,10 @@ else:
     mask = make_mask_dict(tempmask)
     P_id = copy.deepcopy(P_id_dum)
     # for the dates where fibre 8 had a ~20% drop in throughput, do NOT subtract 2
-    if (int(date) <= 20190203) or (int(date) >= 20190619):
+    if int(date) == 20190414:
+        for o in P_id.keys():
+            P_id[o][0] -= 1.
+    elif (int(date) <= 20190203) or (int(date) >= 20190619):
         for o in P_id.keys():
             P_id[o][0] -= 2.
     np.save(path + 'P_id.npy', P_id)
@@ -220,11 +224,11 @@ else:
     np.save(path + 'traces.npy', traces)
 
 # determine slit_heights from fibre profiles
-    slit_heights = []
-    for ord in sorted(traces['allfib'].keys()):
-        # calculate median slit height between outermost sky fibres and add 5 pixels to make sure we're at least ~3-4 pixels above/beloce calib fibres
-        slit_heights.append(np.ceil(np.median(np.abs(0.5 * (fibparms[ord]['fibre_02']['mu_fit'] - fibparms[ord]['fibre_27']['mu_fit'])))) + 5)
-    slit_height = np.max(slit_heights[1:]).astype(int)  # exclude order_01, as can be quite dodgy
+slit_heights = []
+for ord in sorted(traces['allfib'].keys()):
+    # calculate median slit height between outermost sky fibres and add 5 pixels to make sure we're at least ~3-4 pixels above/beloce calib fibres
+    slit_heights.append(np.ceil(np.median(np.abs(0.5 * (fibparms[ord]['fibre_02']['mu_fit'] - fibparms[ord]['fibre_27']['mu_fit'])))) + 5)
+slit_height = np.max(slit_heights[1:]).astype(int)  # exclude order_01, as can be quite dodgy
 #####################################################################################################################################################
 
 
@@ -302,24 +306,45 @@ if len(laser_and_thxe_list) > 0:
 # first, figure out the configuration of the calibration lamps for the ARC exposures
 print('Processing ARC (fibre Thorium) images...')
 arc_sublists = {'lfc':[], 'thxe':[], 'both':[], 'neither':[]}
-for file in arc_list:
-    lc = 0
-    thxe = 0
-    h = pyfits.getheader(file)
-    if 'LCEXP' in h.keys():
-        lc = 1
-    if h['SIMCALTT'] > 0:
-        thxe = 1
-    assert lc+thxe in [0,1,2], 'ERROR: could not establish status of LFC and simultaneous ThXe for the exposures in this list!!!'    
-    if lc+thxe == 0:
-        arc_sublists['neither'].append(file)
-    if lc+thxe == 1:
-        if lc == 1:
-            arc_sublists['lfc'].append(file)
-        else:
-            arc_sublists['thxe'].append(file)
-    elif lc+thxe == 2:
-        arc_sublists['both'].append(file)
+if int(date) < 20190503:
+        # look at the actual 2D image (using chipmasks for LFC and simThXe) to determine which calibration lamps fired
+        for file in arc_list:
+            img = correct_for_bias_and_dark_from_filename(file, medbias, MD, gain=gain, scalable=scalable, savefile=saveall, path=path)
+            lc = laser_on(img, chipmask)
+            thxe = thxe_on(img, chipmask)
+            if (not lc) and (not thxe):
+                arc_sublists['neither'].append(file)
+            elif (lc) and (thxe):
+                arc_sublists['both'].append(file)
+            else:
+                if lc:
+                    arc_sublists['lfc'].append(file)
+                elif thxe:
+                    arc_sublists['thxe'].append(file)
+    else:
+        # since May 2019 the header keywords are correct, so check for LFC / ThXe in header, as that is MUCH faster
+        for file in arc_list:
+            lc = 0
+            thxe = 0
+            h = pyfits.getheader(file)
+            if 'LCNEXP' in h.keys():  # this indicates the latest version of the FITS headers (from May 2019 onwards)
+                if ('LCEXP' in h.keys()) or ('LCMNEXP' in h.keys()):  # this indicates the LFC actually was actually exposed (either automatically or manually)
+                    lc = 1
+            else:  # if not, just go with the OBJECT field
+                if ('LC' in pyfits.getval(file, 'OBJECT').split('+')) or ('LFC' in pyfits.getval(file, 'OBJECT').split('+')):
+                    lc = 1
+            if h['SIMCALTT'] > 0:
+                thxe = 1
+            assert lc+thxe in [0,1,2], 'ERROR: could not establish status of LFC and simultaneous ThXe for the exposures in this list!!!'    
+            if lc+thxe == 0:
+                arc_sublists['neither'].append(file)
+            if lc+thxe == 1:
+                if lc == 1:
+                    arc_sublists['lfc'].append(file)
+                else:
+                    arc_sublists['thxe'].append(file)
+            elif lc+thxe == 2:
+                arc_sublists['both'].append(file)
 
 for subl in arc_sublists.keys():
     if len(arc_sublists[subl]) > 0:
