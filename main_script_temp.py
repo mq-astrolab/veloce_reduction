@@ -160,7 +160,7 @@ else:
     assert len(P_id_dum) == 39, 'ERROR: not exactly 39 orders found!!!'
     mask = make_mask_dict(tempmask)
     P_id = copy.deepcopy(P_id_dum)
-    # for the dates where fibre 8 had a ~20% drop in throughput, do NOT subtract 2
+    # for the dates where fibre 8 had a ~20-30% drop in throughput, do NOT subtract 2
     if int(date) == 20190414:
         for o in P_id.keys():
             P_id[o][0] -= 1.
@@ -298,7 +298,7 @@ if len(laser_and_thxe_list) > 0:
     # pix_q,flux_q,err_q = extract_spectrum_from_indices(master_both, err_master_both, q_indices, method='quick', slit_height=qsh, ronmask=ronmask, savefile=True,
     #                                                    date=date, filetype='fits', obsname='master_laser_and_thxe_list', path=path, timit=True)
     pix,flux,err = extract_spectrum_from_indices(master_both, err_master_both, indices, method='optimal', slit_height=slit_height, fibs='calibs', slope=True, offset=True, date=date,
-                                                 individual_fibres=True, ronmask=ronmask, savefile=True, filetype='fits', obsname='master_laser_and_thxe_list', path=path, timit=True)
+                                                 individual_fibres=True, ronmask=ronmask, savefile=True, filetype='fits', obsname='master_lfc_plus_simth', path=path, timit=True)
 #####################################################################################################################################################    
 
 
@@ -309,7 +309,7 @@ arc_sublists = {'lfc':[], 'thxe':[], 'both':[], 'neither':[]}
 if int(date) < 20190503:
         # look at the actual 2D image (using chipmasks for LFC and simThXe) to determine which calibration lamps fired
         for file in arc_list:
-            img = correct_for_bias_and_dark_from_filename(file, medbias, MD, gain=gain, scalable=scalable, savefile=saveall, path=path)
+            img = correct_for_bias_and_dark_from_filename(file, medbias, MDS, gain=gain, scalable=False, savefile=False, path=path)
             lc = laser_on(img, chipmask)
             thxe = thxe_on(img, chipmask)
             if (not lc) and (not thxe):

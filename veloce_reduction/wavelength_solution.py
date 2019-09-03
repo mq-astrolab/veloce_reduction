@@ -1568,7 +1568,7 @@ def xcorr_thflux(thflux, thflux2, scale=300., masking=True, satmask=None, lampty
 
 
 
-def get_dispsol_from_known_lines(thflux, fibre=None, date=None, fitwidth=4, search_width=None, satmask=None, lamptype='thar', minsigma=0.4, maxsigma=2.,
+def get_dispsol_from_known_lines(thflux, fibre=None, date=None, fitwidth=4, search_width=None, satmask=None, lamptype='thxe', minsigma=0.4, maxsigma=2.,
                                  sigma_0=0.85, minamp=0., maxamp=np.inf, return_all_pars=False, deg_spectral=7, deg_spatial=7,
                                  polytype='chebyshev', return_full=True, savetable=True, outpath=None, debug_level=0, timit=False):
 
@@ -1597,7 +1597,7 @@ def get_dispsol_from_known_lines(thflux, fibre=None, date=None, fitwidth=4, sear
    
     if satmask is None:
         n_ord = thflux.shape[0]
-        satmask = define_arc_mask(lamptype, n_ord)
+        satmask = define_arc_mask(lamptype.lower(), n_ord)
    
     if search_width is None:
         search_width = fitwidth 
@@ -2334,6 +2334,8 @@ def get_dispsol_for_all_fibs_2(obsname, relto='LFC', degpol=7, fibs='stellar', n
     fibname = ['S5', 'S2', '07', '18', '17', '06', '16', '15', '05', '14', '13', '01', '12', '11', '04', '10', '09',
                '03', '08', '19', '02', 'S4', 'S3', 'S1']
     offsets = 1.97 * np.array(range(3) + range(4,23) + range(24,26))[::-1]   # 1.97 pix is the median fib-to-fib separation
+    if not refit:
+        print('WARNING: median fibre to fibre separation not correct!!!')
 
     nfib = len(fibname)
 
@@ -2617,6 +2619,113 @@ def make_arc_dispsols_for_all_nights(outpath='/Users/christoph/OneDrive - UNSW/d
             pyfits.writeto(outpath + lamptype + '_dispsol_' + date + '.fits', all_air_wl, clobber=overwrite)
         
     return
+
+
+
+
+
+def get_dispsol_for_all_fibs_from_fibth(fn, date=None, path=None, deg_spectral=7, deg_spatial=7, polytype='chebyshev', savefits=False, debug_level=0, timit=False):
+        
+    if timit:
+        start_time = time.time()    
+    
+#     assert date is not None, 'ERROR: date not provided!!!'
+#     if savefits:
+#         assert path is not None, 'ERROR: cannot save to file: output directory ("path") not provided!!!'
+
+    if date is None:
+        date = fn.split('/')[-2]
+    if path is None:
+        path = fn.split(date)[0] + date + '/'
+            
+    spec = pyfits.getdata(fn)
+    
+    # only want the 24 fibres for which we have the fibre ThXe
+    if spec.shape[1] == 24:
+        userange = np.arange(24)
+    elif spec.shape[1] == 26:
+        userange = np.arange(1,25)
+        
+    # fibslot = [0,1,  3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,23,  24,25]
+    fibname = ['ThXe', 'S5', 'S2', '07', '18', '17', '06', '16', '15', '05', '14', '13', '01', '12', '11', '04', '10', '09',
+               '03', '08', '19', '02', 'S4', 'S3', 'S1', 'LC']
+
+    # prepare output arrays
+    all_air_wl = np.zeros(spec.shape)
+    all_vac_wl = np.zeros(spec.shape)
+
+    # loop over all fibres
+    for fib in userange:
+        
+        if debug_level > 0:
+            print('Processing fibre ' + fibname[fib])
+
+        # spectrum for that particular fibre
+        thflux = spec[:, fib, :]
+
+        # what kind of arc lamp is it?
+        if date == '20180917':
+            lamptype = 'ThAr'
+        else:
+            lamptype = 'ThXe'
+
+        # calculate wl-solution
+        air_wl, vac_wl = get_dispsol_from_known_lines(thflux, fibre=fibname[fib], lamptype=lamptype, deg_spectral=deg_spectral,
+                                                      deg_spatial=deg_spatial, polytype=polytype, return_full=True,
+                                                      savetable=False, timit=timit)
+
+        # save to all-fibres-combined array
+        all_air_wl[:, fib, :] = air_wl[:-1, :].copy()  # do NOT include the blue-most order
+        all_vac_wl[:, fib, :] = vac_wl[:-1, :].copy()  # do NOT include the blue-most order
+        
+#         if save_individual:
+#             pyfits.writeto(outpath + lamptype + '_dispsol_' + date + '_fibre_' + fibname[fib] + '.fits', air_wl, clobber=overwrite)
+    
+
+    # save to all-fibres-combined fits file
+    if savefits:
+        shortname = fn.split('/')[-1]
+        obsname = shortname.split('_')[-3]
+        obj = 'ARC_'
+        pyfits.writeto(path + obj + lamptype + '_' + obsname + '_air_dispsol_' + date + '.fits', all_air_wl, clobber=True)
+        pyfits.writeto(path + obj + lamptype + '_' + obsname + '_vac_dispsol_' + date + '.fits', all_vac_wl, clobber=True)
+    
+    if timit:
+        delta_t = time.time() - start_time
+        print('Time taken for creating ARC dispsol for all fibres: ' + str(np.round(delta_t,1)) + ' seconds')
+    
+    return all_air_wl, all_vac_wl
+
+
+
+
+
+def interpolate_dispsols(wl1, wl2, t1, t2, tobs):
+    
+    assert wl1.shape == wl2.shape, 'ERROR: wl1 and wl2 do not have the same dimensions!!!'
+    assert t1 <= t2, 'ERROR: t2 is not greater than or equal to t1'
+    assert (tobs >= t1) and (tobs <= t2), 'ERROR: tobs does not lie between t1 and t2'
+    if t1 == t2:
+        assert wl1 == wl2, 'ERROR: t1 is equal to t2, but the wl-solutions are not the same!!!'
+        return wl1
+    
+    #prepare output array
+    interp_wl = np.zeros(wl1.shape)
+    
+    # difference array
+    delta_wl = wl2 - wl1
+    
+    # total time between the two reference wl-solutions
+    delta_t = t2 - t1
+    
+    # fractional time ([0...1]) that is the target for interpolation
+    frac = (tobs - t1) / delta_t
+    
+    # now linearly interpolate between wl1 and wl2 to tobs
+    interp_wl = wl1 + frac * delta_wl
+    
+    return interp_wl
+
 
 
 

@@ -162,19 +162,19 @@ def get_RV_from_xcorr(f, err, wl, f0, wl0, mask=None, smoothed_flat=None, osf=2,
     if timit:
         start_time = time.time()
     
-    #speed of light in m/s
+    # speed of light in m/s
     c = 2.99792458e8
     
     rv = {}
     rverr = {}
     
-    #loop over orders
+    # loop over orders
     for ord in sorted(f.iterkeys()):
         
         if debug_level >= 1:
             print(ord)
         
-        #only use pixels that have enough signal
+        # only use pixels that have enough signal
         if mask is None:
             normflat = smoothed_flat[ord]/np.max(smoothed_flat[ord])
             ordmask = np.ones(len(normflat), dtype = bool)
@@ -205,7 +205,7 @@ def get_RV_from_xcorr(f, err, wl, f0, wl0, mask=None, smoothed_flat=None, osf=2,
             #ordmask  = mask[ord][::-1]
             ordmask  = mask[ord]
         
-        #either way, disregard #(edge_cut) pixels at either end; this is slightly dodgy, but the gaussian filtering above introduces edge effects due to mode='reflect'
+        # either way, disregard #(edge_cut) pixels at either end; this is slightly dodgy, but the gaussian filtering above introduces edge effects due to mode='reflect'
         ordmask[:2*int(filter_width)] = False
         ordmask[-2*int(filter_width):] = False
     
@@ -237,7 +237,7 @@ def get_RV_from_xcorr(f, err, wl, f0, wl0, mask=None, smoothed_flat=None, osf=2,
             ord_f0_sorted = f0[ord].copy()
             ord_f_sorted = f[ord].copy()
         
-        #rebin spectra onto logarithmic wavelength grid
+        # rebin spectra onto logarithmic wavelength grid
 #         rebinned_f0 = np.interp(logwlgrid,logwl[mask],f0_unblazed[mask])
 #         rebinned_f = np.interp(logwlgrid,logwl[mask],f_unblazed[mask])
         spl_ref_f0 = interp.InterpolatedUnivariateSpline(logwl0_sorted[ordmask_sorted], ord_f0_sorted[ordmask_sorted], k=3)    #slightly slower than linear, but best performance for cubic spline

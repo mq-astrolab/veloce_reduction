@@ -1074,7 +1074,7 @@ def extract_spectrum(stripes, err_stripes, ron_stripes, method='optimal', indivi
             
         # name of object
         try:
-            starname = pyfits.getval(path + obsname + '.fits', 'OBJECT')
+            starname = pyfits.getval(path + obsname + '.fits', 'OBJECT').split('+')[0]
         except:
             starname = ''
                      
@@ -1244,7 +1244,7 @@ def extract_spectrum_from_indices(img, err_img, stripe_indices, ronmask=None, me
         
         # name of object
         try:
-            starname = pyfits.getval(path + obsname + '.fits', 'OBJECT')
+            starname = pyfits.getval(path + obsname + '.fits', 'OBJECT').split('+')[0]
         except:
             starname = ''
                     

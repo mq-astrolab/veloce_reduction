@@ -5,40 +5,12 @@ import astropy.io.fits as pyfits
 import barycorrpy
 import numpy as np
 from readcol import readcol
+import glob
 
+from veloce_reduction.veloce_reduction.get_info_from_headers import get_obstype_lists
+from veloce_reduction.veloce_reduction.helper_functions import short_filenames
 
 # starnames = ['HD10700', 'HD190248', 'Gl87', 'GJ1132', 'GJ674', 'HD194640', 'HD212301']
-
-
-def define_target_dict(starnames):
-    target_dict = {}
-    #add stars
-
-    # for TAUCETI
-    ra = 26.00930287666994
-    dec = -15.933798650941204
-    pmra = -1729.7257241911389
-    pmdec = 855.492578244384
-    px = 277.516215785613
-    rv = -16.68e3
-
-    # for TOI129
-    ra = 0.187097
-    dec = -54.830506
-    pmra = -202.8150572
-    pmdec = -71.51751871
-    px = 16.15604552
-    rv = 21.04070239e3
-
-    # for TOI394
-    ra = 48.49947914772984
-    dec = -8.573851369791486
-    pmra = -9.3210485208989
-    pmdec = -76.26200762315906
-    px = 6.994665452843984
-    rv = 18.040873585123297e3
-
-    return target_dict
 
 
 
@@ -50,7 +22,7 @@ def create_gaiadr2_id_dict(path='/Users/christoph/OneDrive - UNSW/observations/'
     # read input file for ALL targets (excluding B-stars)
     targets, T0, P, g2id = readcol(path + 'PT0_gaiadr2_list.txt', twod=False, verbose=False)
     
-    # fill dictionary with other targets
+    # fill dictionary with target
     for i in range(len(targets)):
         gaia_dict[targets[i]] = {'gaia_dr2_id':g2id[i][1:]}
 
@@ -85,12 +57,17 @@ def get_barycentric_correction(fn, rvabs=None, obs_path='/Users/christoph/OneDri
 
     try:
         # for TOIs
-        if typ == '.01':
-            gaia_dr2_id = gaia_dict['TOI'+targ[:3]]['gaia_dr2_id']
+        if (typ == '.01') or (targ[:3] in ['TOI', 'TIC']):
+            if targ[:3] in ['TOI', 'TIC']:
+                gaia_dr2_id = gaia_dict['TOI'+targ[3:6]]['gaia_dr2_id']
+            else:
+                gaia_dr2_id = gaia_dict['TOI'+targ[:3]]['gaia_dr2_id']
         # for other targets
         else:
             if targ.lower() in ['gj674', 'gl87', 'proxima', 'KELT-15b', 'WASP-54b']:
                 gaia_dr2_id = gaia_dict[targ]['gaia_dr2_id']
+            elif targ.lower() == 'gj87':
+                gaia_dr2_id = gaia_dict['Gl87']['gaia_dr2_id']
             elif targ.lower()[:2] == 'hd':
                 gaia_dr2_id = gaia_dict[targ]['gaia_dr2_id']
             else:
@@ -124,6 +101,62 @@ def get_barycentric_correction(fn, rvabs=None, obs_path='/Users/christoph/OneDri
     #                            px=px, rv=rv, obsname='AAO', ephemeris='de430')
 
     return bc[0][0][0]
+
+
+
+def get_bc_from_gaia(gaia_dr2_id, jd, rvabs=0):
+    """
+    wrapper routine for using barycorrpy with Gaia DR2 coordinates
+    """
+    
+    # use 2015.5 as an epoch (Gaia DR2)
+    epoch = 2457206.375
+
+#     gaia_data = Gaia.query_object_async(coordinate=coord, width=width, height=height)
+#     q = Gaia.launch_job_async('SELECT * FROM gaiadr2.gaia_source WHERE source_id = ' + str(gaia_dr2_id))
+    q = Gaia.launch_job('SELECT * FROM gaiadr2.gaia_source WHERE source_id = ' + str(gaia_dr2_id))
+    gaia_data = q.results
+
+    bc = barycorrpy.get_BC_vel(JDUTC=jd, ra=gaia_data['ra'], dec=gaia_data['dec'], pmra=gaia_data['pmra'], pmdec=gaia_data['pmdec'],
+                               px=gaia_data['parallax'], rv=rvabs*1e3, epoch=epoch, obsname='AAO', ephemeris='de430')
+    # bc = barycorrpy.get_BC_vel(JDUTC=utmjd, ra=ra, dec=dec, pmra=gaia_data['pmra'], pmdec=gaia_data['pmdec'],
+    #                            px=gaia_data['parallax'], rv=gaia_data['radial_velocity']*1e3, obsname='AAO', ephemeris='de430')
+    # bc = barycorrpy.get_BC_vel(JDUTC=utmjd, ra=ra, dec=dec, pmra=pmra, pmdec=pmdec,
+    #                            px=px, rv=rv, obsname='AAO', ephemeris='de430')
+
+    return bc[0][0]
+
+
+
+def append_bc_to_reduced_files(date, root='/Volumes/BERGRAID/data/veloce/'):
+    
+    print('Appending barycentric corrections to the reduced spectra of ' + str(date) + '...')
+    
+    acq_list, bias_list, dark_list, flat_list, skyflat_list, domeflat_list, arc_list, thxe_list, laser_list, laser_and_thxe_list, stellar_list, unknown_list = get_obstype_lists(root+'raw_goodonly/'+date+'/')
+    stellar_list.sort()
+    obsnames = short_filenames(stellar_list)
+    
+    print('Calculating barycentric correction for stellar observation:')
+    
+    for i,(file,obsname) in enumerate(zip(stellar_list, obsnames)):
+        
+        print(str(i+1) + '/' + str(len(stellar_list)))
+        
+        bc = get_barycentric_correction(file)
+        bc = np.round(bc,2)
+        if np.isnan(bc):
+            bc = ''
+        # write the barycentric correction into the FITS header of both the quick-extracted and the optimal-extracted reduced spectrum files
+        sublist = glob.glob(root + 'reduced/' + date + '/*' + obsname + '*extracted*')
+        for outfn in sublist:
+            pyfits.setval(outfn, 'BARYCORR', value=bc, comment='barycentric velocity correction [m/s]')   
+    
+    print('DONE!')
+    
+    return    
+    
+        
+       
 
 
 
@@ -178,4 +211,37 @@ def old_get_barycentric_correction(fn, starname='tauceti', h=0.01, w=0.01):
     #                            px=px, rv=rv, obsname='AAO', ephemeris='de430')
 
     return bc[0][0]
+
+
+
+def define_target_dict(starnames):
+    target_dict = {}
+    #add stars
+
+    # for TAUCETI
+    ra = 26.00930287666994
+    dec = -15.933798650941204
+    pmra = -1729.7257241911389
+    pmdec = 855.492578244384
+    px = 277.516215785613
+    rv = -16.68e3
+
+    # for TOI129
+    ra = 0.187097
+    dec = -54.830506
+    pmra = -202.8150572
+    pmdec = -71.51751871
+    px = 16.15604552
+    rv = 21.04070239e3
+
+    # for TOI394
+    ra = 48.49947914772984
+    dec = -8.573851369791486
+    pmra = -9.3210485208989
+    pmdec = -76.26200762315906
+    px = 6.994665452843984
+    rv = 18.040873585123297e3
+
+    return target_dict
+
 

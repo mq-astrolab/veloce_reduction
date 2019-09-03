@@ -258,10 +258,13 @@ def process_science_images(imglist, P_id, chipmask, mask=None, stripe_indices=No
         changes = np.where(np.array(object_list)[:-1] != np.array(object_list)[1:])[0] + 1   # need the plus one to get the indices of the first occasion of a new object
         # list of indices for individual epochs - there's gotta be a smarter way to do this...
         all_epoch_list = []
-        all_epoch_list.append(np.arange(0,changes[0]))
-        for j in range(len(changes) - 1):
-            all_epoch_list.append(np.arange(changes[j], changes[j+1]))
-        all_epoch_list.append(np.arange(changes[-1], len(object_list)))
+        if len(changes) > 0:
+            all_epoch_list.append(np.arange(0,changes[0]))
+            for j in range(len(changes) - 1):
+                all_epoch_list.append(np.arange(changes[j], changes[j+1]))
+            all_epoch_list.append(np.arange(changes[-1], len(object_list)))
+        else:
+            all_epoch_list.append(np.arange(0, len(object_list)))
 
 
     #####################################
@@ -331,6 +334,20 @@ def process_science_images(imglist, P_id, chipmask, mask=None, stripe_indices=No
                             epoch_sublists['lfc'].append(file)
                         elif thxe:
                             epoch_sublists['thxe'].append(file)
+                # now check the calibration lamp configuration for the main observation in question
+                img = correct_for_bias_and_dark_from_filename(filename, MB, MD, gain=gain, scalable=scalable,
+                                                              savefile=saveall, path=path)
+                lc = laser_on(img, chipmask)
+                thxe = thxe_on(img, chipmask)
+                if (not lc) and (not thxe):
+                    lamp_config = 'neither'
+                elif (lc) and (thxe):
+                    lamp_config = 'both'
+                else:
+                    if lc:
+                        lamp_config = 'lfc'
+                    elif thxe:
+                        lamp_config = 'thxe'
             else:
                 # since May 2019 the header keywords are correct, so check for LFC / ThXe in header, as that is MUCH faster
                 for file in epoch_list:
@@ -355,6 +372,27 @@ def process_science_images(imglist, P_id, chipmask, mask=None, stripe_indices=No
                             epoch_sublists['thxe'].append(file)
                     elif lc+thxe == 2:
                         epoch_sublists['both'].append(file)
+                # now check the calibration lamp configuration for the main observation in question
+                lc = 0
+                thxe = 0
+                h = pyfits.getheader(filename)
+                if 'LCNEXP' in h.keys():  # this indicates the latest version of the FITS headers (from May 2019 onwards)
+                    if ('LCEXP' in h.keys()) or ('LCMNEXP' in h.keys()):  # this indicates the LFC actually was actually exposed (either automatically or manually)
+                        lc = 1
+                else:  # if not latest header version, just go with the OBJECT field
+                    if ('LC' in pyfits.getval(filename, 'OBJECT').split('+')) or ('LFC' in pyfits.getval(filename, 'OBJECT').split('+')):
+                        lc = 1
+                if h['SIMCALTT'] > 0:
+                    thxe = 1
+                if lc + thxe == 0:
+                    lamp_config = 'neither'
+                elif lc + thxe == 1:
+                    if lc == 1:
+                        lamp_config = 'lfc'
+                    else:
+                        lamp_config = 'thxe'
+                elif lc + thxe == 2:
+                    lamp_config = 'both'
         else:
             # for calibration images we don't need to check for the calibration lamp configuration!
             # just create a dummy copy of the image list so that it is in the same format that ix expected for stellar observations
@@ -362,46 +400,13 @@ def process_science_images(imglist, P_id, chipmask, mask=None, stripe_indices=No
             epoch_sublists = {}
             epoch_sublists[lamp_config] = imglist[:]
 
+
         # (1) call routine that does all the overscan-, bias- & dark-correction stuff and proper error treatment
         img = correct_for_bias_and_dark_from_filename(filename, MB, MD, gain=gain, scalable=scalable, savefile=saveall, path=path)   # [e-]
         #err = np.sqrt(img + ronmask*ronmask)   # [e-]
         #TEMPFIX: (how should I be doing this properly???)
         err_img = np.sqrt(np.clip(img,0,None) + ronmask*ronmask)   # [e-]
-        
-        # now check the calibration lamp configuration for the main observation in question
-        if int(date) < 20190503:
-            lc = 0
-            thxe = 0
-            h = pyfits.getheader(filename)
-            if 'LCNEXP' in h.keys():  # this indicates the latest version of the FITS headers (from May 2019 onwards)
-                if ('LCEXP' in h.keys()) or ('LCMNEXP' in h.keys()):  # this indicates the LFC actually was actually exposed (either automatically or manually)
-                    lc = 1
-            else:  # if not, just go with the OBJECT field
-                if ('LC' in pyfits.getval(filename, 'OBJECT').split('+')) or ('LFC' in pyfits.getval(filename, 'OBJECT').split('+')):
-                    lc = 1
-            if h['SIMCALTT'] > 0:
-                thxe = 1
-            if lc+thxe == 0:
-                lamp_config = 'neither'
-            elif lc+thxe == 1:
-                if lc == 1:
-                    lamp_config = 'lfc'
-                else:
-                    lamp_config = 'thxe'
-            elif lc+thxe == 2:
-                lamp_config = 'both'
-        else:
-            lc = laser_on(img, chipmask)
-            thxe = thxe_on(img, chipmask)
-            if (not lc) and (not thxe):
-                lamp_config = 'neither'
-            elif (lc) and (thxe):
-                lamp_config = 'both'
-            else:
-                if lc:
-                    lamp_config = 'lfc'
-                elif thxe:
-                    lamp_config = 'thxe'
+
         
         ## (2) remove cosmic rays (ERRORS MUST REMAIN UNCHANGED)
         ## check if there are multiple exposures for this epoch (if yes, we can do the much simpler "median_remove_cosmics")

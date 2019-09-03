@@ -885,14 +885,14 @@ def single_sigma_clip(x, tl, th=None, centre='median', return_indices=False):
         print('ERROR: Method for computing centre must be "median" or "mean"')
         return
     
-    goodix = ~bad_high & ~bad_low
-    badix = ~goodix
-    clipped = clipped[goodix]
+    goodboolix = ~bad_high & ~bad_low
+    badix = ~goodboolix
+    clipped = clipped[goodboolix]
 
     if return_indices:
-        goodix = indices[goodix]
+        goodix = indices[goodboolix]
         badix = indices[badix]
-        return clipped, goodix.astype(int), badix.astype(int)
+        return clipped, goodboolix, goodix.astype(int), badix.astype(int)
     else:
         return clipped   
    
@@ -911,9 +911,6 @@ def sigma_clip(x, tl, th=None, centre='median', return_indices=False):
     
     OUTPUT:
     'x'  : the now sigma-clipped array
-
-    TODO:
-    implement return_indices keyword
     """
     
     # make sure both boundaries are defined

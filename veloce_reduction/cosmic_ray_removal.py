@@ -79,7 +79,7 @@ def median_remove_cosmics(img_list, main_index=0, scales=None, ronmask=None, thr
     med_sig_arr = np.sqrt(medimg + ronmask * ronmask)
 
     # get the difference image
-    diff_img = img - medimg
+    diff_img = img - medimg       #this needs to be scaled as well
 
     # Now, although it is unlikely, it is not impossible for some pixels to be affected by a cosmic ray in two or more
     # images! we want to make sure that if that's the case we want to the median of the rest or the lowest pixel value
@@ -101,7 +101,7 @@ def median_remove_cosmics(img_list, main_index=0, scales=None, ronmask=None, thr
     if debug_level > 1:
         print('Cleaning ' + str(np.sum(cosmics)) + 'cosmic-ray affected pixels...')
     cleaned = img.copy()
-    cleaned[cosmics] = medimg[cosmics]
+    cleaned[cosmics] = medimg[cosmics]   # I need to multiply/divide this by the scaling factor
 
     # now simply speaking that's it - however, we can try and be smart and also check for ramps of cosmics, ie check
     # if there are pixels in the immediate vicinity of the pixels identified as cosmics above that are at least a lower
