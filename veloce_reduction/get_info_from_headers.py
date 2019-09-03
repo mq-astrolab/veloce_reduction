@@ -5,7 +5,6 @@ Created on 7 May 2018
 '''
 
 
-
 import glob
 import astropy.io.fits as pyfits
 import numpy as np
