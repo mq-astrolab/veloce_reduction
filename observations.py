@@ -67,7 +67,7 @@ def calculate_orbital_phase(name, jd=None, PT0_dict=None, t_ref = 2457000.):
 
 
 
-def create_toi_velobs_dict(path='/Users/christoph/OneDrive - UNSW/observations/', savefile=True, src='raw', laptop=False):
+def create_toi_velobs_dict(obspath='/Users/christoph/OneDrive - UNSW/observations/', savefile=True, src='raw', laptop=False):
 
     """
     TODO:
@@ -100,7 +100,7 @@ def create_toi_velobs_dict(path='/Users/christoph/OneDrive - UNSW/observations/'
 
 
     # read input file
-    targets, T0, P = readcol(path + 'PT0_list.txt', twod=False, verbose=False)
+    targets, T0, P = readcol(obspath + 'PT0_list.txt', twod=False, verbose=False)
 
     # initialise dictionary
     vo = {}
@@ -147,8 +147,7 @@ def create_toi_velobs_dict(path='/Users/christoph/OneDrive - UNSW/observations/'
             elif src.lower() == 'raw':
                 fn_list = [fn for fn,target in zip(all_obs_list, all_target_list) if target.split('+')[0] in [targ, targ2]]
         
-        
-#             
+        # sort the entire list            
         fn_list.sort()
 
         # prepare dictionary entry for this target
@@ -188,7 +187,7 @@ def create_toi_velobs_dict(path='/Users/christoph/OneDrive - UNSW/observations/'
                 vo[targ]['nepochs'] -= np.sum(rundiff == 1)
 
     if savefile:
-        np.save(path + 'velobs_' + rawred + '.npy', vo)
+        np.save(obspath + 'velobs_' + rawred + '.npy', vo)
 
     return vo
 

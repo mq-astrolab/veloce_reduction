@@ -19,7 +19,7 @@ def create_gaiadr2_id_dict(path='/Users/christoph/OneDrive - UNSW/observations/'
     # prepare dictionary
     gaia_dict = {}
 
-    # read input file for ALL targets (excluding B-stars)
+    # read input file for ALL targets (no including some B-stars)
     targets, T0, P, g2id = readcol(path + 'PT0_gaiadr2_list.txt', twod=False, verbose=False)
     
     # fill dictionary with target
@@ -64,10 +64,16 @@ def get_barycentric_correction(fn, rvabs=None, obs_path='/Users/christoph/OneDri
                 gaia_dr2_id = gaia_dict['TOI'+targ[:3]]['gaia_dr2_id']
         # for other targets
         else:
-            if targ.lower() in ['gj674', 'gl87', 'proxima', 'KELT-15b', 'WASP-54b']:
+            if targ.lower() in ['gj674', 'gl87', 'proxima', 'kelt-15b', 'wasp-54b', 'gj514', 'gj526', 'gj699']:
                 gaia_dr2_id = gaia_dict[targ]['gaia_dr2_id']
             elif targ.lower() == 'gj87':
                 gaia_dr2_id = gaia_dict['Gl87']['gaia_dr2_id']
+            elif targ.lower() in ['zetapic', 'zeta pic']:
+                gaia_dr2_id = gaia_dict['zetaPic']['gaia_dr2_id']
+            elif targ.lower() in ['ekeri', 'ek eri']:
+                gaia_dr2_id = gaia_dict['EKEri']['gaia_dr2_id']
+            elif targ.lower() in ['ksihya', 'ksi hya', 'ksihya_new']:
+                gaia_dr2_id = gaia_dict['ksiHya']['gaia_dr2_id']
             elif targ.lower()[:2] == 'hd':
                 gaia_dr2_id = gaia_dict[targ]['gaia_dr2_id']
             else:
@@ -100,7 +106,12 @@ def get_barycentric_correction(fn, rvabs=None, obs_path='/Users/christoph/OneDri
     # bc = barycorrpy.get_BC_vel(JDUTC=utmjd, ra=ra, dec=dec, pmra=pmra, pmdec=pmdec,
     #                            px=px, rv=rv, obsname='AAO', ephemeris='de430')
 
-    return bc[0][0][0]
+    try:
+        final_bc = bc[0][0][0]
+    except:
+        final_bc = bc[0][0]
+        
+    return final_bc
 
 
 
@@ -135,12 +146,13 @@ def append_bc_to_reduced_files(date, root='/Volumes/BERGRAID/data/veloce/'):
     acq_list, bias_list, dark_list, flat_list, skyflat_list, domeflat_list, arc_list, thxe_list, laser_list, laser_and_thxe_list, stellar_list, unknown_list = get_obstype_lists(root+'raw_goodonly/'+date+'/')
     stellar_list.sort()
     obsnames = short_filenames(stellar_list)
+    object_list = [pyfits.getval(file, 'OBJECT').split('+')[0] for file in stellar_list]
     
     print('Calculating barycentric correction for stellar observation:')
     
     for i,(file,obsname) in enumerate(zip(stellar_list, obsnames)):
         
-        print(str(i+1) + '/' + str(len(stellar_list)))
+        print(str(i+1) + '/' + str(len(stellar_list)) + '   (' + object_list[i] + ')')
         
         bc = get_barycentric_correction(file)
         bc = np.round(bc,2)

@@ -2138,9 +2138,9 @@ def get_dispsol_for_all_fibs(obsname, date=None, relto='LFC', twod=False, degpol
             yr = '2018'
         date = yr + mon + day
 
-    # need to do this b/c not all files have a pixfit coeffs file
     if fibtofib:
         if nightly_coeffs:
+            # need to do this b/c not all nights have a pixfit coeffs file
             pc_fn = '/Users/christoph/OneDrive - UNSW/dispsol/pixfit_coeffs/pixfit_coeffs_relto_' + relto + '_for_' + date + '.npy'
             while not os.path.isfile(pc_fn):
                 date = str(int(date) - 1)
@@ -2316,7 +2316,7 @@ def get_dispsol_for_all_fibs(obsname, date=None, relto='LFC', twod=False, degpol
 
 
 
-def get_dispsol_for_all_fibs_2(obsname, relto='LFC', degpol=7, fibs='stellar', nx=4112, eps=0.5, fudge=1., refit=False, debug_level=0, timit=False):
+def get_dispsol_for_all_fibs_2(obsname, date=None, relto='LFC', degpol=7, fibs='stellar', nx=4112, eps=0.5, fudge=1., refit=False, debug_level=0, timit=False):
     '''using CGT's DAOPHOT results to measure LFC shifts'''
 
     # TODO: instead of reading P_id for the LFC, do a divide into orders and fit new x-y-traces
@@ -2326,6 +2326,21 @@ def get_dispsol_for_all_fibs_2(obsname, relto='LFC', degpol=7, fibs='stellar', n
 
     if timit:
         start_time = time.time()
+
+    # make sure a date is provided
+    assert date is not None, 'ERROR: "date" not provided'
+    
+    if fibtofib:
+        if nightly_coeffs:
+            # need to do this b/c not all nights have a pixfit coeffs file
+            pc_fn = '/Users/christoph/OneDrive - UNSW/dispsol/pixfit_coeffs/pixfit_coeffs_relto_' + relto + '_for_' + date + '.npy'
+            while not os.path.isfile(pc_fn):
+                date = str(int(date) - 1)
+                pc_fn = '/Users/christoph/OneDrive - UNSW/dispsol/pixfit_coeffs/pixfit_coeffs_relto_' + relto + '_for_' + date + '.npy'
+        else:
+            # load default coefficients
+            pc_fn = '/Users/christoph/OneDrive - UNSW/dispsol_tests/20180917/pixfit_coeffs_relto_' + relto + '_as_of_2018-11-14.npy'
+        pixfit_coeffs = np.load(pc_fn).item()
 
     # load default coefficients
     pixfit_coeffs = np.load('/Users/christoph/OneDrive - UNSW/dispsol_tests/20180917/pixfit_coeffs_relto_' + relto + '_as_of_2018-11-14.npy').item()
@@ -2458,7 +2473,200 @@ def get_dispsol_for_all_fibs_2(obsname, relto='LFC', degpol=7, fibs='stellar', n
 
 
 
-def make_master_fibth(date=None, laptop=False):
+def get_dispsol_for_all_fibs_3(obsname, date=None, relto='LFC', degpol=7, nx=4112, refit=True, fibtofib=True, return_auxdata=False, norm_coords=False, laptop=False, debug_level=0, timit=False):
+    '''using CGT's new DAOPHOT results to measure LFC shifts; anchor using the wl-solution from the master ARC that night'''
+
+    # TODO: IDEA: instead of reading P_id for the LFC, do a divide into orders and fit new x-y-traces
+    # TODO: use meansep - get_mean_fibre_separation instead of 1.97
+
+    # make sure a date is provided
+    assert date is not None, 'ERROR: "date" not provided'
+    year = str(date)[:4]
+    
+    if laptop:
+        raw_path = '/Users/christoph/data/raw_goodonly/' + date + '/'
+        red_path = '/Users/christoph/data/reduced/' + date + '/'
+        lfc_path = '/Users/christoph/data/lfc_peaks/'
+    else:
+        raw_path = '/Volumes/BERGRAID/data/veloce/raw_goodonly/' + date + '/'
+        red_path = '/Volumes/BERGRAID/data/veloce/reduced/' + date + '/'
+        lfc_path = '/Volumes/BERGRAID/data/veloce/lfc_peaks/'
+        
+    # read in LFC vac wls (f0 = 9.56 GHz   &   f_rep = 25 GHz)    
+    lfc_vac_wls = np.squeeze(np.array(readcol('/Users/christoph/OneDrive - UNSW/dispsol/lfc_vac_wls_nm.txt', twod=False))) * 10.    # in Angstroms
+    
+    if timit:
+        start_time = time.time()
+
+    # load default coefficients
+    pixfit_coeffs = np.load('/Users/christoph/OneDrive - UNSW/dispsol_tests/20180917/pixfit_coeffs_relto_' + relto + '_as_of_2018-11-14.npy').item()
+
+    # fibslot = [(0),1,2,   3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,   22,23,24,(25)]
+    fibname = ['S5', 'S2', '07', '18', '17', '06', '16', '15', '05', '14', '13', '01', '12', '11', '04', '10', '09', '03', '08', '19', '02', 'S4', 'S3', 'S1']
+    
+    if not refit:
+        offsets = 1.97 * np.array(range(3) + range(4,23) + range(24,26))[::-1]   # 1.97 pix is the median fib-to-fib separation
+        print('WARNING: median fibre to fibre separation not correct!!!')
+
+#     nfib = len(fibname)
+    nfib = len(fibname) + 2   # we want to include the simcalib fibres, although they're not used in the pixfit_coeffs (LFC wl-sol is saved, simThXe is not)
+
+    # what kind of arc lamp is it?
+    if date == '20180917':
+        lamptype = 'thar'
+    else:
+        lamptype = 'thxe'
+        
+    # read master ARC dispsol for that night
+    assert (os.path.isfile(red_path + lamptype + '_dispsol_' + date + '.fits')) or (os.path.isfile(raw_path + lamptype + '_dispsol_' + date + '.fits')), 'ERROR: master ARC wl-solution does not exist for ' + str(date) + ' !!!'
+    try:
+        # air_wl = pyfits.getdata(red_path + lamptype + '_dispsol_' + date + '.fits', 0)
+        vac_wl = pyfits.getdata(red_path + lamptype + '_dispsol_' + date + '.fits', 1)
+    except:
+        # air_wl = pyfits.getdata(raw_path + lamptype + '_dispsol_' + date + '.fits', 0)
+        vac_wl = pyfits.getdata(raw_path + lamptype + '_dispsol_' + date + '.fits', 1)
+            
+    # read file containing LFC peak positions of observation
+#     _, yref, xref, _, _, _, _, _, _, _, _ = readcol(lfc_path + '21sep30019olc.nst', twod=False, skipline=2)
+    try:
+        _, y, x, _, _, _, _, _, _, _, _ = readcol(lfc_path + 'all/' + year + '/' + obsname + 'olc.nst', twod=False, skipline=2)
+    except:
+        _, y, x, _, _, _, _, _, _ = readcol(lfc_path + 'all/' + year + '/' + obsname + 'olc.nst', twod=False, skipline=2)
+    del _
+#     xref = nx - xref
+    x = nx - x
+#     yref = yref - 54.   # cut off 53 overscan pixels that DAOPHOT includes + 1 pixel b/c it starts indexing from 1
+    y = y - 54.         # cut off 53 overscan pixels that DAOPHOT includes + 1 pixel b/c it starts indexing from 1
+    
+    # some housekeeping...
+    xx = np.arange(nx)
+
+    if refit:
+        # divide LFC peak positions into orders
+        peaks = divide_lfc_peaks_into_orders(x, y)
+    else:
+        print('FEHLER: muss ich erst noch machen')
+#         # get affine transformation matrix
+#         #     if   x' = x * M
+#         # # then   x  = x' * M_inv
+#         Minv = find_affine_transformation_matrix(xref, yref, x, y, timit=True, eps=2.)
+#         # also get the rough trace of the LFC fibre (needed below)
+#         pid = np.load(lfc_path + 'lfc_P_id.npy').item()
+
+    # prepare outputs
+    wldict = {}
+    auxdata = {}
+    # wl = np.zeros((n_ord, nfib, nx))
+    wl = np.zeros((40, nfib, nx))
+     
+    # loop over all orders
+    for o in range(vac_wl.shape[0]):
+        
+        # some housekeeping...
+        ord = 'order_'+str(o+1).zfill(2)
+        if debug_level > 0:
+            print(ord)
+        wldict[ord] = {}
+        auxdata[ord] = {}
+        
+        # divide DAOPHOT LFC peaks into orders
+        peaks = divide_lfc_peaks_into_orders(x, y)
+        ord_x = np.array(peaks[ord])[:,0]
+        ord_y = np.array(peaks[ord])[:,1]
+        ord_y = ord_y[ord_x.argsort()]
+        ord_x = ord_x[ord_x.argsort()]
+        
+        # this just recovers the 7th order polynomial used in the 2-dim ThXe dispsol for this order (almost perfect)
+        ord_wlfit = np.poly1d(np.polyfit(xx, vac_wl[o,-2,:], degpol))
+        peak_thxe_wls = ord_wlfit(ord_x)
+        
+        # find the nearest entry in the array of theoretical wavelengths for each peak based in the ThXe dispsol
+        theo_wls = np.array([find_nearest(lfc_vac_wls, ord_wlfit(peak_x)) for peak_x in ord_x])
+        
+        if norm_coords:
+            # go to normalized co-ordinates (constrain the x-values to [0,1])
+            ord_x_norm = (ord_x / (nx-1))
+#             ord_xx_norm = (xx.astype(float) / (nx-1)) 
+            ord_lam_norm = (theo_wls - np.min(theo_wls)) / (np.max((theo_wls - np.min(theo_wls)))) 
+            new_fit = np.poly1d(np.polyfit(ord_x_norm, theo_wls, degpol))
+            # residuals in Angstromgs
+            wlres = theo_wls - new_fit(ord_x_norm)
+            # fit the inverse problem as well, so that we can estimate the RMS in pixels (note that I subtract min(theo_wls) so as to "normalize" wls for the fit (otherwise it goes haywire numreically)
+            inv_new_fit = np.poly1d(np.polyfit(ord_lam_norm, ord_x, degpol))
+            # residuals in pixels
+            pixres = ord_x - inv_new_fit(ord_lam_norm)
+        else:   
+            # make new wl-vs-x-fit and reject outliers
+            new_fit = np.poly1d(np.polyfit(ord_x, theo_wls, degpol))
+            # residuals in Angstromgs
+            wlres = theo_wls - new_fit(ord_x)
+            # fit the inverse problem as well, so that we can estimate the RMS in pixels (note that I subtract min(theo_wls) so as to "normalize" wls for the fit (otherwise it goes haywire numreically)
+            inv_new_fit = np.poly1d(np.polyfit(theo_wls - np.min(theo_wls), ord_x, degpol))
+            # residuals in pixels
+            pixres = ord_x - inv_new_fit(theo_wls - np.min(theo_wls))
+        
+        # remove outliers and refit
+        clipped, goodboolix, goodix, badix = single_sigma_clip(wlres, 3, return_indices=True)
+        new_outies = len(badix)
+        while new_outies > 0:
+            ord_x = ord_x[goodboolix]
+            ord_y = ord_y[goodboolix]
+            theo_wls = theo_wls[goodboolix]
+            if norm_coords:
+                ord_x_norm = (ord_x / (nx-1))
+                ord_lam_norm = (theo_wls - np.min(theo_wls)) / (np.max((theo_wls - np.min(theo_wls)))) 
+                new_fit = np.poly1d(np.polyfit(ord_x_norm, theo_wls, degpol))
+                inv_new_fit = np.poly1d(np.polyfit(ord_lam_norm, ord_x, degpol))
+                wlres = theo_wls - new_fit(ord_x_norm)
+                pixres = ord_x - inv_new_fit(ord_lam_norm)
+            else:
+                new_fit = np.poly1d(np.polyfit(ord_x, theo_wls, degpol))
+                inv_new_fit = np.poly1d(np.polyfit(theo_wls - np.min(theo_wls), ord_x, degpol))
+                wlres = theo_wls - new_fit(ord_x)
+                pixres = ord_x - inv_new_fit(theo_wls - np.min(theo_wls))
+            clipped, goodboolix, goodix, badix = single_sigma_clip(wlres, 3, return_indices=True)
+            new_outies = len(badix)
+        
+        # if lam = f(x), and x = g(lam), then it should hold true that x = g(f(x)), or equivalently, lam = f(g(lam))
+        
+        # save data on LFC fit to output variables
+        if return_auxdata:
+            auxdata[ord]['wlres'] = wlres
+            auxdata[ord]['pixres'] = pixres
+            auxdata[ord]['x'] = ord_x
+            auxdata[ord]['y'] = ord_y
+            auxdata[ord]['peak_wl'] = theo_wls
+            auxdata[ord]['rms_wl'] = np.std(wlres)
+            auxdata[ord]['rms_pix'] = np.std(pixres)
+            auxdata[ord]['n_peaks'] = len(ord_x)
+        newly_fit_dispsol = new_fit(xx)
+        wldict[ord]['laser'] = newly_fit_dispsol  
+        wl[o,-1,:] = newly_fit_dispsol
+
+        # now apply the fibre-to-fibre shifts
+        # loop over all fibres
+        for i,fib in enumerate(fibname):
+            if fibtofib:
+                xfib = ord_x + pixfit_coeffs[ord]['fibre_'+fib](ord_x)
+            else:
+                xfib = ord_x.copy()
+            fib_fit = np.poly1d(np.polyfit(xfib, theo_wls, degpol))
+            wldict[ord][fib] = fib_fit(xx)
+            wl[o,i+1,:] = fib_fit(xx)       # note the i+1 because wl includes the two simcalib fibres, but we don't have pixfit_coeffs for these
+
+    if timit:
+        print('Time elapsed: ' + str(np.round(time.time() - start_time, 1)) + ' seconds')
+
+    if return_auxdata:
+        return wldict, wl, auxdata
+    else:
+        return wldict, wl
+
+
+
+
+
+def make_master_fibth(date=None, savefile=True, overwrite=False, laptop=False):
     
     # make sure we have an existing date
     if date is None:
@@ -2474,57 +2682,78 @@ def make_master_fibth(date=None, laptop=False):
     else:
         path = "/Volumes/BERGRAID/data/veloce/reduced/" + date + "/"
                 
-    # list of all Fibre Thoriums (ThAr for 20180917 or ThXe for all later nights)
+    # list of all Fibre Thoriums (ThAr for 20180917; ThXe for all later nights)
     arc_list = glob.glob(path + 'ARC*optimal*')
     if len(arc_list) == 0:
-        print('No Fibre Thoriums (ARC) exposures found for '+date+' !!!')
-        return []
+        print('WARNING: no Fibre Thorium (ARC) exposures found for '+date+' !!!')
+        return (-1,-1)
     
+    # prepare arrays
+    allspec = []
+    allerr = []
+    # get lists of the reduced spectra and respective error arrays
     for i,fn in enumerate(arc_list):
-        red_arc_spec = pyfits.getdata(fn)
-        if i == 0:
-            master_arc = red_arc_spec.copy()
-        else:
-            master_arc = master_arc + red_arc_spec
-    del red_arc_spec
+        allspec.append(pyfits.getdata(fn,0))
+        allerr.append(pyfits.getdata(fn,1))
+            
+    # list of individual exposure times for all whites (should all be the same, but just in case...)
+    texp_list = [pyfits.getval(fn, 'ELAPSED') for fn in arc_list]
+    # scale to the median exposure time
+    tscale = np.array(texp_list) / np.median(texp_list)
+                
+    # median spectrum                
+    medspec = np.nanmedian(np.array(allspec) / tscale.reshape(len(allspec), 1, 1, 1), axis=0)
+    n_arc = len(arc_list)
+    err_medspec = 1.253 * np.std(allspec, axis=0) / np.sqrt(n_arc-1)     # normally it would be sigma/sqrt(n), but np.std is dividing by sqrt(n), not by sqrt(n-1)
     
-    return master_arc
+    if savefile:
+        pyfits.writeto(path + 'master_ARC_' + date + '.fits', medspec, clobber=overwrite)
+        pyfits.append(path + 'master_ARC_' + date + '.fits', err_medspec, clobber=overwrite)
+    
+    return medspec, err_medspec
 
 
 
 
 
-def make_arc_dispsols(date, outpath='/Users/christoph/OneDrive - UNSW/dispsol/arc_dispsols/', deg_spectral=7, deg_spatial=7,
-                      polytype='chebyshev', savetable=False, savefits=True, overwrite=False, save_individual=False,
-                      laptop=False, debug_level=0, timit=False):
+def make_arc_dispsols(date, deg_spectral=7, deg_spatial=7, polytype='chebyshev', savetable=False, savefits=True, overwrite=False, 
+                      save_individual=False, laptop=False, debug_level=0, timit=False):
 
     """
     for making the one per night fibre ThAr/ThXe dispsols
     """
 
-    print('VACUUM OR AIR???')
-
     if timit:
         start_time = time.time()
 
     # fibslot = [0,1,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,23,24,25]
-    fibname = ['S5', 'S2', '07', '18', '17', '06', '16', '15', '05', '14', '13', '01', '12', '11', '04', '10', '09',
-               '03', '08', '19', '02', 'S4', 'S3', 'S1']
+    fibname = ['simth', 'S5', 'S2', '07', '18', '17', '06', '16', '15', '05', '14', '13', '01', '12', '11', '04', '10', '09',
+               '03', '08', '19', '02', 'S4', 'S3', 'S1', 'LFC']
 
     print('Creating ARC wavelength solution for ' + date + ' ...')
 
-    # make master arc for that night
-    master_arc = make_master_fibth(date=date, laptop=laptop)
-    # assert master_arc != [], 'ERROR: No FibThs found for '+date
-    if master_arc == []:
-        print('ERROR: No FibThs found for ' + date)
-        return -1
+    if laptop:
+        path = "/Users/christoph/data/reduced/" + date + "/"
+    else:
+        path = "/Volumes/BERGRAID/data/veloce/reduced/" + date + "/"
+    
+    # check if wl-solution file already exists
+    if os.path.isfile(path + 'master_ARC_' + date + '.fits'):
+        master_arc = pyfits.getdata((path + 'master_ARC_' + date + '.fits'))
+    else:
+        # make master arc for that night
+        master_arc, err_master_arc = make_master_fibth(date=date, savefile=True, laptop=laptop)
+#     # assert master_arc != [], 'ERROR: No FibThs found for '+date
+#     if master_arc == []:
+#         print('ERROR: No FibThs found for ' + date)
+#         return -1
 
     # prepare output array
     all_air_wl = np.zeros(master_arc.shape)
+    all_vac_wl = np.zeros(master_arc.shape)
 
-    # loop over all fibres
-    for fib in range(master_arc.shape[1]):
+    # loop over all fibres (excluding the simTh & LFC fibre)
+    for fib in range(1,master_arc.shape[1]-1):     
 
         print('Processing fibre ' + fibname[fib])
 
@@ -2546,13 +2775,15 @@ def make_arc_dispsols(date, outpath='/Users/christoph/OneDrive - UNSW/dispsol/ar
         if savefits:
             # save to all-fibres-combined array
             all_air_wl[:, fib, :] = air_wl[:-1, :].copy()  # do NOT include the blue-most order
+            all_vac_wl[:, fib, :] = vac_wl[:-1, :].copy()
             if save_individual:
-                pyfits.writeto(outpath + lamptype + '_dispsol_' + date + '_fibre_' + fibname[fib] + '.fits', air_wl,
-                               clobber=overwrite)
+                pyfits.writeto(path + lamptype + '_dispsol_' + date + '_fibre_' + fibname[fib] + '.fits', air_wl, clobber=overwrite)
+                pyfits.append(path + lamptype + '_dispsol_' + date + '_fibre_' + fibname[fib] + '.fits', vac_wl)
 
     # save to all-fibres-combined fits file
     if savefits:
-        pyfits.writeto(outpath + lamptype + '_dispsol_' + date + '.fits', all_air_wl, clobber=overwrite)
+        pyfits.writeto(path + lamptype + '_dispsol_' + date + '.fits', all_air_wl, clobber=overwrite)
+        pyfits.append(path + lamptype + '_dispsol_' + date + '.fits', all_vac_wl)
 
     if timit:
         delta_t = time.time() - start_time

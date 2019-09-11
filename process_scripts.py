@@ -310,12 +310,36 @@ def process_science_images(imglist, P_id, chipmask, mask=None, stripe_indices=No
         object = pyfits.getval(filename, 'OBJECT').split('+')[0]
         object_indices = np.where(object == np.array(object_list))[0]
         texp = pyfits.getval(filename, 'ELAPSED')
+        # check if this exposure belongs to the same epoch as the previous one
+        if i > 0:
+            if filename in epoch_list:
+                new_epoch = False
+            else:
+                new_epoch = True
+                # delete existing temp bg files so we don't accidentally load them for a wrong epoch
+                if os.path.isfile(path + 'temp_bg_lfc.fits'):
+                    os.remove(path + 'temp_bg_lfc.fits')
+                if os.path.isfile(path + 'temp_bg_thxe.fits'):
+                    os.remove(path + 'temp_bgthxe.fits')
+                if os.path.isfile(path + 'temp_bg_both.fits'):
+                    os.remove(path + 'temp_bg_both.fits')
+                if os.path.isfile(path + 'temp_bg_neither.fits'):
+                    os.remove(path + 'temp_bg_neither.fits')
+        else:
+            new_epoch = True
+
 
         print('Extracting ' + obstype + ' spectrum ' + str(i + 1) + '/' + str(len(imglist)) + ': ' + obsname)
         
         if obstype == 'stellar':
+            # first, check if the new file belongs to the same epoch_sublist as the previous one (because then there is no need
+            # to re-calculate the background again, which is very time-consuming!!! (can't be if i=0, of course)
+            redo_bg = True
+            if i > 0:
+                if filename in prev_epoch_sublists[lamp_config]:
+                    redo_bg = False
             # list of all the observations belonging to this epoch
-            epoch_ix = [sublist for sublist in all_epoch_list if i in sublist]   # different from object_indices, as epoch_ix contains only indices for this particular epoch if there are multiple epohcs of a target in a given night
+            epoch_ix = [sublist for sublist in all_epoch_list if i in sublist]   # different from object_indices, as epoch_ix contains only indices for this particular epoch if there are multiple epochs of a target in a given night
             epoch_list = list(np.array(imglist)[epoch_ix])
             # make sublists according to the four possible calibration lamp configurations
             epoch_sublists = {'lfc':[], 'thxe':[], 'both':[], 'neither':[]}
@@ -394,7 +418,7 @@ def process_science_images(imglist, P_id, chipmask, mask=None, stripe_indices=No
                 elif lc + thxe == 2:
                     lamp_config = 'both'
         else:
-            # for calibration images we don't need to check for the calibration lamp configuration!
+            # for calibration images we don't need to check for the calibration lamp configuration (done external to this function)!
             # just create a dummy copy of the image list so that it is in the same format that ix expected for stellar observations
             lamp_config = 'dum'
             epoch_sublists = {}
@@ -422,40 +446,61 @@ def process_science_images(imglist, P_id, chipmask, mask=None, stripe_indices=No
             # fit background
             bg_coeffs, bg_img = fit_background(bg, clip=10, return_full=True, timit=timit)
         elif len(epoch_sublists[lamp_config]) == 2:
-            # list of individual exposure times for this epoch
-            subepoch_texp_list = [pyfits.getval(file, 'ELAPSED') for file in epoch_sublists[lamp_config]]
-            tscale = np.array(subepoch_texp_list) / texp
-            # get background from the element-wise minimum-image of the two images
-            img1 = correct_for_bias_and_dark_from_filename(epoch_sublists[lamp_config][0], MB, MD, gain=gain, scalable=scalable, savefile=False)
-            img2 = correct_for_bias_and_dark_from_filename(epoch_sublists[lamp_config][1], MB, MD, gain=gain, scalable=scalable, savefile=False)
-            min_img = np.minimum(img1/tscale[0], img2/tscale[1])
-            # identify and extract background from the minimum-image
-            bg = extract_background(min_img, chipmask['bg'], timit=timit)
-#             bg = extract_background_pid(min_img, P_id, slit_height=30, exclude_top_and_bottom=True, timit=timit)
-            del min_img
-            # fit background
-            bg_coeffs, bg_img = fit_background(bg, clip=10, return_full=True, timit=timit)
+            if new_epoch or not os.path.isfile(path + 'temp_bg_' + lamp_config + '.fits'):
+                # list of individual exposure times for this epoch
+                subepoch_texp_list = [pyfits.getval(file, 'ELAPSED') for file in epoch_sublists[lamp_config]]
+                tscale = np.array(subepoch_texp_list) / texp
+                # get background from the element-wise minimum-image of the two images
+                img1 = correct_for_bias_and_dark_from_filename(epoch_sublists[lamp_config][0], MB, MD, gain=gain, scalable=scalable, savefile=False)
+                img2 = correct_for_bias_and_dark_from_filename(epoch_sublists[lamp_config][1], MB, MD, gain=gain, scalable=scalable, savefile=False)
+                min_img = np.minimum(img1/tscale[0], img2/tscale[1])
+                # identify and extract background from the minimum-image
+                bg = extract_background(min_img, chipmask['bg'], timit=timit)
+    #             bg = extract_background_pid(min_img, P_id, slit_height=30, exclude_top_and_bottom=True, timit=timit)
+                del min_img
+                # fit background
+                bg_coeffs, bg_img = fit_background(bg, clip=10, return_full=True, timit=timit)
+                # save background image to temporary file for re-use later (when reducing the next file of this sublist)
+                pyfits.writeto(path + 'temp_bg_' + lamp_config + '.fits', bg_img)
+            else:
+                # no need to re-compute background, just load it from file
+                bg_img = pyfits.getdata(path + 'temp_bg_' + lamp_config + '.fits')
         else:
-            # list of individual exposure times for this epoch
-            subepoch_texp_list = [pyfits.getval(file, 'ELAPSED') for file in epoch_sublists[lamp_config]]
-            tscale = np.array(subepoch_texp_list) / texp
-            # make list of actual images
-            img_list = []
-            for file in epoch_sublists[lamp_config]:
-                img_list.append(correct_for_bias_and_dark_from_filename(file, MB, MD, gain=gain, scalable=scalable, savefile=False))
-#             # index indicating which one of the files in the epoch list is the "main" one
-#             main_index = np.where(np.array(epoch_ix) == i)[0][0]
-            # take median after scaling to same exposure time as main exposure
-            med_img = np.median(np.array(img_list) / tscale.reshape(len(img_list), 1, 1), axis=0)
-            del img_list
-            # identify and extract background from the median image
-            bg = extract_background(med_img, chipmask['bg'], timit=timit)
-#             bg = extract_background_pid(med_img, P_id, slit_height=30, exclude_top_and_bottom=True, timit=timit)
-            del med_img
-            # fit background
-            bg_coeffs, bg_img = fit_background(bg, clip=10, return_full=True, timit=timit)
+            if new_epoch or not os.path.isfile(path + 'temp_bg_' + lamp_config + '.fits'):
+                # make sure this sublist is not too long (otherwise we might run out of memory in this step)
+                if len(epoch_sublists[lamp_config]) > 10:
+                    mainix = epoch_sublists[lamp_config].index(filename)
+                    if mainix < 5:
+                        epoch_sublists[lamp_config] = epoch_sublists[lamp_config][:11]
+                    elif mainix > len(epoch_sublists[lamp_config]) - 6:
+                        epoch_sublists[lamp_config] = epoch_sublists[lamp_config][-11:]
+                    else:
+                        epoch_sublists[lamp_config] = epoch_sublists[lamp_config][mainix-5:mainix+6]
+                # list of individual exposure times for this epoch
+                subepoch_texp_list = [pyfits.getval(file, 'ELAPSED') for file in epoch_sublists[lamp_config]]
+                tscale = np.array(subepoch_texp_list) / texp
+                # make list of actual images
+                img_list = []
+                for file in epoch_sublists[lamp_config]:
+                    img_list.append(correct_for_bias_and_dark_from_filename(file, MB, MD, gain=gain, scalable=scalable, savefile=False))
+    #             # index indicating which one of the files in the epoch list is the "main" one
+    #             main_index = np.where(np.array(epoch_ix) == i)[0][0]
+                # take median after scaling to same exposure time as main exposure
+                med_img = np.median(np.array(img_list) / tscale.reshape(len(img_list), 1, 1), axis=0)
+                del img_list
+                # identify and extract background from the median image
+                bg = extract_background(med_img, chipmask['bg'], timit=timit)
+    #             bg = extract_background_pid(med_img, P_id, slit_height=30, exclude_top_and_bottom=True, timit=timit)
+                del med_img
+                # fit background
+                bg_coeffs, bg_img = fit_background(bg, clip=10, return_full=True, timit=timit)
+                # save background image to temporary file for re-use later (when reducing the next file of this sublist)
+                pyfits.writeto(path + 'temp_bg_' + lamp_config + '.fits', bg_img)
+            else:
+                # no need to re-compute background, just load it from file
+                bg_img = pyfits.getdata(path + 'temp_bg_' + lamp_config + '.fits')
 
-        # now actually subtract the model for the background
+        # now actually subtract the background model
         bg_corrected_img = img - bg_img
 
 #       cosmic_cleaned_img = median_remove_cosmics(img_list, main_index=main_index, scales=scaled_texp, ronmask=ronmask, debug_level=1, timit=True)
