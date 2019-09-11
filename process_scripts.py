@@ -329,11 +329,20 @@ def process_science_images(imglist, P_id, chipmask, mask=None, stripe_indices=No
                         os.remove(path + 'temp_bg_neither.fits')
             else:
                 new_epoch = True
+                # delete existing temp bg files so we don't accidentally load them for a wrong epoch
+                if os.path.isfile(path + 'temp_bg_lfc.fits'):
+                    os.remove(path + 'temp_bg_lfc.fits')
+                if os.path.isfile(path + 'temp_bg_thxe.fits'):
+                    os.remove(path + 'temp_bgthxe.fits')
+                if os.path.isfile(path + 'temp_bg_both.fits'):
+                    os.remove(path + 'temp_bg_both.fits')
+                if os.path.isfile(path + 'temp_bg_neither.fits'):
+                    os.remove(path + 'temp_bg_neither.fits')
 
 
         print('Extracting ' + obstype + ' spectrum ' + str(i + 1) + '/' + str(len(imglist)) + ': ' + obsname)
         
-        if obstype == 'stellar':
+        if obstype in ['stellar', 'ARC']:
             # list of all the observations belonging to this epoch
             epoch_ix = [sublist for sublist in all_epoch_list if i in sublist]   # different from object_indices, as epoch_ix contains only indices for this particular epoch if there are multiple epochs of a target in a given night
             epoch_list = list(np.array(imglist)[epoch_ix])
@@ -414,7 +423,7 @@ def process_science_images(imglist, P_id, chipmask, mask=None, stripe_indices=No
                 elif lc + thxe == 2:
                     lamp_config = 'both'
         else:
-            # for calibration images we don't need to check for the calibration lamp configuration for all exposures (done external to this function)!
+            # for sim. calibration images we don't need to check for the calibration lamp configuration for all exposures (done external to this function)!
             # just for the file in question and then create a dummy copy of the image list so that it is in the same format that ix expected for stellar
             # observations
             if int(date) < 20190503:
