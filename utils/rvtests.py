@@ -135,7 +135,7 @@ for i, filename in enumerate(files[73:83]):
     # f_clean = f.copy()
     # for o in range(f.shape[0]):
     #     for fib in range(f.shape[1]):
-    #         f_clean[o,:],ncos = onedim_medfilt_cosmic_ray_removal(f[o,fib,:], err[o,fib,:], w=31, thresh=5., low_thresh=3.)
+    #         f_clean[o,fib,:],ncos = onedim_medfilt_cosmic_ray_removal(f[o,fib,:], err[o,fib,:], w=31, thresh=5., low_thresh=3.)
     #     wl = pyfits.getdata(filename, 2)
     #     wl = pyfits.getdata('/Users/christoph/OneDrive - UNSW/dispsol/individual_fibres_dispsol_poly7_21sep30019.fits')
     #     wldict,wl = get_dispsol_for_all_fibs(obsname, date=date, fibs='stellar', refit=False, fibtofib=True, nightly_coeffs=True)

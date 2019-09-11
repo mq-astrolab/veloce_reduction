@@ -338,7 +338,11 @@ def process_science_images(imglist, P_id, chipmask, mask=None, stripe_indices=No
                     os.remove(path + 'temp_bg_both.fits')
                 if os.path.isfile(path + 'temp_bg_neither.fits'):
                     os.remove(path + 'temp_bg_neither.fits')
-
+        else:
+            if i == 0:
+                new_epoch = True
+            else:
+                new_epoch = False
 
         print('Extracting ' + obstype + ' spectrum ' + str(i + 1) + '/' + str(len(imglist)) + ': ' + obsname)
         
