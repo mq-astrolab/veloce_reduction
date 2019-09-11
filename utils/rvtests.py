@@ -90,8 +90,7 @@ for o in range(f0.shape[0]):
         print('Order ', o + 1)
         if (o == 0) and (fib == 0):
             start_time = time.time()
-        f0_clean[o, :], ncos = onedim_medfilt_cosmic_ray_removal(f0[o, fib, :], err0[o, fib, :], w=31, thresh=5.,
-                                                                 low_thresh=3.)
+        f0_clean[o, :], ncos = onedim_medfilt_cosmic_ray_removal(f0[o, fib, :], err0[o, fib, :], w=31, thresh=5., low_thresh=3.)
         if (o == 38) and (fib == 18):
             print('time elapsed ', time.time() - start_time, ' seconds')
 

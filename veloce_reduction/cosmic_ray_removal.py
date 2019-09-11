@@ -136,7 +136,7 @@ def onedim_medfilt_cosmic_ray_removal(f, err, thresh=5., low_thresh=3., w=31, ma
     cont_rough = ndimage.gaussian_filter(ndimage.maximum_filter(medfilt(f, w), size=maxfilter_size), gauss_filter_sigma)
     # we also need to adjust the threshold according to the normalized scatter of f - f_sm
     dum = (f - f_sm) / err_sm
-    scatter = np.std(sigma_clip(dum, 3))
+    scatter = np.nanstd(sigma_clip(dum, 3))
 #     cosmics = (f - f_sm) / err_sm > thresh
 #     cosmics = (f - f_sm) / err_sm > thresh * scatter
 #     cosmics = (f - f_sm) / err_sm > thresh * np.max([1,scatter])
