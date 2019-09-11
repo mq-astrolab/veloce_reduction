@@ -455,9 +455,10 @@ def process_science_images(imglist, P_id, chipmask, mask=None, stripe_indices=No
                 # fit background
                 bg_coeffs, bg_img = fit_background(bg, clip=10, return_full=True, timit=timit)
                 # save background image to temporary file for re-use later (when reducing the next file of this sublist)
-                pyfits.writeto(path + 'temp_bg_' + lamp_config + '.fits', bg_img)
+                pyfits.writeto(path + 'temp_bg_' + lamp_config + '.fits', bg_img, clobber=True)
             else:
                 # no need to re-compute background, just load it from file
+                print('Loading background image for this epoch and lamp configuration...')
                 bg_img = pyfits.getdata(path + 'temp_bg_' + lamp_config + '.fits')
         else:
             if new_epoch or not os.path.isfile(path + 'temp_bg_' + lamp_config + '.fits'):
@@ -489,9 +490,10 @@ def process_science_images(imglist, P_id, chipmask, mask=None, stripe_indices=No
                 # fit background
                 bg_coeffs, bg_img = fit_background(bg, clip=10, return_full=True, timit=timit)
                 # save background image to temporary file for re-use later (when reducing the next file of this sublist)
-                pyfits.writeto(path + 'temp_bg_' + lamp_config + '.fits', bg_img)
+                pyfits.writeto(path + 'temp_bg_' + lamp_config + '.fits', bg_img, clobber=True)
             else:
                 # no need to re-compute background, just load it from file
+                print('Loading background image for this epoch and lamp configuration...')
                 bg_img = pyfits.getdata(path + 'temp_bg_' + lamp_config + '.fits')
 
         # now actually subtract the background model
