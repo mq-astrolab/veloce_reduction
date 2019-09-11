@@ -254,6 +254,7 @@ def process_science_images(imglist, P_id, chipmask, mask=None, stripe_indices=No
         obstype = 'simcalib'
     else:
         obstype = 'stellar'
+    if obstype in ['stellar', 'ARC']:
         # and the indices where the object changes (to figure out which observations belong to one epoch)
         changes = np.where(np.array(object_list)[:-1] != np.array(object_list)[1:])[0] + 1   # need the plus one to get the indices of the first occasion of a new object
         # list of indices for individual epochs - there's gotta be a smarter way to do this...
@@ -311,22 +312,23 @@ def process_science_images(imglist, P_id, chipmask, mask=None, stripe_indices=No
         object_indices = np.where(object == np.array(object_list))[0]
         texp = pyfits.getval(filename, 'ELAPSED')
         # check if this exposure belongs to the same epoch as the previous one
-        if i > 0:
-            if filename in epoch_list:
-                new_epoch = False
+        if obstype in ['stellar', 'ARC']:
+            if i > 0:
+                if filename in epoch_list:
+                    new_epoch = False
+                else:
+                    new_epoch = True
+                    # delete existing temp bg files so we don't accidentally load them for a wrong epoch
+                    if os.path.isfile(path + 'temp_bg_lfc.fits'):
+                        os.remove(path + 'temp_bg_lfc.fits')
+                    if os.path.isfile(path + 'temp_bg_thxe.fits'):
+                        os.remove(path + 'temp_bgthxe.fits')
+                    if os.path.isfile(path + 'temp_bg_both.fits'):
+                        os.remove(path + 'temp_bg_both.fits')
+                    if os.path.isfile(path + 'temp_bg_neither.fits'):
+                        os.remove(path + 'temp_bg_neither.fits')
             else:
                 new_epoch = True
-                # delete existing temp bg files so we don't accidentally load them for a wrong epoch
-                if os.path.isfile(path + 'temp_bg_lfc.fits'):
-                    os.remove(path + 'temp_bg_lfc.fits')
-                if os.path.isfile(path + 'temp_bg_thxe.fits'):
-                    os.remove(path + 'temp_bgthxe.fits')
-                if os.path.isfile(path + 'temp_bg_both.fits'):
-                    os.remove(path + 'temp_bg_both.fits')
-                if os.path.isfile(path + 'temp_bg_neither.fits'):
-                    os.remove(path + 'temp_bg_neither.fits')
-        else:
-            new_epoch = True
 
 
         print('Extracting ' + obstype + ' spectrum ' + str(i + 1) + '/' + str(len(imglist)) + ': ' + obsname)
@@ -412,9 +414,47 @@ def process_science_images(imglist, P_id, chipmask, mask=None, stripe_indices=No
                 elif lc + thxe == 2:
                     lamp_config = 'both'
         else:
-            # for calibration images we don't need to check for the calibration lamp configuration (done external to this function)!
-            # just create a dummy copy of the image list so that it is in the same format that ix expected for stellar observations
-            lamp_config = 'dum'
+            # for calibration images we don't need to check for the calibration lamp configuration for all exposures (done external to this function)!
+            # just for the file in question and then create a dummy copy of the image list so that it is in the same format that ix expected for stellar
+            # observations
+            if int(date) < 20190503:
+                # now check the calibration lamp configuration for the main observation in question
+                img = correct_for_bias_and_dark_from_filename(filename, MB, MD, gain=gain, scalable=scalable, savefile=saveall, path=path)
+                lc = laser_on(img, chipmask)
+                thxe = thxe_on(img, chipmask)
+                if (not lc) and (not thxe):
+                    lamp_config = 'neither'
+                elif (lc) and (thxe):
+                    lamp_config = 'both'
+                else:
+                    if lc:
+                        lamp_config = 'lfc'
+                    elif thxe:
+                        lamp_config = 'thxe'
+            else:
+                # now check the calibration lamp configuration for the main observation in question
+                lc = 0
+                thxe = 0
+                h = pyfits.getheader(filename)
+                if 'LCNEXP' in h.keys():  # this indicates the latest version of the FITS headers (from May 2019 onwards)
+                    if ('LCEXP' in h.keys()) or (
+                            'LCMNEXP' in h.keys()):  # this indicates the LFC actually was actually exposed (either automatically or manually)
+                        lc = 1
+                else:  # if not latest header version, just go with the OBJECT field
+                    if ('LC' in pyfits.getval(filename, 'OBJECT').split('+')) or (
+                            'LFC' in pyfits.getval(filename, 'OBJECT').split('+')):
+                        lc = 1
+                if h['SIMCALTT'] > 0:
+                    thxe = 1
+                if lc + thxe == 0:
+                    lamp_config = 'neither'
+                elif lc + thxe == 1:
+                    if lc == 1:
+                        lamp_config = 'lfc'
+                    else:
+                        lamp_config = 'thxe'
+                elif lc + thxe == 2:
+                    lamp_config = 'both'
             epoch_sublists = {}
             epoch_sublists[lamp_config] = imglist[:]
 

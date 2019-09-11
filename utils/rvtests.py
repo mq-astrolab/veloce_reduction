@@ -8,7 +8,7 @@ from readcol import readcol
 from veloce_reduction.veloce_reduction.wavelength_solution import get_dispsol_for_all_fibs, get_dispsol_for_all_fibs_2
 from veloce_reduction.veloce_reduction.get_radial_velocity import get_RV_from_xcorr, get_RV_from_xcorr_2, make_ccfs, \
     old_make_ccfs
-from veloce_reduction.veloce_reduction.helper_functions import get_mean_snr, short_filenames
+from veloce_reduction.veloce_reduction.helper_functions import get_snr, short_filenames
 from veloce_reduction.veloce_reduction.flat_fielding import onedim_pixtopix_variations, deblaze_orders
 from veloce_reduction.veloce_reduction.barycentric_correction import get_barycentric_correction
 from veloce_reduction.veloce_reduction.cosmic_ray_removal import onedim_medfilt_cosmic_ray_removal
@@ -49,7 +49,7 @@ all_snr = readcol(path + 'tauceti_all_snr.dat', twod=False)[0]
 #     print('Estimating mean SNR for tau Ceti observation ' + str(i + 1) + '/' + str(len(files)))
 #     flux = pyfits.getdata(file, 0)
 #     err = pyfits.getdata(file, 1)
-#     all_snr.append(get_mean_snr(flux, err))
+#     all_snr.append(get_snr(flux, err))
 # np.savetxt(path + 'tauceti_all_snr.dat', np.array(all_snr))
 
 ########################################################################################################################
@@ -60,9 +60,6 @@ all_snr = readcol(path + 'tauceti_all_snr.dat', twod=False)[0]
 # (either with or without the LFC shifts applied, comment out the 'wl' and 'wl0' you don't want)
 
 vers = 'v1c'
-maskdict = np.load('/Volumes/BERGRAID/data/veloce/reduced/20190128/mask.npy').item()
-# mw_flux = pyfits.getdata('/Volumes/BERGRAID/data/veloce/reduced/20190128/master_white_optimal3a_extracted.fits')
-# smoothed_flat, pix_sens = onedim_pixtopix_variations(mw_flux, filt='gaussian', filter_width=25)
 
 all_xc = []
 all_rv = np.zeros((len(files), 11, 19))
@@ -72,24 +69,17 @@ all_sumrv = []
 xcsums = np.zeros((len(files), 301))
 
 # TEMPLATE:
-ix0 = 6
-f0 = pyfits.getdata(files[ix0], 0)  # one of the higher SNR obs but closest to FibThars used to define fibtofib wl shifts
+ix0 = 7
+f0 = pyfits.getdata(files[ix0], 0)
 err0 = pyfits.getdata(files[ix0], 1)
-# f0 = pyfits.getdata(files[69], 0)   # that's the highest SNR observation for Sep 18
-# f0 = pyfits.getdata(files[2], 0)   # that's the highest SNR observation for Nov 18
-# f0 = pyfits.getdata(files[35], 0)   # that's the 2nd highest SNR observation for Nov 18
+obsname_0 = '19sep30377'  # the highest SNR obs
+date_0 = '20180919'
+wl0 = pyfits.getdata(wl_list[ix0])
 
-# wl0 = pyfits.getdata(files[69], 2)
+maskdict = np.load('/Volumes/BERGRAID/data/veloce/reduced/' + date_0 + '/mask.npy').item()
+
 # wl0 = pyfits.getdata('/Users/christoph/OneDrive - UNSW/dispsol/individual_fibres_dispsol_poly7_21sep30019.fits')
-obsname_0 = '20sep30087'  # one of the higher SNR obs but closest to FibThars used to define fibtofib wl shifts
-date_0 = '20180920'
-# obsname_0 = '24sep30078'     # that's the highest SNR observation for Sep 18
-# obsname_0 = '16nov30128'     # that's the highest SNR observation for Nov 18
-# obsname_0 = '25nov30084'     # that's the 2nd highest SNR observation for Nov 18
-# wldict0,wl0 = get_dispsol_for_all_fibs(obsname_0, date=date_0, fudge=fudge, signflip_shift=signflip_shift,
-#                                        signflip_slope=signflip_slope, signflip_secord=signflip_secord)
-# wldict0,wl0 = get_dispsol_for_all_fibs(obsname_0, date=date_0, fibs='stellar', refit=False, fibtofib=True, nightly_coeffs=True)
-wldict0, wl0 = get_dispsol_for_all_fibs_2(obsname_0, refit=True, eps=2)
+
 mw_flux = pyfits.getdata('/Volumes/BERGRAID/data/veloce/reduced/' + date_0 + '/master_white_optimal3a_extracted.fits')
 smoothed_flat, pix_sens = onedim_pixtopix_variations(mw_flux, filt='gaussian', filter_width=25)
 
@@ -105,8 +95,11 @@ for o in range(f0.shape[0]):
         if (o == 38) and (fib == 18):
             print('time elapsed ', time.time() - start_time, ' seconds')
 
-f0_dblz, err0_dblz = deblaze_orders(f0_clean, smoothed_flat[:, 2:21, :], maskdict, err=err0, combine_fibres=True,
+f0_dblz, err0_dblz = deblaze_orders(f0_clean[:,3:22,:], smoothed_flat[:,3:22,:], maskdict, err=err0[:,3:22,:], combine_fibres=True,
                                     degpol=2, gauss_filter_sigma=3., maxfilter_size=100)
+f0_dblz, err0_dblz = deblaze_orders(f0_clean, smoothed_flat, maskdict, err=err0, combine_fibres=True,
+                                    degpol=2, gauss_filter_sigma=3., maxfilter_size=100)
+
 
 # use a synthetic template?
 # wl0, f0 = readcol('/Users/christoph/OneDrive - UNSW/synthetic_templates/' + 'synth_teff5250_logg45.txt', twod=False)
