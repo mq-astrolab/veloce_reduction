@@ -171,7 +171,8 @@ def onedim_pixtopix_variations_single_order(f_flat, filt='gaussian', filter_widt
     
     
     
-def deblaze_orders(f, smoothed_flat, mask, err=None, wl=None, degpol=1, gauss_filter_sigma=3., maxfilter_size=100, combine_fibres=False, skip_first_order=False, debug_level=0):
+def deblaze_orders(f, smoothed_flat, mask, err=None, wl=None, degpol=1, gauss_filter_sigma=3., maxfilter_size=100,
+                   combine_fibres=False, skip_first_order=False, debug_level=0):
     
     assert f.shape == smoothed_flat.shape, 'Shapes of "flux" and "smoothed_flat" do not agree!!!'
 # wl has shape (40,4112), whereas flux has (39, 4112)
@@ -210,29 +211,29 @@ def deblaze_orders(f, smoothed_flat, mask, err=None, wl=None, degpol=1, gauss_fi
                     for fib in range(f.shape[1]): 
                         # first, divide by the "blaze-function", ie the smoothed flat, which we got from filtering the MASTER WHITE
                         if not combine_fibres:
-                            f_dblz[o,fib,:][mask[ord]] = f[o,fib,:][mask[ord]] / (smoothed_flat[o,fib,:][mask[ord]] / np.max(smoothed_flat[o,fib,:][mask[ord]]))
+                            f_dblz[o,fib,:][mask[ord]] = f[o,fib,:][mask[ord]] / (smoothed_flat[o,fib,:][mask[ord]] / np.nanmax(smoothed_flat[o,fib,:][mask[ord]]))
                         else:
-                            f_dblz[o,fib,:][mask[ord]] = f[o,fib,:][mask[ord]] / (np.sum(smoothed_flat[o,:,:],axis=0)[mask[ord]] / np.max(np.sum(smoothed_flat[o,:,:],axis=0)[mask[ord]]))
+                            f_dblz[o,fib,:][mask[ord]] = f[o,fib,:][mask[ord]] / (np.nansum(smoothed_flat[o,:,:],axis=0)[mask[ord]] / np.nanmax(np.nansum(smoothed_flat[o,:,:],axis=0)[mask[ord]]))
                         # get rough continuum shape by performing a series of filters
                         cont_rough = ndimage.maximum_filter(ndimage.gaussian_filter(f_dblz[o,fib,:], gauss_filter_sigma), size=maxfilter_size)
                         # now fit polynomial to that rough continuum and divide by that polynomial
                         # if wl is provided do that fit in wl space, otherwise just in pixel space)
                         if wl is not None:
                             p = np.poly1d(np.polyfit(wl[o,fib,:][mask[ord]], cont_rough[mask[ord]], degpol))
-                            f_dblz[o,fib,:] = f_dblz[o,fib,:] / (p(wl[o,fib,:]) / np.median(p(wl[o,fib,:])[mask[ord]]))
+                            f_dblz[o,fib,:] = f_dblz[o,fib,:] / (p(wl[o,fib,:]) / np.nanmedian(p(wl[o,fib,:])[mask[ord]]))
                         else:
                             p = np.poly1d(np.polyfit(np.arange(f.shape[2])[mask[ord]], cont_rough[mask[ord]], degpol)) 
-                            f_dblz[o,fib,:] = f_dblz[o,fib,:] / (p(np.arange(f.shape[2])) / np.median(p(np.arange(f.shape[2])[mask[ord]])))
+                            f_dblz[o,fib,:] = f_dblz[o,fib,:] / (p(np.arange(f.shape[2])) / np.nanmedian(p(np.arange(f.shape[2])[mask[ord]])))
                         # need to treat the error arrays in the same way, as need to keep relative error the same
                         if err is not None:
                             if not combine_fibres:
-                                err_dblz[o,fib,:] = err[o,fib,:] / (smoothed_flat[o,fib,:]/np.max(smoothed_flat[o,fib,:]))
+                                err_dblz[o,fib,:] = err[o,fib,:] / (smoothed_flat[o,fib,:]/np.nanmax(smoothed_flat[o,fib,:]))
                             else:
-                                err_dblz[o,fib,:][mask[ord]] = err[o,fib,:][mask[ord]] / (np.sum(smoothed_flat[o,:,:],axis=0)[mask[ord]] / np.max(np.sum(smoothed_flat[o,:,:],axis=0)[mask[ord]]))
+                                err_dblz[o,fib,:][mask[ord]] = err[o,fib,:][mask[ord]] / (np.nansum(smoothed_flat[o,:,:],axis=0)[mask[ord]] / np.nanmax(np.nansum(smoothed_flat[o,:,:],axis=0)[mask[ord]]))
                             if wl is not None:    
-                                err_dblz[o,fib,:] = err_dblz[o,fib,:] / (p(wl[o,fib,:]) / np.median(p(wl[o,fib,:])[mask[ord]]))
+                                err_dblz[o,fib,:] = err_dblz[o,fib,:] / (p(wl[o,fib,:]) / np.nanmedian(p(wl[o,fib,:])[mask[ord]]))
                             else:
-                                err_dblz[o,fib,:] = err_dblz[o,fib,:] / (p(np.arange(f.shape[2])) / np.median(p(np.arange(f.shape[2])[mask[ord]])))
+                                err_dblz[o,fib,:] = err_dblz[o,fib,:] / (p(np.arange(f.shape[2])) / np.nanmedian(p(np.arange(f.shape[2])[mask[ord]])))
                 # or are they just quick-extracted spectra
                 else:
                     # first, divide by the "blaze-function", ie the smoothed flat, which we got from filtering the MASTER WHITE
