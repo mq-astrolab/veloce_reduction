@@ -332,12 +332,6 @@ def process_science_images(imglist, P_id, chipmask, mask=None, stripe_indices=No
         print('Extracting ' + obstype + ' spectrum ' + str(i + 1) + '/' + str(len(imglist)) + ': ' + obsname)
         
         if obstype == 'stellar':
-            # first, check if the new file belongs to the same epoch_sublist as the previous one (because then there is no need
-            # to re-calculate the background again, which is very time-consuming!!! (can't be if i=0, of course)
-            redo_bg = True
-            if i > 0:
-                if filename in prev_epoch_sublists[lamp_config]:
-                    redo_bg = False
             # list of all the observations belonging to this epoch
             epoch_ix = [sublist for sublist in all_epoch_list if i in sublist]   # different from object_indices, as epoch_ix contains only indices for this particular epoch if there are multiple epochs of a target in a given night
             epoch_list = list(np.array(imglist)[epoch_ix])
