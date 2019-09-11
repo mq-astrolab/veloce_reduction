@@ -2657,6 +2657,15 @@ def get_dispsol_for_all_fibs_3(obsname, date=None, relto='LFC', degpol=7, nx=411
     if timit:
         print('Time elapsed: ' + str(np.round(time.time() - start_time, 1)) + ' seconds')
 
+    # for ord in sorted(auxdata.keys()):
+    #     plt.hlines(int(ord[-2:]), xmin=0, xmax=4111, color='gray', linestyle='--')
+    #     plt.plot(auxdata[ord]['x'], int(ord[-2:]) + auxdata[ord]['pixres'], 'b.')
+    #     plt.xlabel('pixel (dispersion direction)')
+    #     plt.ylabel('Order number  |  residuals in dispersion direction (pix)')
+    #     #         plt.text(4112, int(ord[-2:]), 'RMS = '+str(np.round(auxdata[ord]['rms_pix'],3))+' pix', verticalalignment='center')
+    #     plt.text(4112, int(ord[-2:]), 'RMS = {0:.3f} pix'.format(auxdata[ord]['rms_pix']), verticalalignment='center')
+    #     plt.xlim(-150, 4700)
+
     if return_auxdata:
         return wldict, wl, auxdata
     else:

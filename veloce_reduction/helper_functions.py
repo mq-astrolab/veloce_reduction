@@ -982,7 +982,7 @@ def get_datestring():
 
 def get_mean_snr(flux, err=None, per_order=False):
     """ 
-    Calculate the mean SNR of the quick-extracted 1-dim spectrum.
+    Calculate the median SNR of the extracted 1-dim spectrum.
     Treat all negative flux values as zero for the purpose of this.
     
     INPUT:
@@ -997,16 +997,34 @@ def get_mean_snr(flux, err=None, per_order=False):
     MODHIST:
     18/05/2018 - CMB create
     30/05/2018 - CMB added 'per_order' keyword
+    11/09/2019 - CMB added fucntionality to accept optimal-extracted spectra as well
     """
     
     # data in the form of numpy array (ie from fits files)
     if flux.__class__ == np.ndarray:
-        
-        #estimate errors if not provided
-        if err is None:
+
+        if err is not None:
+            assert flux.shape == err.shape, 'ERROR: dimensions of flux and error arrays do not match!!!'
+        # estimate errors if not provided
+        else:
             print('WARNING: error-array not provided! Using SQRT(flux) as an estimate instead...')
             print
-            err = np.sqrt(np.maximum(10., flux))   # RON is sth like 3 e-/pix, so use 10. as a minimum value for the variance
+            err = np.sqrt(np.maximum(10., flux))  # RON is sth like 3 e-/pix, so use 10. as a minimum value for the variance
+
+        # check if quick-extracted or optimal-extracted; if optimal-extracted, collapse across fibres
+        assert len(flux.shape) in [2,3], 'ERROR: format of flux array not recognized!!!'
+        if len(flux.shape) == 3:
+            # only use stellar fibres
+            assert flux.shape[1] in [19,24,26], 'ERROR: format of flux array not recognized!!!'
+            if flux.shape[1] == 26:
+                flux = np.sum(flux[:,3:22,:], axis=1)
+                err = np.sqrt(np.sum(err[:, 3:22, :]**2, axis=1))
+            elif flux.shape[1] == 24:
+                flux = np.sum(flux[:, 2:21, :], axis=1)
+                err = np.sqrt(np.sum(err[:, 2:21, :] ** 2, axis=1))
+            else:
+                flux = np.sum(flux, axis=1)
+                err = np.sqrt(np.sum(err**2, axis=1))
         
         if per_order:
             snr_ord = []
@@ -1024,16 +1042,28 @@ def get_mean_snr(flux, err=None, per_order=False):
             print
             err = {}
             for o in sorted(flux.keys()):
-                mask1 = flux[o] < 0.
-                flux[o][mask1] = 0.
                 err[o] = np.sqrt(np.maximum(10.,flux[o]))
-                
+
+        # check if quick-extracted or optimal-extracted; if optimal-extracted, collapse across fibres
+        for o in sorted(flux.keys()):
+            assert len(flux[o].shape) in [1,2], 'ERROR: format of flux array not recognized!!!'
+            if len(flux[o].shape) == 2:
+                if flux[o].shape[0] == 26:
+                    flux[o] = np.sum(flux[o][3:22,:], axis=0)
+                    err[o] = np.sqrt(np.sum(err[o][3:22,:]**2, axis=0))
+                elif flux[o].shape == 24:
+                    flux[o] = np.sum(flux[o][2:21,:], axis=0)
+                    err[o] = np.sqrt(np.sum(err[o][2:21,:]**2, axis=0))
+                else:
+                    flux[o] = np.sum(flux[o], axis=0)
+                    err[o] = np.sqrt(np.sum(err[o]**2, axis=0))
+
         snr_ord = []
-        
         for o in sorted(flux.keys()):
             snr_ord.append(np.nanmedian(np.maximum(0., flux[o] / np.maximum(np.sqrt(10.), err[o]))))
-        
+
         snr =  np.nanmedian(snr_ord)
+
     else:
         print('ERROR: data type / variable class not recognized')
         return
