@@ -980,7 +980,7 @@ def get_datestring():
 
 
 
-def get_mean_snr(flux, err=None, per_order=False):
+def get_snr(flux, err=None, per_order=False):
     """ 
     Calculate the median SNR of the extracted 1-dim spectrum.
     Treat all negative flux values as zero for the purpose of this.
