@@ -63,7 +63,7 @@ from veloce_reduction.process_scripts import process_whites, process_science_ima
 
 # path = '/Volumes/BERGRAID/data/veloce/tests_20180723/'
 # path = '/Users/christoph/data/commissioning/20180916/'
-path = '/Users/christoph/data/raw_goodonly/20180917/'
+path = '/data/veloce/190919/ccd_3/'
 
 
 
