@@ -52,3 +52,9 @@ pip install matplotlib
 pip install lmfit
 
 fix impritn of process_scripts
+
+pip install astroquery
+
+pip install barycorrpy
+
+
