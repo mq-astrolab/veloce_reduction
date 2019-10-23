@@ -148,7 +148,8 @@ def readcol(filename,skipline=0,skipafter=0,names=False,fsep=None,twod=True,
             ncols,nrows = mode(nperline)
             if nrows != len(splitarr):
                 if verbose:
-                    #print "Removing %i rows that don't match most common length %i.  \
+                    print("verbose")
+                    #print"Removing %i rows that don't match most common length %i.  \
                      #\n%i rows read into array." % (len(splitarr) - nrows,ncols,nrows)
                 for i in xrange(len(splitarr)-1,-1,-1):  # need to go backwards
                     if nperline[i] != ncols:
