@@ -4,6 +4,10 @@ Created on 25 Jul. 2018
 @author: christoph
 '''
 
+import sys
+sys.path.append("/home/astrolab/codestore/veloce_reduction/veloce_reduction/")
+
+
 import glob
 import astropy.io.fits as pyfits
 import numpy as np

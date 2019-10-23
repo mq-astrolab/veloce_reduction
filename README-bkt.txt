@@ -36,3 +36,8 @@ mount -t vboxsf velocedata /velocedata
 
 veloce_reduction directory - has functions
 
+
+packages to install:
+
+pip install astropy
+
