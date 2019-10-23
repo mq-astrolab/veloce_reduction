@@ -160,6 +160,7 @@ def readcol(filename,skipline=0,skipafter=0,names=False,fsep=None,twod=True,
     except ValueError:
         if verbose: 
             #print "WARNING: reading as string array because %s array failed" % 'float'
+            print("verbose")
         try:
             x = numpy.asarray( splitarr , dtype='S')
         except ValueError:
