@@ -4,7 +4,7 @@ Created on 25 Jul. 2018
 @author: christoph
 '''
 
-#import sys
+##import sys
 #sys.path.append("/home/astrolab/codestore/veloce_reduction/veloce_reduction/")
 
 
