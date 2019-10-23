@@ -67,7 +67,7 @@ from process_scripts import process_whites, process_science_images
 
 # path = '/Volumes/BERGRAID/data/veloce/tests_20180723/'
 # path = '/Users/christoph/data/commissioning/20180916/'
-path = '/data/veloce/190919/ccd_3/'
+path = '/data/veloce/to_process/'
 
 
 
