@@ -41,3 +41,13 @@ packages to install:
 
 pip install astropy
 
+repalce veloce_reduction.veloce_reduction with veloce_reduction
+
+or else modules in veloce_reduction subdir wont work
+
+pip install scipy
+
+pip install matplotlib
+
+pip install lmfit
+
