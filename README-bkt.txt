@@ -57,4 +57,6 @@ pip install astroquery
 
 pip install barycorrpy
 
+yum install python-matplotlib - for python2
+
 
