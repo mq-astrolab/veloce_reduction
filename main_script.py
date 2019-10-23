@@ -5,6 +5,7 @@ Created on 25 Jul. 2018
 '''
 
 import sys
+sys.path.append("/home/astrolab/codestore/veloce_reduction/")
 sys.path.append("/home/astrolab/codestore/veloce_reduction/veloce_reduction/")
 
 
