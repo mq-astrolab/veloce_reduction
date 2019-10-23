@@ -10,11 +10,11 @@ import datetime
 import astropy.io.fits as pyfits
 import os
 
-from veloce_reduction.veloce_reduction.helper_functions import fibmodel_with_amp, make_norm_profiles_6, short_filenames
-from veloce_reduction.veloce_reduction.spatial_profiles import fit_single_fibre_profile
-from veloce_reduction.veloce_reduction.linalg import linalg_extract_column
-from veloce_reduction.veloce_reduction.order_tracing import flatten_single_stripe, flatten_single_stripe_from_indices, extract_stripes
-from veloce_reduction.veloce_reduction.relative_intensities import get_relints
+from veloce_reduction.helper_functions import fibmodel_with_amp, make_norm_profiles_6, short_filenames
+from veloce_reduction.spatial_profiles import fit_single_fibre_profile
+from veloce_reduction.linalg import linalg_extract_column
+from veloce_reduction.order_tracing import flatten_single_stripe, flatten_single_stripe_from_indices, extract_stripes
+from veloce_reduction.relative_intensities import get_relints
 
 
 

@@ -9,8 +9,8 @@ import glob
 import astropy.io.fits as pyfits
 import numpy as np
 
-from veloce_reduction.veloce_reduction.helper_functions import laser_on, thxe_on
-from veloce_reduction.veloce_reduction.calibration import correct_for_bias_and_dark_from_filename
+from veloce_reduction.helper_functions import laser_on, thxe_on
+from veloce_reduction.calibration import correct_for_bias_and_dark_from_filename
 
 #path = '/Users/christoph/UNSW/veloce_spectra/test1/'
 

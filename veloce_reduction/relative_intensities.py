@@ -16,9 +16,9 @@ import scipy.optimize as op
 # from lmfit.models import *
 # from lmfit.minimizer import *
 
-from veloce_reduction.veloce_reduction.linalg import linalg_extract_column
-from veloce_reduction.veloce_reduction.helper_functions import make_norm_profiles_2, central_parts_of_mask, CMB_pure_gaussian
-from veloce_reduction.veloce_reduction.order_tracing import flatten_single_stripe, flatten_single_stripe_from_indices
+from veloce_reduction.linalg import linalg_extract_column
+from veloce_reduction.helper_functions import make_norm_profiles_2, central_parts_of_mask, CMB_pure_gaussian
+from veloce_reduction.order_tracing import flatten_single_stripe, flatten_single_stripe_from_indices
 
 
 

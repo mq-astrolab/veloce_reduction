@@ -7,8 +7,8 @@ import numpy as np
 from readcol import readcol
 import glob
 
-from veloce_reduction.veloce_reduction.get_info_from_headers import get_obstype_lists
-from veloce_reduction.veloce_reduction.helper_functions import short_filenames
+from veloce_reduction.get_info_from_headers import get_obstype_lists
+from veloce_reduction.helper_functions import short_filenames
 
 # starnames = ['HD10700', 'HD190248', 'Gl87', 'GJ1132', 'GJ674', 'HD194640', 'HD212301']
 

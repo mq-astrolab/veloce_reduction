@@ -12,8 +12,8 @@ import scipy.interpolate as interp
 from scipy import ndimage
 import barycorrpy
 
-from veloce_reduction.veloce_reduction.barycentric_correction import get_bc_from_gaia
-from veloce_reduction.veloce_reduction.wavelength_solution import interpolate_dispsols
+from veloce_reduction.barycentric_correction import get_bc_from_gaia
+from veloce_reduction.wavelength_solution import interpolate_dispsols
 
 
 

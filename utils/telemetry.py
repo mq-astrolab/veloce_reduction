@@ -13,8 +13,8 @@ import glob
 import astropy.io.fits as pyfits
 import os
 
-from veloce_reduction.veloce_reduction.lfc_peaks import find_affine_transformation_matrix, divide_lfc_peaks_into_orders
-from veloce_reduction.veloce_reduction.helper_functions import find_nearest
+from veloce_reduction.lfc_peaks import find_affine_transformation_matrix, divide_lfc_peaks_into_orders
+from veloce_reduction.helper_functions import find_nearest
 
 
 def telemetry():

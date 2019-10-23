@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 # import astropy.io.fits as pyfits
 
 from readcol import readcol
-from veloce_reduction.veloce_reduction.helper_functions import find_nearest
+from veloce_reduction.helper_functions import find_nearest
 
 
 

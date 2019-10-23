@@ -18,16 +18,16 @@ import datetime
 import copy
 import os
 
-from veloce_reduction.veloce_reduction.get_info_from_headers import get_obstype_lists
-from veloce_reduction.veloce_reduction.helper_functions import short_filenames, laser_on, thxe_on
-from veloce_reduction.veloce_reduction.calibration import correct_for_bias_and_dark_from_filename, get_bias_and_readnoise_from_bias_frames, make_master_calib, \
+from veloce_reduction.get_info_from_headers import get_obstype_lists
+from veloce_reduction.helper_functions import short_filenames, laser_on, thxe_on
+from veloce_reduction.calibration import correct_for_bias_and_dark_from_filename, get_bias_and_readnoise_from_bias_frames, make_master_calib, \
 make_ronmask, make_master_bias_from_coeffs, make_master_dark, correct_orientation, crop_overscan_region
-from veloce_reduction.veloce_reduction.order_tracing import find_stripes, make_P_id, make_mask_dict, extract_stripes, make_order_traces_from_fibparms
-# from veloce_reduction.veloce_reduction.spatial_profiles import fit_profiles, fit_profiles_from_indices
-from veloce_reduction.veloce_reduction.profile_tests import fit_multiple_profiles_from_indices
-from veloce_reduction.veloce_reduction.get_profile_parameters import make_real_fibparms_by_ord, combine_fibparms
-from veloce_reduction.veloce_reduction.chipmasks import make_chipmask
-from veloce_reduction.veloce_reduction.extraction import extract_spectrum_from_indices
+from veloce_reduction.order_tracing import find_stripes, make_P_id, make_mask_dict, extract_stripes, make_order_traces_from_fibparms
+# from veloce_reduction.spatial_profiles import fit_profiles, fit_profiles_from_indices
+from veloce_reduction.profile_tests import fit_multiple_profiles_from_indices
+from veloce_reduction.get_profile_parameters import make_real_fibparms_by_ord, combine_fibparms
+from veloce_reduction.chipmasks import make_chipmask
+from veloce_reduction.extraction import extract_spectrum_from_indices
 from process_scripts import process_whites, process_science_images
 
 

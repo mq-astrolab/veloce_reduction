@@ -4,11 +4,11 @@ import astropy.io.fits as pyfits
 import matplotlib.pyplot as plt
 from readcol import readcol
 
-from veloce_reduction.veloce_reduction.wavelength_solution import get_dispsol_for_all_fibs, get_dispsol_for_all_fibs_2
-from veloce_reduction.veloce_reduction.get_radial_velocity import get_RV_from_xcorr, get_RV_from_xcorr_2, make_ccfs
-from veloce_reduction.veloce_reduction.helper_functions import get_mean_snr
-from veloce_reduction.veloce_reduction.flat_fielding import onedim_pixtopix_variations, deblaze_orders
-from veloce_reduction.veloce_reduction.barycentric_correction import get_barycentric_correction
+from veloce_reduction.wavelength_solution import get_dispsol_for_all_fibs, get_dispsol_for_all_fibs_2
+from veloce_reduction.get_radial_velocity import get_RV_from_xcorr, get_RV_from_xcorr_2, make_ccfs
+from veloce_reduction.helper_functions import get_mean_snr
+from veloce_reduction.flat_fielding import onedim_pixtopix_variations, deblaze_orders
+from veloce_reduction.barycentric_correction import get_barycentric_correction
 
 
 ########################################################################################################################

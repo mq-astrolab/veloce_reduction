@@ -11,7 +11,7 @@ import time
 import os
 import matplotlib.pyplot as plt
 
-from veloce_reduction.veloce_reduction.helper_functions import get_iterable, find_nearest, get_datestring
+from veloce_reduction.helper_functions import get_iterable, find_nearest, get_datestring
 
 #from matplotlib.cm import cmap_d
 from plotting_helpers import circles

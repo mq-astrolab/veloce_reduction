@@ -6,7 +6,7 @@ Created on 15 Jun. 2018
 
 import numpy as np
 
-from veloce_reduction.veloce_reduction.helper_functions import find_nearest, CMB_pure_gaussian
+from veloce_reduction.helper_functions import find_nearest, CMB_pure_gaussian
 
 
 

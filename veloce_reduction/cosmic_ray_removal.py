@@ -12,7 +12,7 @@ import astropy.io.fits as pyfits
 from scipy.signal import medfilt
 import matplotlib.pyplot as plt
 
-from veloce_reduction.veloce_reduction.helper_functions import sigma_clip
+from veloce_reduction.helper_functions import sigma_clip
 
 # imgname = '/Users/christoph/UNSW/cosmics/image.fit'
 # img = pyfits.getdata(imgname)
