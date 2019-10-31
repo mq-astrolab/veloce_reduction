@@ -91,11 +91,11 @@ del dumimg
 
 
 # (1) BAD PIXEL MASK ################################################################################################################################
-bpm_list = glob.glob(path + '*bad_pixel_mask*')
+#bpm_list = glob.glob(path + '*bad_pixel_mask*')
 #read most recent bad pixel mask
-bpm_dates = [x[-12:-4] for x in bpm_list]
-most_recent_datestring = sorted(bpm_dates)[-1]
-bad_pixel_mask = np.load(path + 'bad_pixel_mask_' + most_recent_datestring + '.npy')
+#bpm_dates = [x[-12:-4] for x in bpm_list]
+#most_recent_datestring = sorted(bpm_dates)[-1]
+#bad_pixel_mask = np.load(path + 'bad_pixel_mask_' + most_recent_datestring + '.npy')
 
 # update the pixel mask
 #blablabla
@@ -104,7 +104,7 @@ bad_pixel_mask = np.load(path + 'bad_pixel_mask_' + most_recent_datestring + '.n
 now = datetime.datetime.now()
 dumstring = str(now)[:10].split('-')
 datestring = ''.join(dumstring)
-np.save(path+'bad_pixel_mask_'+datestring+'.npy', bad_pixel_mask)
+#np.save(path+'bad_pixel_mask_'+datestring+'.npy', bad_pixel_mask)
 #####################################################################################################################################################
 
 
