@@ -82,6 +82,7 @@ path = '/data/veloce/to_process/'
 # stellar_list = glob.glob(path + 'Light*.fits')
 ###END TEMP###
 acq_list, bias_list, dark_list, flat_list, skyflat_list, domeflat_list, arc_list, thxe_list, laser_list, laser_and_thxe_list, stellar_list, unknown_list = get_obstype_lists_temp(path)
+print(bias_list)
 obsnames = short_filenames(stellar_list)
 dumimg = crop_overscan_region(correct_orientation(pyfits.getdata(stellar_list[0])))
 ny,nx = dumimg.shape
