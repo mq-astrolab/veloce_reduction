@@ -233,26 +233,26 @@ def get_flux_and_variance_pairs(imglist, MB, MD=None, scalable=True, simu=False,
                 img2 = img2 - MD
         
         #take difference and do sigma-clipping
-        # diff = img1.astype(long) - img2.astype(long)
+        # diff = img1.astype(int) - img2.astype(int)
         med1_q1 = np.nanmedian(img1[q1])
         med2_q1 = np.nanmedian(img2[q1])
         r_q1 = med1_q1 / med2_q1
-        diff_q1 = img1[q1].astype(long) - r_q1 * img2[q1].astype(long)
+        diff_q1 = img1[q1].astype(int) - r_q1 * img2[q1].astype(int)
         var_q1 = (np.nanstd(sigma_clip(diff_q1, 5))/np.sqrt(2))**2
         med1_q2 = np.nanmedian(img1[q2])
         med2_q2 = np.nanmedian(img2[q2])
         r_q2 = med1_q2 / med2_q2
-        diff_q2 = img1[q2].astype(long) - r_q2 * img2[q2].astype(long)
+        diff_q2 = img1[q2].astype(int) - r_q2 * img2[q2].astype(int)
         var_q2 = (np.nanstd(sigma_clip(diff_q2, 5)) / np.sqrt(2)) ** 2
         med1_q3 = np.nanmedian(img1[q3])
         med2_q3 = np.nanmedian(img2[q3])
         r_q3 = med1_q3 / med2_q3
-        diff_q3 = img1[q3].astype(long) - r_q3 * img2[q3].astype(long)
+        diff_q3 = img1[q3].astype(int) - r_q3 * img2[q3].astype(int)
         var_q3 = (np.nanstd(sigma_clip(diff_q3, 5)) / np.sqrt(2)) ** 2
         med1_q4 = np.nanmedian(img1[q4])
         med2_q4 = np.nanmedian(img2[q4])
         r_q4 = med1_q4 / med2_q4
-        diff_q4 = img1[q4].astype(long) - r_q4 * img2[q4].astype(long)
+        diff_q4 = img1[q4].astype(int) - r_q4 * img2[q4].astype(int)
         var_q4 = (np.nanstd(sigma_clip(diff_q4, 5)) / np.sqrt(2)) ** 2
 
         #fill output arrays
@@ -592,7 +592,7 @@ def get_bias_and_readnoise_from_bias_frames(bias_list, degpol=5, clip=5, gain=No
         img2 = crop_overscan_region(img2)
 
         # take difference and do sigma-clipping
-        diff = img1.astype(long) - img2.astype(long)
+        diff = img1.astype(int) - img2.astype(int)
         sigs_q1.append(np.nanstd(sigma_clip(diff[q1], 5))/np.sqrt(2))
         sigs_q2.append(np.nanstd(sigma_clip(diff[q2], 5))/np.sqrt(2))
         sigs_q3.append(np.nanstd(sigma_clip(diff[q3], 5))/np.sqrt(2))
@@ -770,7 +770,7 @@ def old_get_bias_and_readnoise_from_bias_frames(bias_list, degpol=5, clip=5, gai
         img2 = crop_overscan_region(img2)
 
         #take difference and do sigma-clipping
-        diff = img1.astype(long) - img2.astype(long)
+        diff = img1.astype(int) - img2.astype(int)
         sigs_q1.append(np.nanstd(sigma_clip(diff[q1], 5))/np.sqrt(2))
         sigs_q2.append(np.nanstd(sigma_clip(diff[q2], 5))/np.sqrt(2))
         sigs_q3.append(np.nanstd(sigma_clip(diff[q3], 5))/np.sqrt(2))
