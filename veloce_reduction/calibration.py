@@ -616,14 +616,17 @@ def get_bias_and_readnoise_from_bias_frames(bias_list, degpol=5, clip=5, gain=No
     x_norm = (XX_q1.flatten() / ((len(xq1)-1)/2.)) - 1.
     y_norm = (YY_q1.flatten() / ((len(yq1)-1)/2.)) - 1.
     
+    print("start proc q1")
     # Quadrant 1
     medimg_q1 = clean_medimg[:int(ny/2), :int(nx/2)]
     # clean this, otherwise the surface fit will be rubbish
     medimg_q1[np.abs(medimg_q1 - np.median(medians_q1)) > clip * np.median(sigs_q1)] = np.median(medians_q1)
     coeffs_q1 = polyfit2d(x_norm, y_norm, medimg_q1.flatten(), order=degpol)
     
+    print("end proc q1")
+    
     # Quadrant 2
-    medimg_q2 = clean_medimg[:(ny/2), (nx/2):]
+    medimg_q2 = clean_medimg[:int(ny/2), int(nx/2):]
     # clean this, otherwise the surface fit will be rubbish
     medimg_q2[np.abs(medimg_q2 - np.median(medians_q2)) > clip * np.median(sigs_q2)] = np.median(medians_q2)
 #     xq2 = np.arange((nx/2),nx)
@@ -634,13 +637,13 @@ def get_bias_and_readnoise_from_bias_frames(bias_list, degpol=5, clip=5, gain=No
     coeffs_q2 = polyfit2d(x_norm, y_norm, medimg_q2.flatten(), order=degpol)
     
     # Quadrant 3
-    medimg_q3 = clean_medimg[(ny/2):, (nx/2):]
+    medimg_q3 = clean_medimg[int(ny/2):, int(nx/2):]
     # clean this, otherwise the surface fit will be rubbish
     medimg_q3[np.abs(medimg_q3 - np.median(medians_q3)) > clip * np.median(sigs_q3)] = np.median(medians_q3)
     coeffs_q3 = polyfit2d(x_norm, y_norm, medimg_q3.flatten(), order=degpol)
     
     # Quadrant 4
-    medimg_q4 = clean_medimg[(ny/2):, :(nx/2)]
+    medimg_q4 = clean_medimg[int(ny/2):, :int(nx/2)]
     # clean this, otherwise the surface fit will be rubbish
     medimg_q4[np.abs(medimg_q4 - np.median(medians_q4)) > clip * np.median(sigs_q4)] = np.median(medians_q4)
     coeffs_q4 = polyfit2d(x_norm, y_norm, medimg_q4.flatten(), order=degpol)
