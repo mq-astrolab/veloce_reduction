@@ -72,3 +72,9 @@ comment out bad pixel mask in main_script, doesn't look like the npy that is loa
 reduced bias frames to 5 fits file
 
 make medbias array int() in line 620 of calibration.py
+
+code is running out of memory ont he poly2d fit step
+
+increased the VM memory to 8 gig
+
+update more int type index issues
