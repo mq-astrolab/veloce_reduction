@@ -617,7 +617,7 @@ def get_bias_and_readnoise_from_bias_frames(bias_list, degpol=5, clip=5, gain=No
     y_norm = (YY_q1.flatten() / ((len(yq1)-1)/2.)) - 1.
     
     # Quadrant 1
-    medimg_q1 = clean_medimg[:(ny/2), :(nx/2)]
+    medimg_q1 = clean_medimg[:int(ny/2), :int(nx/2)]
     # clean this, otherwise the surface fit will be rubbish
     medimg_q1[np.abs(medimg_q1 - np.median(medians_q1)) > clip * np.median(sigs_q1)] = np.median(medians_q1)
     coeffs_q1 = polyfit2d(x_norm, y_norm, medimg_q1.flatten(), order=degpol)

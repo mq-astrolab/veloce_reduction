@@ -60,3 +60,15 @@ pip install barycorrpy
 yum install python-matplotlib - for python2
 
 
+issue with overcommit memory allocation
+
+to fix, echo 1 > /proc/sys/vm/overcommit_memory
+
+also change instances of long to init for python3
+
+comment out bad pixel mask in main_script, doesn't look like the npy that is loaded is used later on
+
+
+reduced bias frames to 5 fits file
+
+make medbias array int() in line 620 of calibration.py
