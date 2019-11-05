@@ -78,3 +78,14 @@ code is running out of memory ont he poly2d fit step
 increased the VM memory to 8 gig
 
 update more int type index issues
+
+use only 5 bias and 5 flats
+
+full set of bias ran out of memory at 4 gb
+
+still running out of memory, create a 32 GB swap in /data
+
+conflicting
+
+no P_id is provided but bg_remove is set to true in process_whites
+

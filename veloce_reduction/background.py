@@ -264,11 +264,14 @@ def extract_background_pid(img, P_id, slit_height=25, return_mask=False, exclude
 #     logging.info('Extracting background...')
     print('Extracting background...')
 
-    ny, nx = img.shape
+    ny=img.shape[1]
+    nx=img.shape[2]
+    #ny, nx = img.shape
     xx = np.arange(nx, dtype='f8')
     yy = np.arange(ny, dtype='f8')
     x_grid, y_grid = np.meshgrid(xx, yy, copy=False)
     bg_mask = np.ones((ny, nx), dtype=bool)
+
 
     for o, p in sorted(P_id.items()):
         
