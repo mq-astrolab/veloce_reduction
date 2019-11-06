@@ -89,3 +89,5 @@ conflicting
 
 no P_id is provided but bg_remove is set to true in process_whites
 
+try just one white flats
+

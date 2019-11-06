@@ -85,6 +85,7 @@ acq_list, bias_list, dark_list, flat_list, skyflat_list, domeflat_list, arc_list
 #print(flat_list)
 obsnames = short_filenames(stellar_list)
 dumimg = crop_overscan_region(correct_orientation(pyfits.getdata(stellar_list[0])))
+print(dumimg.shape)
 ny,nx = dumimg.shape
 del dumimg
 #####################################################################################################################################################

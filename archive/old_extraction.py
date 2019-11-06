@@ -326,7 +326,7 @@ def optimal_extraction(stripes, err_stripes=None, nfib=28, RON=0., gain=1., slit
     pix = {}
     
     #loop over all orders
-    for ord in sorted(stripes.iterkeys()):
+    for ord in sorted(stripes.keys()):
         if debug_level > 0:
             print('Processing order '+ord)
         if timit:
@@ -546,7 +546,7 @@ def optimal_extraction_from_indices(img, stripe_indices, err_img=None, nfib=28, 
     pix = {}
     
     #loop over all orders
-    for ord in sorted(stripe_indices.iterkeys()):
+    for ord in sorted(stripe_indices.keys()):
         if debug_level > 0:
             print('Processing order '+ord)
         if timit:

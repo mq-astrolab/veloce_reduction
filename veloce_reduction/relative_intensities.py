@@ -410,7 +410,7 @@ def get_relints(P_id, stripes, err_stripes, mask=None, sampling_size=25, slit_he
         cenmask = central_parts_of_mask(mask)
         
     #loop over all orders
-    for ord in sorted(P_id.iterkeys()):
+    for ord in sorted(P_id.keys()):
         print('OK, now processing '+str(ord))
         
         #fibre profile parameters for that order
@@ -532,7 +532,7 @@ def get_relints_from_indices(P_id, img, err_img, stripe_indices, mask=None, samp
         cenmask = central_parts_of_mask(mask)
         
     #loop over all orders
-    for ord in sorted(P_id.iterkeys()):
+    for ord in sorted(P_id.keys()):
         print('OK, now processing '+str(ord))
         
         #fibre profile parameters for that order
@@ -893,7 +893,7 @@ def get_relints_from_indices_gaussian(P_id, img, err_img, stripe_indices, mask=N
         cenmask = central_parts_of_mask(mask)
 
     # loop over all orders
-    for ord in sorted(P_id.iterkeys()):
+    for ord in sorted(P_id.keys()):
         print('OK, now processing ' + str(ord))
 
         # # fibre profile parameters for that order

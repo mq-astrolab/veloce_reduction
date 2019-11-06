@@ -45,15 +45,28 @@ def find_stripes(flat, deg_polynomial=2, gauss_filter_sigma=3., min_peak=0.05, m
     if timit:
         start_time = time.time()
     
+    
     #logging.info('Finding stripes...')
     print("Finding stripes...")
-    ny, nx = flat.shape
+    #ny, nx = flat.shape
+    ny = flat.shape[1]
+    nx = flat.shape[2]
+
+    temp_flat=flat[0]
 
     # smooth image slightly for noise reduction
-    filtered_flat = ndimage.gaussian_filter(flat.astype(np.float), gauss_filter_sigma)
-    
+    #filtered_flat = ndimage.gaussian_filter(flat.astype(np.float), gauss_filter_sigma)
+    filtered_flat = ndimage.gaussian_filter(temp_flat.astype(np.float), gauss_filter_sigma)
+
+
     # find peaks in center column
+    #data = filtered_flat[:, int(nx / 2)]
     data = filtered_flat[:, int(nx / 2)]
+
+
+    print(ny)
+    print(nx)
+    print(data.shape)
     peaks = np.r_[True, data[1:] > data[:-1]] & np.r_[data[:-1] > data[1:], True]
     #troughs = np.r_[True, data[1:] < data[:-1]] & np.r_[data[:-1] < data[1:], True]
 
@@ -435,7 +448,13 @@ def extract_single_stripe(img, p, slit_height=25, return_indices=False, indonly=
     
     #start_time = time.time()
     
+    #print(img.shape)
+    
+    img=img[0,:,:]
+
     ny, nx = img.shape
+    #ny = img.shape[1]
+    #nx = img.shape[2]
     #xx = np.arange(nx, dtype=img.dtype)
     xx = np.arange(nx, dtype='f8')
     #yy = np.arange(ny, dtype=img.dtype)
@@ -846,7 +865,7 @@ def find_tramlines(fp_uu, fp_ul, fp_lu, fp_ll, mask_uu, mask_ul, mask_lu, mask_l
     
     tramlines = {}
     
-    for ord in sorted(fp_uu.iterkeys()):
+    for ord in sorted(fp_uu.keys()):
         uu = np.array(fp_uu[ord]['mu'])
         ul = np.array(fp_ul[ord]['mu'])
         lu = np.array(fp_lu[ord]['mu'])
@@ -914,7 +933,7 @@ def find_laser_tramlines(fp, mask, debug_level=0, timit=False):
     
     tramlines = {}
     
-    for ord in sorted(fp.iterkeys()):
+    for ord in sorted(fp.keys()):
         mu = np.array(fp[ord]['mu'])
         upper_boundary, lower_boundary = find_laser_tramlines_single_order(mu, mask[ord])
         tramlines[ord] = {'upper_boundary':upper_boundary, 'lower_boundary':lower_boundary}

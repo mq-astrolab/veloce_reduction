@@ -3107,7 +3107,7 @@ def WIP():
     #     thar_dispsol = {}
     #
     #     #loop over all orders
-    #     #for ord in sorted(thardata['flux'].iterkeys()):
+    #     #for ord in sorted(thardata['flux'].keys()):
     #     for ord in ['order_01']:
     #
     #         if verbose:
@@ -3179,7 +3179,7 @@ def WIP():
     #
     #     #loop over all orders
     #     #order 43 does not work properly, as some laser peaks are missing!!!
-    #     for ord in sorted(laserdata['flux'].iterkeys())[:-1]:
+    #     for ord in sorted(laserdata['flux'].keys())[:-1]:
     #
     #         if verbose:
     #             print('Finding wavelength solution for '+str(ord))
