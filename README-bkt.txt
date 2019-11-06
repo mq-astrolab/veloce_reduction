@@ -91,3 +91,11 @@ no P_id is provided but bg_remove is set to true in process_whites
 
 try just one white flats
 
+fix iterkeys to keys for python3 compatibility
+
+in ordertracing
+
+do
+img=img[0,:,:]
+
+for extract_single_stripe function
