@@ -622,6 +622,8 @@ def flatten_single_stripe(stripe, slit_height=25, timit=False):
                 #now, because the valid pixels are supposed to be at the bottom of the cutout, we need to roll them to the end
                 if ct != (2*slit_height):
                     flux = np.zeros(2*slit_height) - 1.     #negative flux can be used to identify these pixels later
+                    print(flux_temp.shape)
+                    print(flux_temp)
                     flux[0:ct] = flux_temp
                     flux = np.roll(flux,2*slit_height - ct)
                     rownum = np.zeros(2*slit_height,dtype='int32')    #zeroes can be used to identify these pixels later
@@ -638,7 +640,7 @@ def flatten_single_stripe(stripe, slit_height=25, timit=False):
         #parts of order missing on RIGHT side of chip?
         elif contents[1][-1] != nx-1:
             print('some parts of the order are missing on RIGHT side of chip...NIGHTMARE, THIS HAS NOT BEEN IMPLEMENTED YET') 
-            quit()
+            #quit()
 #             for i in col_values:
 #                 #is there a value for all pixels across the i-th cutout?
 #                 if i == np.max(col_values):
@@ -685,7 +687,7 @@ def flatten_single_stripe(stripe, slit_height=25, timit=False):
         #parts of order missing at the bottom?
         elif np.min(contents[0]) == 0:
             print('some parts of the order are missing on at the BOTTOM of the chip...NIGHTMARE, THIS HAS NOT BEEN IMPLEMENTED YET') 
-            quit()
+            #quit()
         
     else:    
         #this is the "normal", easy part, where all (2*slit_height,4096) pixels of the stripe lie on the CCD 
